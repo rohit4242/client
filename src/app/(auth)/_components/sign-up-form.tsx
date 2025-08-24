@@ -4,6 +4,7 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import Image from "next/image";
 
 import { authClient } from "@/lib/auth-client";
 import { z } from "zod";
@@ -71,7 +72,7 @@ export function SignUpForm({
 
   const onSubmit = async (values: z.infer<typeof formSchema>) => {
     setError(null);
-    const { error } = await authClient.signUp.email(
+    await authClient.signUp.email(
       {
         email: values.email,
         password: values.password,
@@ -79,12 +80,12 @@ export function SignUpForm({
         callbackURL: "/dashboard",
       },
       {
-        onRequest: (ctx) => {
+        onRequest: () => {
           toast.loading("Signing up...", {
             id: "signup-toast",
           });
         },
-        onSuccess: (ctx) => {
+        onSuccess: () => {
           router.push("/dashboard");
           toast.success("Sign up successful", {
             id: "signup-toast",
@@ -108,7 +109,7 @@ export function SignUpForm({
         callbackURL: "/dashboard",
       },
       {
-        onSuccess: (ctx) => {
+        onSuccess: () => {
           toast.success("Sign up successful", {
             id: "signup-toast",
           });
@@ -278,7 +279,7 @@ export function SignUpForm({
             </form>
           </Form>
           <div className="bg-gradient-to-br from-blue-500 via-blue-600 to-cyan-600 relative hidden md:flex justify-center items-center flex-col gap-y-4">
-            <img src="/logo.svg" alt="Image" className="h-[120px] w-[120px]" />
+            <Image src="/logo.svg" alt="Bytik Logo" width={120} height={120} />
             <p className="text-white font-semibold text-2xl">Bytik</p>
           </div>
         </CardContent>

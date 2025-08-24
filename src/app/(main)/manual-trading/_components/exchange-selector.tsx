@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import React from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -15,8 +15,8 @@ import { RefreshCw } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { useQuery } from "@tanstack/react-query";
 import { getExchanges } from "@/db/actions/exchange/get-exchanges";
-import { Exchange } from "@/db/schema/exchange";
-import { Skeleton } from "@/components/ui/skeleton";
+import { Exchange } from "@/types/exchange";
+
 import { Spinner } from "@/components/spinner";
 
 interface ExchangeSelectorProps {

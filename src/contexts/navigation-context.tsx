@@ -1,6 +1,6 @@
 "use client"
 
-import React, { createContext, useContext, useMemo } from "react";
+import React, { createContext, useContext, useMemo, useCallback } from "react";
 import { usePathname } from "next/navigation";
 import { 
   navigationConfig, 
@@ -45,10 +45,10 @@ export function NavigationProvider({ children }: { children: React.ReactNode }) 
     return items;
   }, [pathname]);
 
-  const isActiveRoute = (url: string) => {
+  const isActiveRoute = useCallback((url: string) => {
     if (url === "/") return pathname === "/";
     return pathname.startsWith(url);
-  };
+  }, [pathname]);
 
   const value = useMemo(() => ({
     currentRoute,
@@ -56,7 +56,7 @@ export function NavigationProvider({ children }: { children: React.ReactNode }) 
     isActiveRoute,
     pathname,
     navigationConfig,
-  }), [currentRoute, breadcrumbs, pathname]);
+  }), [currentRoute, breadcrumbs, isActiveRoute, pathname]);
 
   return (
     <NavigationContext.Provider value={value}>

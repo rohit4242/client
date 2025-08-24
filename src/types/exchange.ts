@@ -8,10 +8,10 @@ export interface Exchange {
   apiSecret: string;
   isActive: boolean;
   positionMode: "OneWay" | "Hedge";
-  totalValue: number | null; // Decimal from Prisma
-  lastSyncedAt: Date | null;
-  createdAt: Date;
-  updatedAt: Date;
+  totalValue: number | null; // Decimal from Prisma converted to number
+  lastSyncedAt: string | null; // Date converted to ISO string for client compatibility
+  createdAt: string; // Date converted to ISO string for client compatibility
+  updatedAt: string; // Date converted to ISO string for client compatibility
 }
 
 export interface CreateExchangeData {

@@ -68,8 +68,23 @@ const navigationItems = [
 
 export function SearchCommand() {
   const [open, setOpen] = React.useState(false)
-  const [positions, setPositions] = useState<any[]>([])
-  const [exchanges, setExchanges] = useState<any[]>([])
+  const [positions, setPositions] = useState<Array<{
+    id: string;
+    symbol: string;
+    side: string;
+    status: string;
+    quantity: number;
+    entryPrice: number;
+    unrealizedPnl?: number;
+    realizedPnl?: number;
+  }>>([])
+  const [exchanges, setExchanges] = useState<Array<{
+    id: string;
+    name: string;
+    accountName: string;
+    isTestnet?: boolean;
+    isEnabled?: boolean;
+  }>>([])
   const [loading, setLoading] = useState(false)
   const router = useRouter()
 
@@ -77,7 +92,7 @@ export function SearchCommand() {
     if (open && !loading) {
       fetchSearchData()
     }
-  }, [open])
+  }, [open, loading])
 
   const fetchSearchData = async () => {
     setLoading(true)

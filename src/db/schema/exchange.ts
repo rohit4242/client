@@ -22,7 +22,7 @@ export const updateExchangeSchema = z.object({
 export const exchangeSchema = z.object({
   id: z.string(),
   name: z.string(),
-  accountName: z.string(),
+  accountName: z.string().nullable(),
   apiKey: z.string(),
   apiSecret: z.string(),
   positionMode: z.enum(["OneWay", "Hedge"]),

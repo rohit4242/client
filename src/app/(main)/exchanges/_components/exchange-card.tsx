@@ -102,7 +102,7 @@ export function ExchangeCard({
         </div>
       </TableCell>
       <TableCell className="text-sm text-muted-foreground">
-        {formatDate(exchange.lastSyncedAt)}
+        {formatDate(exchange.lastSyncedAt ? new Date(exchange.lastSyncedAt) : null)}
       </TableCell>
       <TableCell>
         <div className="flex items-center space-x-2">
