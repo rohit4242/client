@@ -1,14 +1,18 @@
 import axios from "axios";
-import { Exchange } from "@/db/schema/exchange";
 import { AssetPrice } from "@/types/trading";
 
 interface GetPriceResponse {
   price: AssetPrice | null;
 }
 
+interface ExchangeCredentials {
+  apiKey: string;
+  apiSecret: string;
+}
+
 export const getPrice = async (
   symbol: string,
-  exchange: Exchange
+  exchange: ExchangeCredentials
 ): Promise<GetPriceResponse | null> => {
   if (!symbol || !exchange?.apiKey || !exchange?.apiSecret) {
     return null;

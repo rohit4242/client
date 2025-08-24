@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from "react";
-import { Exchange } from "@/db/schema/exchange";
+import { Exchange } from "@/types/exchange";
 import { AssetData, LivePriceConfig, DEFAULT_LIVE_PRICE_CONFIG } from "@/types/trading";
 import { getAsset } from "@/db/actions/assets/get-asset";
 import { getPrice } from "@/db/actions/assets/get-price";

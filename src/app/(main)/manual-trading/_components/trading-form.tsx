@@ -10,7 +10,7 @@ import {
   TradingFormData,
   TradingFormSchema,
 } from "@/db/schema/order";
-import { Exchange } from "@/db/schema/exchange";
+import { Exchange } from "@/types/exchange";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {

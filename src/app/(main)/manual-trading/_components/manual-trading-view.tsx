@@ -1,6 +1,6 @@
 "use client";
 
-import { Exchange } from "@/db/schema/exchange";
+import { Exchange } from "@/types/exchange";
 import { ExchangeSelector } from "./exchange-selector";
 import { useState } from "react";
 import { TradingForm } from "./trading-form";

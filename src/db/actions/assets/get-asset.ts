@@ -1,14 +1,18 @@
 import axios from "axios";
-import { Exchange } from "@/db/schema/exchange";
 import { AssetBalance } from "@/types/trading";
 
 interface GetAssetResponse {
   asset: AssetBalance | null;
 }
 
+interface ExchangeCredentials {
+  apiKey: string;
+  apiSecret: string;
+}
+
 export const getAsset = async (
   symbol: string, 
-  exchange: Exchange
+  exchange: ExchangeCredentials
 ): Promise<GetAssetResponse | null> => {
   if (!symbol || !exchange?.apiKey || !exchange?.apiSecret) {
     return null;
