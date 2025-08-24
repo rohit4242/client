@@ -1,0 +1,198 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String        @id
+  name          String
+  email         String        @unique
+  emailVerified Boolean
+  image         String?
+  createdAt     DateTime
+  updatedAt     DateTime
+  accounts      Account[]
+  sessions      Session[]
+  userAccounts  UserAccount[]
+
+  @@map("user")
+}
+
+model Session {
+  id        String   @id
+  expiresAt DateTime
+  token     String   @unique
+  createdAt DateTime
+  updatedAt DateTime
+  ipAddress String?
+  userAgent String?
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("session")
+}
+
+model Account {
+  id                    String    @id
+  accountId             String
+  providerId            String
+  userId                String
+  accessToken           String?
+  refreshToken          String?
+  idToken               String?
+  accessTokenExpiresAt  DateTime?
+  refreshTokenExpiresAt DateTime?
+  scope                 String?
+  password              String?
+  createdAt             DateTime
+  updatedAt             DateTime
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("account")
+}
+
+model Verification {
+  id         String    @id
+  identifier String
+  value      String
+  expiresAt  DateTime
+  createdAt  DateTime?
+  updatedAt  DateTime?
+
+  @@map("verification")
+}
+
+model UserAccount {
+  id        String     @id @default(uuid())
+  userId    String
+  name      String     @default("Default Account")
+
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+  
+  exchanges Exchange[]
+  orders    Order[]
+  positions Position[]
+  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("user_account")
+}
+
+model Exchange {
+  id            String       @id @default(uuid())
+  userId        String
+  userAccountId String
+  name          String
+  accountName   String?
+  apiKey        String
+  apiSecret     String
+  isActive      Boolean      @default(true)
+  positionMode  PositionMode @default(OneWay)
+  totalValue    Decimal?     @default(0)
+  lastSyncedAt  DateTime?
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+  userAccount   UserAccount  @relation(fields: [userAccountId], references: [id], onDelete: Cascade)
+
+  @@map("exchange")
+}
+
+model Order {
+  id            String      @id @default(uuid())
+  symbol        String
+  side          OrderSide
+  type          OrderType
+  price         Decimal
+  quantity      Decimal
+  value         Decimal
+  status        OrderStatus
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+  positionId    String?     @unique
+  userAccountId String
+  userAccount   UserAccount @relation(fields: [userAccountId], references: [id], onDelete: Cascade)
+  position      Position?
+
+  @@map("order")
+}
+
+model Position {
+  id               String         @id @default(uuid())
+  userAccountId    String
+  orderId          String?        @unique
+  symbol           String
+  side             PositionSide
+  type             PositionType
+  entryPrice       Decimal
+  quantity         Decimal
+  entryValue       Decimal
+  entryTime        DateTime
+  status           PositionStatus @default(Open)
+  exitPrice        Decimal?
+  exitTime         DateTime?
+  exitValue        Decimal?
+  profit           Decimal?
+  profitPercentage Decimal?
+  leverage         Int?
+  stopLoss         Decimal?
+  takeProfit       Decimal?
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+  order            Order?         @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  userAccount      UserAccount    @relation(fields: [userAccountId], references: [id], onDelete: Cascade)
+  logs             PositionLog[]
+
+  @@map("position")
+}
+
+model PositionLog {
+  id         String   @id @default(uuid())
+  positionId String
+  message    String
+  createdAt  DateTime @default(now())
+  position   Position @relation(fields: [positionId], references: [id], onDelete: Cascade)
+
+  @@map("position_log")
+}
+
+enum OrderType {
+  Market
+  Limit
+  Stop
+}
+
+enum OrderStatus {
+  Pending
+  Filled
+  Canceled
+}
+
+enum OrderSide {
+  Buy
+  Sell
+}
+
+enum PositionSide {
+  Long
+  Short
+}
+
+enum PositionType {
+  Buy
+  Sell
+}
+
+enum PositionStatus {
+  Open
+  Closed
+  Canceled
+}
+
+enum PositionMode {
+  OneWay
+  Hedge
+}
