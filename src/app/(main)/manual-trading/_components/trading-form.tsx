@@ -33,10 +33,12 @@ import {
 // Optimized imports
 import { useAssetData } from "@/hooks/use-asset-data";
 import { useTradingCalculations } from "@/hooks/use-trading-calculations";
+import { useSymbolInfo } from "@/hooks/use-symbol-info";
 import { AssetInfoCard } from "./asset-info-card";
 import { ToggleButtonGroup } from "./toggle-button-group";
-import { PercentageButtons } from "./percentage-buttons";
+import { PercentageSlider } from "./percentage-slider";
 import { ExpandableSection } from "./expandable-section";
+import { ValidationWarnings } from "./validation-warnings";
 import { extractBaseAsset } from "@/lib/utils";
 import { useCreateOrder } from "@/db/actions/order/use-create-order";
 
@@ -68,13 +70,19 @@ export function TradingForm({
     livePriceConfig: { intervalMs: 1000 },
   });
 
+  // Symbol info for exchange filters
+  const { symbolInfo, isLoading: isLoadingSymbolInfo } = useSymbolInfo({
+    symbol: selectedAsset,
+    exchange: selectedExchange,
+  });
+
   // Memoized form configuration
   const form = useForm<TradingFormData>({
     resolver: zodResolver(TradingFormSchema),
     defaultValues: getDefaultValues(orderType),
   });
 
-  // Trading calculations hook
+  // Trading calculations hook with exchange validation
   const {
     maxQuantity,
     handlePercentageSelect,
@@ -84,12 +92,14 @@ export function TradingForm({
     tradingFee,
     totalCost,
     side,
+    exchangeValidation,
     error: calculationError,
   } = useTradingCalculations({
     balance,
     price,
     form,
     feeRate: 0.001, // 0.1% trading fee
+    symbolInfo,
   });
 
   // Memoized toggle options
@@ -204,6 +214,14 @@ export function TradingForm({
                 </div>
               </div>
             )}
+
+            {/* Exchange Filter Validation Warnings */}
+            <ValidationWarnings
+              hasAdjustments={exchangeValidation.hasAdjustments}
+              adjustments={exchangeValidation.allAdjustments}
+              adjustedQuantity={exchangeValidation.adjustedQuantity}
+              originalQuantity={parseFloat(form.watch("quantity") || "0")}
+            />
 
             <FormField
               control={form.control}
@@ -320,14 +338,16 @@ export function TradingForm({
               />
             )}
 
-            {/* Percentage Buttons */}
+            {/* Percentage Slider */}
             {maxQuantity > 0 && (
               <div className="space-y-2">
                 <div className="text-xs text-muted-foreground">
                   Quick Select (Max: {maxQuantity.toFixed(8)}{" "}
                   {extractBaseAsset(selectedAsset)})
                 </div>
-                <PercentageButtons
+                <PercentageSlider
+                  maxQuantity={maxQuantity}
+                  symbolInfo={symbolInfo}
                   onPercentageSelect={handlePercentageSelect}
                 />
               </div>
@@ -400,6 +420,14 @@ export function TradingForm({
               )}
             </div>
 
+            {/* Exchange Info Loading */}
+            {isLoadingSymbolInfo && (
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-current"></div>
+                Loading exchange filters...
+              </div>
+            )}
+
             {/* Enhanced Submit Button */}
             <Button
               type="submit"
@@ -408,7 +436,12 @@ export function TradingForm({
                   ? "bg-teal-600 hover:bg-teal-700"
                   : "bg-rose-600 hover:bg-rose-700"
               }`}
-              disabled={!canTrade || !selectedExchange || isPending}
+              disabled={
+                !canTrade ||
+                !selectedExchange ||
+                isPending ||
+                isLoadingSymbolInfo
+              }
             >
               {isPending ? (
                 <>
@@ -416,7 +449,16 @@ export function TradingForm({
                   Processing...
                 </>
               ) : (
-                `${side === "BUY" ? "BUY" : "SELL"} ${selectedAsset}`
+                <div className="flex flex-col items-center">
+                  <span>{`${
+                    side === "BUY" ? "BUY" : "SELL"
+                  } ${selectedAsset}`}</span>
+                  {exchangeValidation.hasAdjustments && (
+                    <span className="text-xs opacity-80">
+                      (Quantity will be adjusted)
+                    </span>
+                  )}
+                </div>
               )}
             </Button>
           </form>

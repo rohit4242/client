@@ -5,6 +5,7 @@ import { headers } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
 import db from "@/db";
 import { getTradingPairInfo } from "@/db/actions/account/get-trading-pain-info";
+import { validateLotSizeFilter, validateNotionalFilter, SymbolInfo } from "@/lib/trading-calculations";
 
 export async function POST(request: NextRequest) {
   try {
@@ -57,74 +58,70 @@ export async function POST(request: NextRequest) {
     const exchangeInfo = await getTradingPairInfo(order.symbol, exchange);
 
     // Validate quantity against LOT_SIZE filter if exchange info is available
-    let adjustedQuantity = parseFloat(order.quantity || "0");
+    const originalQuantity = parseFloat(order.quantity || "0");
     const adjustedPrice =
       order.type === "LIMIT" ? parseFloat(order.price || "0") : undefined;
+
+    // Find symbol info and validate filters
+    let adjustedQuantity = originalQuantity;
+    let lotSizeValidation = null;
+    let notionalValidation = null;
 
     if (exchangeInfo && exchangeInfo.exchangeInfo?.symbols) {
       const symbolInfo = exchangeInfo.exchangeInfo.symbols.find(
         (s) => s.symbol === order.symbol
-      );
+      ) as SymbolInfo | undefined;
+
       if (symbolInfo) {
-        const lotSizeFilter = symbolInfo.filters?.find(
-          (f) => f.filterType === "LOT_SIZE"
-        );
+        console.log("Symbol filters:", symbolInfo.filters);
 
-        const notionalFilter = symbolInfo.filters?.find(
-          (f) => f.filterType === "NOTIONAL"
-        );
+        // Validate lot size first
+        lotSizeValidation = validateLotSizeFilter(originalQuantity, symbolInfo);
+        adjustedQuantity = lotSizeValidation.adjustedQuantity;
 
-        console.log("filters: ", symbolInfo.filters);
+        // Then validate notional if we have a price
+        if (adjustedPrice && adjustedPrice > 0) {
+          notionalValidation = validateNotionalFilter(
+            adjustedQuantity, 
+            adjustedPrice, 
+            symbolInfo, 
+            order.type
+          );
+          adjustedQuantity = notionalValidation.adjustedQuantity;
+        }
 
-        console.log("notionalFilter: ", notionalFilter);
+        console.log("Filter validation results:", {
+          originalQuantity,
+          adjustedQuantity,
+          lotSizeAdjustments: lotSizeValidation.adjustments,
+          notionalAdjustments: notionalValidation?.adjustments || [],
+          lotSizeValid: lotSizeValidation.isValid,
+          notionalValid: notionalValidation?.isValid ?? true,
+        });
 
-        if (lotSizeFilter) {
-          const minQty = parseFloat(lotSizeFilter.minQty || "0");
-          const maxQty = parseFloat(lotSizeFilter.maxQty || "999999999");
-          const stepSize = parseFloat(lotSizeFilter.stepSize || "1");
+        // Log all adjustments
+        [...(lotSizeValidation.adjustments || []), ...(notionalValidation?.adjustments || [])]
+          .forEach((adjustment) => console.log("Adjustment:", adjustment));
 
-          console.log("LOT_SIZE filter:", {
-            minQty,
-            maxQty,
-            stepSize,
-            originalQuantity: adjustedQuantity,
-          });
+        // Check if any validation failed
+        if (!lotSizeValidation.isValid) {
+          return NextResponse.json(
+            { 
+              error: "Lot size validation failed", 
+              details: lotSizeValidation.error 
+            },
+            { status: 400 }
+          );
+        }
 
-          // Check minimum quantity
-          if (adjustedQuantity < minQty) {
-            console.log(
-              `Quantity ${adjustedQuantity} is below minimum ${minQty}, adjusting to minimum`
-            );
-            adjustedQuantity = minQty;
-          }
-
-          // Check maximum quantity
-          if (adjustedQuantity > maxQty) {
-            console.log(
-              `Quantity ${adjustedQuantity} is above maximum ${maxQty}, adjusting to maximum`
-            );
-            adjustedQuantity = maxQty;
-          }
-
-          // Check step size compliance
-          if (stepSize > 0) {
-            const adjustedFromMin = adjustedQuantity - minQty;
-            const remainder = adjustedFromMin % stepSize;
-
-            if (Math.abs(remainder) > 1e-8) {
-              const steps = Math.round(adjustedFromMin / stepSize);
-              const newQuantity = minQty + steps * stepSize;
-              console.log(
-                `Quantity ${adjustedQuantity} doesn't comply with step size ${stepSize}, adjusting to ${newQuantity}`
-              );
-              adjustedQuantity = Math.max(
-                minQty,
-                Math.min(maxQty, newQuantity)
-              );
-            }
-          }
-
-          console.log("Final adjusted quantity:", adjustedQuantity);
+        if (notionalValidation && !notionalValidation.isValid) {
+          return NextResponse.json(
+            { 
+              error: "Notional validation failed", 
+              details: notionalValidation.error 
+            },
+            { status: 400 }
+          );
         }
       }
     }
@@ -224,7 +221,7 @@ export async function POST(request: NextRequest) {
           console.log("orderParams: ", orderParams);
           const binanceResponseRaw = await client.restAPI.newOrder(orderParams);
           console.log("binanceResponseRaw: ", binanceResponseRaw);
-          const binanceResponse = (await binanceResponseRaw.data) as SpotRestAPI.NewOrderResponse;
+          const binanceResponse = (await binanceResponseRaw.data()) as SpotRestAPI.NewOrderResponse;
 
           console.log("binanceResponse: ", JSON.stringify(binanceResponse));
 
@@ -255,6 +252,9 @@ export async function POST(request: NextRequest) {
             order: updatedOrder,
             binanceResponse,
             message: "Order created successfully",
+            lotSizeAdjustments: lotSizeValidation?.adjustments || [],
+            notionalAdjustments: notionalValidation?.adjustments || [],
+            quantityAdjusted: originalQuantity !== adjustedQuantity,
           });
         } catch (binanceError) {
           console.error("Binance API error:", binanceError);

@@ -2,10 +2,13 @@
 import { DashboardHeader } from "./_components/dashboard-header";
 import { StatsCards } from "./_components/stats-cards";
 import { QuickActions } from "./_components/quick-actions";
+import { PortfolioChart } from "./_components/portfolio-chart";
+import { RecentOrders } from "./_components/recent-orders";
 import { QuickNav } from "../_components/quick-nav";
 import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
+import { generateDashboardStats } from "@/lib/mock-data";
 
 export default async function DashboardPage() {
   
@@ -17,6 +20,9 @@ export default async function DashboardPage() {
     redirect("/sign-in");
   }
 
+  // Generate mock dashboard statistics
+  const stats = generateDashboardStats();
+
   return (
     <div className="space-y-6">
       <DashboardHeader
@@ -25,14 +31,12 @@ export default async function DashboardPage() {
 
       <QuickNav />
 
-      <StatsCards
-        stats={{
-          totalPortfolioValue: 0,
-          totalPnL: 0,
-          totalPnLPercent: 0,
-          openPositions: 0,
-        }}
-      />
+      <StatsCards stats={stats} />
+
+      <div className="grid gap-6 lg:grid-cols-2">
+        <PortfolioChart />
+        <RecentOrders />
+      </div>
 
       <QuickActions />
     </div>

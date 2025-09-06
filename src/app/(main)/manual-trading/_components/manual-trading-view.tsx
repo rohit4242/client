@@ -22,11 +22,13 @@ export default function ManualTradingView() {
   };
 
   return (
-    <div className="flex flex-col gap-4 max-w-sm mx-auto ">
-      <ExchangeSelector
-        onSelect={setSelectedExchange}
-        selectedExchange={selectedExchange}
-      />
+    <div className="flex flex-row gap-4 max-w-2xl mx-auto ">
+      <div className="flex flex-col gap-4 min-w-64">
+        <ExchangeSelector
+          onSelect={setSelectedExchange}
+          selectedExchange={selectedExchange}
+        />
+      </div>
       <TradingForm
         selectedExchange={selectedExchange}
         onSelectAssetsChange={onSelectAssetsChange}

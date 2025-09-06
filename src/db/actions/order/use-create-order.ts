@@ -20,6 +20,9 @@ interface OrderResponse {
   };
   binanceResponse: SpotRestAPI.NewOrderResponse;
   message: string;
+  lotSizeAdjustments?: string[];
+  notionalAdjustments?: string[];
+  quantityAdjusted?: boolean;
 }
 
 interface OrderError {
@@ -42,8 +45,21 @@ export const useCreateOrder = () => {
             }
         },
         onSuccess: (data) => {
+            // Build description with adjustment info
+            let description = `${data.order.side} ${data.order.quantity} ${data.order.symbol} at ${data.order.price}`;
+            
+            if (data.quantityAdjusted) {
+                const adjustments = [
+                    ...(data.lotSizeAdjustments || []),
+                    ...(data.notionalAdjustments || [])
+                ];
+                if (adjustments.length > 0) {
+                    description += `\n⚠️ Quantity adjusted: ${adjustments.join(', ')}`;
+                }
+            }
+            
             toast.success(data.message || "Order created successfully", {
-                description: `${data.order.side} ${data.order.quantity} ${data.order.symbol} at ${data.order.price}`,
+                description,
             });
         },
         onError: (error) => {

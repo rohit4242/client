@@ -5,9 +5,14 @@ import { AssetBalance, AssetPrice } from "@/types/trading";
 import {
   calculateMaxQuantity,
   calculatePercentageQuantity,
+  calculatePercentageQuantityWithStepSize,
   calculateTrade,
   formatTradingQuantity,
-  TradeCalculation
+  validateLotSizeFilter,
+  validateNotionalFilter,
+  TradeCalculation,
+  SymbolInfo,
+  NotionalValidationResult
 } from "@/lib/trading-calculations";
 
 interface UseTradingCalculationsProps {
@@ -15,13 +20,15 @@ interface UseTradingCalculationsProps {
   price: AssetPrice | null;
   form: UseFormReturn<TradingFormData>;
   feeRate?: number;
+  symbolInfo?: SymbolInfo | null;
 }
 
 export function useTradingCalculations({
   balance,
   price,
   form,
-  feeRate = 0.001 // 0.1% default fee
+  feeRate = 0.001, // 0.1% default fee
+  symbolInfo = null
 }: UseTradingCalculationsProps) {
   
   // Calculate maximum available quantity
@@ -32,15 +39,69 @@ export function useTradingCalculations({
   // Watch form values
   const quantity = form.watch('quantity');
   const side = form.watch('side');
+  const orderType = form.watch('type');
+  const orderPrice = form.watch('price');
 
-  // Calculate trade details
+  // Validate lot size and notional filters
+  const exchangeValidation = useMemo(() => {
+    const quantityNum = parseFloat(quantity || "0");
+    const priceNum = orderType === 'LIMIT' ? parseFloat(orderPrice || "0") : 
+                     price ? parseFloat(price.price) : 0;
+
+    if (!symbolInfo || quantityNum <= 0) {
+      return {
+        lotSizeValidation: null,
+        notionalValidation: null,
+        adjustedQuantity: quantityNum,
+        hasAdjustments: false,
+        allAdjustments: []
+      };
+    }
+
+    // Validate lot size first
+    const lotSizeValidation = validateLotSizeFilter(quantityNum, symbolInfo);
+    let adjustedQuantity = lotSizeValidation.adjustedQuantity;
+
+    // Then validate notional if we have a valid price
+    let notionalValidation: NotionalValidationResult | null = null;
+    if (priceNum > 0) {
+      notionalValidation = validateNotionalFilter(
+        adjustedQuantity, 
+        priceNum, 
+        symbolInfo, 
+        orderType
+      );
+      adjustedQuantity = notionalValidation.adjustedQuantity;
+    }
+
+    const allAdjustments = [
+      ...(lotSizeValidation.adjustments || []),
+      ...(notionalValidation?.adjustments || [])
+    ];
+
+    return {
+      lotSizeValidation,
+      notionalValidation,
+      adjustedQuantity,
+      hasAdjustments: allAdjustments.length > 0,
+      allAdjustments,
+      isValid: lotSizeValidation.isValid && (notionalValidation?.isValid ?? true)
+    };
+  }, [quantity, orderPrice, orderType, price, symbolInfo]);
+
+  // Calculate trade details using potentially adjusted quantity
   const tradeCalculation: TradeCalculation = useMemo(() => {
-    return calculateTrade(quantity || "0", price, maxQuantity, feeRate);
-  }, [quantity, price, maxQuantity, feeRate]);
+    const effectiveQuantity = exchangeValidation.adjustedQuantity || parseFloat(quantity || "0");
+    return calculateTrade(effectiveQuantity, price, maxQuantity, feeRate);
+  }, [exchangeValidation.adjustedQuantity, quantity, price, maxQuantity, feeRate]);
 
-  // Handle percentage selection
+  // Handle percentage selection with lot size compliance
   const handlePercentageSelect = (percentage: number) => {
-    const calculatedQuantity = calculatePercentageQuantity(maxQuantity, percentage);
+    const calculatedQuantity = calculatePercentageQuantityWithStepSize(
+      maxQuantity, 
+      percentage, 
+      symbolInfo
+    );
     const formattedQuantity = formatTradingQuantity(calculatedQuantity);
     form.setValue('quantity', formattedQuantity);
   };
@@ -98,6 +159,9 @@ export function useTradingCalculations({
     // Validation
     isValidTrade,
     canTrade,
+    
+    // Exchange filter validation
+    exchangeValidation,
     
     // Additional data
     tradingLimits,
