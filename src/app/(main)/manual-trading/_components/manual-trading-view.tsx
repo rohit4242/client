@@ -5,7 +5,8 @@ import { ExchangeSelector } from "./exchange-selector";
 import { useState } from "react";
 import { TradingForm } from "./trading-form";
 import { POPULAR_SYMBOLS } from "@/db/schema/order";
-import { getAsset } from "@/db/actions/assets/get-asset";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { TradingChart } from "./trading-chart";
 
 export default function ManualTradingView() {
   const [selectedExchange, setSelectedExchange] = useState<Exchange | null>(
@@ -15,25 +16,40 @@ export default function ManualTradingView() {
     POPULAR_SYMBOLS[0]
   );
 
-  const onSelectAssetsChange = async (assets: string[]) => {
+  const onSelectAssetsChange = (assets: string[]) => {
     setSelectedAsset(assets[0]);
-    const asset = await getAsset(assets[0], selectedExchange!);
-    console.log("asset from the onSelectAssetsChange: ", asset);
   };
 
   return (
-    <div className="flex flex-row gap-4 max-w-2xl mx-auto ">
-      <div className="flex flex-col gap-4 min-w-64">
-        <ExchangeSelector
-          onSelect={setSelectedExchange}
-          selectedExchange={selectedExchange}
-        />
+    <div className="flex flex-col h-full max-h-[calc(100vh-12rem)]">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 h-full">
+        {/* Left Columns - Chart Area */}
+        <div className="lg:col-span-2 flex flex-col min-h-0 order-2 lg:order-1">
+          <div className="flex-1 min-h-[300px] lg:min-h-0 rounded-lg border overflow-hidden">
+            <TradingChart symbol={`BINANCE:${selectedAsset}`} />
+          </div>
+        </div>
+
+        {/* Right Column - Trading Forms */}
+        <div className="lg:col-span-1 flex flex-col min-h-0 order-1 lg:order-2">
+          <ScrollArea className="flex-1 max-h-full">
+            <div className="space-y-6 pl-4 pb-4">
+              {/* Exchange Selection */}
+              <ExchangeSelector
+                onSelect={setSelectedExchange}
+                selectedExchange={selectedExchange}
+              />
+
+              {/* Trading Form */}
+              <TradingForm
+                selectedExchange={selectedExchange}
+                onSelectAssetsChange={onSelectAssetsChange}
+                selectedAsset={selectedAsset}
+              />
+            </div>
+          </ScrollArea>
+        </div>
       </div>
-      <TradingForm
-        selectedExchange={selectedExchange}
-        onSelectAssetsChange={onSelectAssetsChange}
-        selectedAsset={selectedAsset}
-      />
     </div>
   );
 }

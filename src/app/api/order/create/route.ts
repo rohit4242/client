@@ -4,8 +4,6 @@ import { Spot, SpotRestAPI } from "@binance/spot";
 import { headers } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
 import db from "@/db";
-import { getTradingPairInfo } from "@/db/actions/account/get-trading-pain-info";
-import { validateLotSizeFilter, validateNotionalFilter, SymbolInfo } from "@/lib/trading-calculations";
 
 export async function POST(request: NextRequest) {
   try {
@@ -55,89 +53,6 @@ export async function POST(request: NextRequest) {
       configurationRestAPI,
     });
 
-    const exchangeInfo = await getTradingPairInfo(order.symbol, exchange);
-
-    // Validate quantity against LOT_SIZE filter if exchange info is available
-    const originalQuantity = parseFloat(order.quantity || "0");
-    const adjustedPrice =
-      order.type === "LIMIT" ? parseFloat(order.price || "0") : undefined;
-
-    // Find symbol info and validate filters
-    let adjustedQuantity = originalQuantity;
-    let lotSizeValidation = null;
-    let notionalValidation = null;
-
-    if (exchangeInfo && exchangeInfo.exchangeInfo?.symbols) {
-      const symbolInfo = exchangeInfo.exchangeInfo.symbols.find(
-        (s) => s.symbol === order.symbol
-      ) as SymbolInfo | undefined;
-
-      if (symbolInfo) {
-        console.log("Symbol filters:", symbolInfo.filters);
-
-        // Validate lot size first
-        lotSizeValidation = validateLotSizeFilter(originalQuantity, symbolInfo);
-        adjustedQuantity = lotSizeValidation.adjustedQuantity;
-
-        // Then validate notional if we have a price
-        if (adjustedPrice && adjustedPrice > 0) {
-          notionalValidation = validateNotionalFilter(
-            adjustedQuantity, 
-            adjustedPrice, 
-            symbolInfo, 
-            order.type
-          );
-          adjustedQuantity = notionalValidation.adjustedQuantity;
-        }
-
-        console.log("Filter validation results:", {
-          originalQuantity,
-          adjustedQuantity,
-          lotSizeAdjustments: lotSizeValidation.adjustments,
-          notionalAdjustments: notionalValidation?.adjustments || [],
-          lotSizeValid: lotSizeValidation.isValid,
-          notionalValid: notionalValidation?.isValid ?? true,
-        });
-
-        // Log all adjustments
-        [...(lotSizeValidation.adjustments || []), ...(notionalValidation?.adjustments || [])]
-          .forEach((adjustment) => console.log("Adjustment:", adjustment));
-
-        // Check if any validation failed
-        if (!lotSizeValidation.isValid) {
-          return NextResponse.json(
-            { 
-              error: "Lot size validation failed", 
-              details: lotSizeValidation.error 
-            },
-            { status: 400 }
-          );
-        }
-
-        if (notionalValidation && !notionalValidation.isValid) {
-          return NextResponse.json(
-            { 
-              error: "Notional validation failed", 
-              details: notionalValidation.error 
-            },
-            { status: 400 }
-          );
-        }
-      }
-    }
-
-    // Validate required parameters with adjusted values
-    if (adjustedQuantity <= 0) {
-      return NextResponse.json({ error: "Invalid quantity" }, { status: 400 });
-    }
-
-    if (order.type === "LIMIT" && (!adjustedPrice || adjustedPrice <= 0)) {
-      return NextResponse.json(
-        { error: "Invalid price for limit order" },
-        { status: 400 }
-      );
-    }
-
     // Map order parameters to Binance format
     const side: SpotRestAPI.NewOrderSideEnum =
       order.side === "BUY"
@@ -149,155 +64,135 @@ export async function POST(request: NextRequest) {
         ? SpotRestAPI.NewOrderTypeEnum.MARKET
         : SpotRestAPI.NewOrderTypeEnum.LIMIT;
 
-    // Build Binance order parameters based on order type
-    let orderParams: SpotRestAPI.NewOrderRequest;
+    // Prepare order parameters based on order type
+    let orderParams: Record<string, string | SpotRestAPI.NewOrderSideEnum | SpotRestAPI.NewOrderTypeEnum>;
 
-    if (order.type === "LIMIT") {
-      orderParams = {
-        symbol: order.symbol,
-        side,
-        type,
-        price: adjustedPrice!,
-        quantity: adjustedQuantity,
-        newOrderRespType: SpotRestAPI.NewOrderNewOrderRespTypeEnum.FULL,
-      };
-    } else if (order.type === "MARKET") {
-      // For MARKET orders, handle quoteOrderQty if provided, otherwise use quantity
-      if ("quoteOrderQty" in order && order.quoteOrderQty) {
-        const quoteQty = parseFloat(order.quoteOrderQty);
-        if (quoteQty > 0) {
-          orderParams = {
-            symbol: order.symbol,
-            side,
-            type,
-            quoteOrderQty: quoteQty,
-            newOrderRespType: SpotRestAPI.NewOrderNewOrderRespTypeEnum.FULL,
-          };
-        } else {
-          orderParams = {
-            symbol: order.symbol,
-            side,
-            type,
-            quantity: adjustedQuantity,
-            newOrderRespType: SpotRestAPI.NewOrderNewOrderRespTypeEnum.FULL,
-          };
-        }
-      } else {
+    if (order.type === "MARKET") {
+      // For market orders, use either quantity or quoteOrderQty
+      if (order.quoteOrderQty && parseFloat(order.quoteOrderQty) > 0) {
         orderParams = {
           symbol: order.symbol,
           side,
           type,
-          quantity: adjustedQuantity,
-          newOrderRespType: SpotRestAPI.NewOrderNewOrderRespTypeEnum.FULL,
+          quoteOrderQty: order.quoteOrderQty,
         };
+      } else if (order.quantity && parseFloat(order.quantity) > 0) {
+        orderParams = {
+          symbol: order.symbol,
+          side,
+          type,
+          quantity: order.quantity,
+        };
+      } else {
+        return NextResponse.json(
+          { error: "Either quantity or quoteOrderQty is required for market orders" },
+          { status: 400 }
+        );
       }
+    } else if (order.type === "LIMIT") {
+      // For limit orders, quantity and price are required
+      if (!order.quantity || !order.price) {
+        return NextResponse.json(
+          { error: "Quantity and price are required for limit orders" },
+          { status: 400 }
+        );
+      }
+      
+      orderParams = {
+        symbol: order.symbol,
+        side,
+        type,
+        quantity: order.quantity,
+        price: order.price,
+        timeInForce: order.timeInForce || "GTC",
+      };
+    } else {
+      return NextResponse.json(
+        { error: "Invalid order type" },
+        { status: 400 }
+      );
     }
 
-    // Calculate estimated value for database storage using adjusted values
-    const estimatedPrice = adjustedPrice || 0;
-    const orderValue = adjustedQuantity * estimatedPrice;
+    console.log("Placing order with params:", orderParams); 
 
-    // Use database transaction to ensure consistency
-    return await db
-      .$transaction(async (tx) => {
-        // Create order in database first (with pending status)
-        console.log("Creating order in database");
-        const dbOrder = await tx.order.create({
-          data: {
-            symbol: order.symbol,
-            side: order.side === "BUY" ? "Buy" : "Sell",
-            type: order.type === "MARKET" ? "Market" : "Limit",
-            price: estimatedPrice,
-            quantity: adjustedQuantity,
-            value: orderValue,
-            status: "Pending",
-            userAccountId: userAccount.id,
-          },
-        });
+    // Place the order on Binance
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const orderResponse = await client.restAPI.newOrder(orderParams as any);
+    const data = await orderResponse.data();
 
-        try {
-          console.log("Executing order on Binance");
-          // Execute order on Binance
-          console.log("orderParams: ", orderParams);
-          const binanceResponseRaw = await client.restAPI.newOrder(orderParams);
-          console.log("binanceResponseRaw: ", binanceResponseRaw);
-          const binanceResponse = (await binanceResponseRaw.data()) as SpotRestAPI.NewOrderResponse;
+    console.log("Order placed successfully:", data);
 
-          console.log("binanceResponse: ", JSON.stringify(binanceResponse));
+    // Store order in database for tracking (optional)
+    try {
+      // Calculate values for database storage
+      const orderQuantity = data.origQty || (order.type === "LIMIT" ? order.quantity : order.quantity) || "0";
+      const orderPrice = data.price || (order.type === "LIMIT" ? order.price : "0") || "0";
+      const orderValue = data.cummulativeQuoteQty || (parseFloat(orderQuantity) * parseFloat(orderPrice)).toString();
+      
+      // Map order side and type to database enums
+      const dbSide = order.side === "BUY" ? "Buy" : "Sell";
+      const dbType = order.type === "MARKET" ? "Market" : "Limit";
+      const dbStatus = data.status === "FILLED" ? "Filled" : 
+                      data.status === "CANCELED" ? "Canceled" : "Pending";
 
-          // Update database order with actual execution details
-          const actualPrice = parseFloat(binanceResponse.price || "0");
-          const actualQuantity = parseFloat(
-            binanceResponse.executedQty || binanceResponse.origQty || "0"
-          );
-          const actualValue = actualPrice * actualQuantity;
-
-          const updatedOrder = await tx.order.update({
-            where: { id: dbOrder.id },
-            data: {
-              price: actualPrice > 0 ? actualPrice : estimatedPrice,
-              quantity: actualQuantity > 0 ? actualQuantity : adjustedQuantity,
-              value: actualValue > 0 ? actualValue : orderValue,
-              status:
-                binanceResponse.status === "FILLED"
-                  ? "Filled"
-                  : binanceResponse.status === "CANCELED"
-                  ? "Canceled"
-                  : "Pending",
-            },
-          });
-
-          return NextResponse.json({
-            success: true,
-            order: updatedOrder,
-            binanceResponse,
-            message: "Order created successfully",
-            lotSizeAdjustments: lotSizeValidation?.adjustments || [],
-            notionalAdjustments: notionalValidation?.adjustments || [],
-            quantityAdjusted: originalQuantity !== adjustedQuantity,
-          });
-        } catch (binanceError) {
-          console.error("Binance API error:", binanceError);
-
-          // Transaction will automatically rollback, but we still update status for clarity
-          await tx.order.update({
-            where: { id: dbOrder.id },
-            data: { status: "Canceled" },
-          });
-
-          // Extract error message from Binance error
-          let errorMessage = "Failed to execute order on Binance";
-          if (binanceError instanceof Error) {
-            errorMessage = binanceError.message;
-          }
-
-          // Throw error to trigger transaction rollback
-          throw new Error(
-            JSON.stringify({
-              error: "Order execution failed",
-              details: errorMessage,
-              orderId: dbOrder.id,
-            })
-          );
-        }
-      })
-      .catch((transactionError) => {
-        // Handle transaction errors
-        try {
-          const errorData = JSON.parse(transactionError.message);
-          return NextResponse.json(errorData, { status: 400 });
-        } catch {
-          console.error("Transaction error:", transactionError);
-          return NextResponse.json(
-            { error: "Order processing failed" },
-            { status: 500 }
-          );
-        }
+      await db.order.create({
+        data: {
+          userAccountId: userAccount.id,
+          symbol: order.symbol,
+          side: dbSide as "Buy" | "Sell",
+          type: dbType as "Market" | "Limit",
+          quantity: parseFloat(orderQuantity),
+          price: parseFloat(orderPrice),
+          value: parseFloat(orderValue),
+          status: dbStatus as "Pending" | "Filled" | "Canceled",
+        },
       });
-  } catch (error) {
+      
+      console.log("Order stored in database successfully");
+    } catch (dbError) {
+      console.warn("Failed to store order in database:", dbError);
+      // Don't fail the request if DB storage fails
+    }
+
+    return NextResponse.json({
+      success: true,
+      message: "Order placed successfully",
+      order: {
+        orderId: data.orderId,
+        symbol: data.symbol,
+        side: data.side,
+        type: data.type,
+        quantity: data.origQty || "0",
+        price: data.price,
+        status: data.status,
+        transactTime: data.transactTime,
+        fills: data.fills || [],
+      },
+    });
+  } catch (error: unknown) {
     console.error("Error creating order:", error);
+    
+    // Handle Binance API errors
+    if (error && typeof error === 'object' && 'response' in error && 
+        error.response && typeof error.response === 'object' && 'data' in error.response) {
+      const binanceError = (error.response as { data: { msg?: string; code?: number } }).data;
+      return NextResponse.json(
+        {
+          error: "Order placement failed",
+          message: binanceError.msg || "Unknown Binance error",
+          code: binanceError.code,
+        },
+        { status: 400 }
+      );
+    }
+    
+    // Handle network or other errors
+    const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
     return NextResponse.json(
-      { error: "Internal server error" },
+      {
+        error: "Internal server error",
+        message: errorMessage,
+      },
       { status: 500 }
     );
   }

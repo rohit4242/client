@@ -1,177 +1,234 @@
-import { useMemo } from "react";
-import { UseFormReturn } from "react-hook-form";
-import { TradingFormData } from "@/db/schema/order";
+import { useState, useMemo, useEffect } from "react";
 import { AssetBalance, AssetPrice } from "@/types/trading";
-import {
-  calculateMaxQuantity,
-  calculatePercentageQuantity,
-  calculatePercentageQuantityWithStepSize,
-  calculateTrade,
-  formatTradingQuantity,
-  validateLotSizeFilter,
-  validateNotionalFilter,
-  TradeCalculation,
-  SymbolInfo,
-  NotionalValidationResult
-} from "@/lib/trading-calculations";
+import { ValidationWarning } from "@/app/(main)/manual-trading/_components/validation-warnings";
+import { SpotRestAPI } from "@binance/spot";
+
+interface SymbolFilter {
+  filterType?: string;
+  minQty?: string;
+  maxQty?: string;
+  stepSize?: string;
+  minPrice?: string;
+  maxPrice?: string;
+  tickSize?: string;
+  minNotional?: string;
+  maxNotional?: string;
+}
+
+export interface TradingCalculations {
+  estimatedCost: number;
+  estimatedQuantity: number;
+  estimatedTotal: number;
+  fees: number;
+  minOrderValue: number;
+  maxOrderValue: number;
+  availableBalance: number;
+  warnings: ValidationWarning[];
+}
 
 interface UseTradingCalculationsProps {
+  symbol: string;
+  side: "BUY" | "SELL";
+  orderType: "LIMIT" | "MARKET" | "STOP_LIMIT";
+  price?: string;
+  quantity?: string;
+  percentage?: number;
   balance: AssetBalance | null;
-  price: AssetPrice | null;
-  form: UseFormReturn<TradingFormData>;
-  feeRate?: number;
-  symbolInfo?: SymbolInfo | null;
+  marketPrice: AssetPrice | null;
+  symbolInfo?: SpotRestAPI.ExchangeInfoResponse | null;
 }
 
 export function useTradingCalculations({
-  balance,
+  symbol,
+  side,
+  orderType,
   price,
-  form,
-  feeRate = 0.001, // 0.1% default fee
-  symbolInfo = null
-}: UseTradingCalculationsProps) {
-  
-  // Calculate maximum available quantity
-  const maxQuantity = useMemo(() => {
-    return calculateMaxQuantity(balance);
-  }, [balance]);
+  quantity,
+  percentage,
+  balance,
+  marketPrice,
+  symbolInfo,
+}: UseTradingCalculationsProps): TradingCalculations {
+  const [calculations, setCalculations] = useState<TradingCalculations>({
+    estimatedCost: 0,
+    estimatedQuantity: 0,
+    estimatedTotal: 0,
+    fees: 0,
+    minOrderValue: 0,
+    maxOrderValue: 0,
+    availableBalance: 0,
+    warnings: [],
+  });
 
-  // Watch form values
-  const quantity = form.watch('quantity');
-  const side = form.watch('side');
-  const orderType = form.watch('type');
-  const orderPrice = form.watch('price');
+  // Extract symbol filters from exchange info
+  const symbolFilters = useMemo(() => {
+    if (!symbolInfo?.symbols?.length) return null;
+    
+    const symbolData = symbolInfo.symbols.find((s) => s.symbol === symbol);
+    if (!symbolData) return null;
 
-  // Validate lot size and notional filters
-  const exchangeValidation = useMemo(() => {
-    const quantityNum = parseFloat(quantity || "0");
-    const priceNum = orderType === 'LIMIT' ? parseFloat(orderPrice || "0") : 
-                     price ? parseFloat(price.price) : 0;
-
-    if (!symbolInfo || quantityNum <= 0) {
-      return {
-        lotSizeValidation: null,
-        notionalValidation: null,
-        adjustedQuantity: quantityNum,
-        hasAdjustments: false,
-        allAdjustments: []
-      };
-    }
-
-    // Validate lot size first
-    const lotSizeValidation = validateLotSizeFilter(quantityNum, symbolInfo);
-    let adjustedQuantity = lotSizeValidation.adjustedQuantity;
-
-    // Then validate notional if we have a valid price
-    let notionalValidation: NotionalValidationResult | null = null;
-    if (priceNum > 0) {
-      notionalValidation = validateNotionalFilter(
-        adjustedQuantity, 
-        priceNum, 
-        symbolInfo, 
-        orderType
-      );
-      adjustedQuantity = notionalValidation.adjustedQuantity;
-    }
-
-    const allAdjustments = [
-      ...(lotSizeValidation.adjustments || []),
-      ...(notionalValidation?.adjustments || [])
-    ];
+    const filters: Record<string, SymbolFilter> = {};
+    symbolData.filters?.forEach((filter) => {
+      if (filter.filterType) {
+        filters[filter.filterType] = filter;
+      }
+    });
 
     return {
-      lotSizeValidation,
-      notionalValidation,
-      adjustedQuantity,
-      hasAdjustments: allAdjustments.length > 0,
-      allAdjustments,
-      isValid: lotSizeValidation.isValid && (notionalValidation?.isValid ?? true)
+      minQty: parseFloat(filters.LOT_SIZE?.minQty || "0"),
+      maxQty: parseFloat(filters.LOT_SIZE?.maxQty || "0"),
+      stepSize: parseFloat(filters.LOT_SIZE?.stepSize || "0"),
+      minPrice: parseFloat(filters.PRICE_FILTER?.minPrice || "0"),
+      maxPrice: parseFloat(filters.PRICE_FILTER?.maxPrice || "0"),
+      tickSize: parseFloat(filters.PRICE_FILTER?.tickSize || "0"),
+      minNotional: parseFloat(filters.MIN_NOTIONAL?.minNotional || "0"),
+      maxNotional: parseFloat(filters.MAX_NOTIONAL?.maxNotional || "0"),
     };
-  }, [quantity, orderPrice, orderType, price, symbolInfo]);
+  }, [symbolInfo, symbol]);
 
-  // Calculate trade details using potentially adjusted quantity
-  const tradeCalculation: TradeCalculation = useMemo(() => {
-    const effectiveQuantity = exchangeValidation.adjustedQuantity || parseFloat(quantity || "0");
-    return calculateTrade(effectiveQuantity, price, maxQuantity, feeRate);
-  }, [exchangeValidation.adjustedQuantity, quantity, price, maxQuantity, feeRate]);
+  useEffect(() => {
+    const calculateTradingMetrics = () => {
+      const warnings: ValidationWarning[] = [];
+      const priceValue = parseFloat(price || "0");
+      const quantityValue = parseFloat(quantity || "0");
+      const currentPrice = parseFloat(marketPrice?.price || "0");
+      const availableBalance = parseFloat(balance?.free || "0");
+      
+      // Use market price for market orders, specified price for limit orders
+      const effectivePrice = orderType === "MARKET" ? currentPrice : priceValue;
+      
+      let estimatedQuantity = quantityValue;
+      let estimatedCost = 0;
+      let estimatedTotal = 0;
 
-  // Handle percentage selection with lot size compliance
-  const handlePercentageSelect = (percentage: number) => {
-    const calculatedQuantity = calculatePercentageQuantityWithStepSize(
-      maxQuantity, 
-      percentage, 
-      symbolInfo
-    );
-    const formattedQuantity = formatTradingQuantity(calculatedQuantity);
-    form.setValue('quantity', formattedQuantity);
-  };
+      // Calculate based on percentage if provided
+      if (percentage && percentage > 0 && availableBalance > 0) {
+        const percentageAmount = (availableBalance * percentage) / 100;
+        
+        if (side === "BUY" && effectivePrice > 0) {
+          estimatedQuantity = percentageAmount / effectivePrice;
+          estimatedCost = percentageAmount;
+        } else if (side === "SELL") {
+          estimatedQuantity = percentageAmount;
+          estimatedCost = percentageAmount * effectivePrice;
+        }
+      } else if (quantityValue > 0 && effectivePrice > 0) {
+        // Calculate based on quantity
+        if (side === "BUY") {
+          estimatedCost = quantityValue * effectivePrice;
+        } else {
+          estimatedCost = quantityValue * effectivePrice;
+        }
+        estimatedQuantity = quantityValue;
+      }
 
-  // Calculate percentage options with values
-  const percentageOptions = useMemo(() => {
-    const options = [25, 50, 75, 100];
-    return options.map(percentage => ({
-      percentage,
-      quantity: calculatePercentageQuantity(maxQuantity, percentage),
-      formattedQuantity: formatTradingQuantity(
-        calculatePercentageQuantity(maxQuantity, percentage)
-      )
-    }));
-  }, [maxQuantity]);
+      // Calculate fees (assuming 0.1% trading fee)
+      const feeRate = 0.001;
+      const fees = estimatedCost * feeRate;
+      estimatedTotal = estimatedCost + fees;
 
-  // Validation helpers
-  const isValidTrade = useMemo(() => {
-    return tradeCalculation.isValid && maxQuantity > 0 && !!price;
-  }, [tradeCalculation.isValid, maxQuantity, price]);
+      // Validation checks
+      if (symbolFilters) {
+        // Check minimum quantity
+        if (estimatedQuantity > 0 && estimatedQuantity < symbolFilters.minQty) {
+          warnings.push({
+            type: "error",
+            message: `Minimum quantity is ${symbolFilters.minQty}`,
+            field: "quantity",
+          });
+        }
 
-  const canTrade = useMemo(() => {
-    return isValidTrade && parseFloat(quantity || "0") > 0;
-  }, [isValidTrade, quantity]);
+        // Check maximum quantity
+        if (estimatedQuantity > symbolFilters.maxQty) {
+          warnings.push({
+            type: "error",
+            message: `Maximum quantity is ${symbolFilters.maxQty}`,
+            field: "quantity",
+          });
+        }
 
-  // Trading limits and suggestions
-  const tradingLimits = useMemo(() => {
-    if (!price) return null;
-    
-    const minQuantity = 0.00000001; // Typical minimum
-    const maxValue = maxQuantity * parseFloat(price.price);
-    
-    return {
-      minQuantity,
-      maxQuantity,
-      maxValue,
-      suggestedQuantities: [
-        maxQuantity * 0.1,  // 10%
-        maxQuantity * 0.25, // 25% 
-        maxQuantity * 0.5,  // 50%
-        maxQuantity         // 100%
-      ].map(q => formatTradingQuantity(q))
+        // Check minimum notional value
+        if (estimatedCost > 0 && estimatedCost < symbolFilters.minNotional) {
+          warnings.push({
+            type: "error",
+            message: `Total order value should be more than ${symbolFilters.minNotional} USDT`,
+            field: "total",
+          });
+        }
+
+        // Check price filters for limit orders
+        if (orderType === "LIMIT" && priceValue > 0) {
+          if (priceValue < symbolFilters.minPrice) {
+            warnings.push({
+              type: "error",
+              message: `Minimum price is ${symbolFilters.minPrice}`,
+              field: "price",
+            });
+          }
+
+          if (priceValue > symbolFilters.maxPrice) {
+            warnings.push({
+              type: "error",
+              message: `Maximum price is ${symbolFilters.maxPrice}`,
+              field: "price",
+            });
+          }
+        }
+      }
+
+      // Balance validation
+      if (side === "BUY" && estimatedTotal > availableBalance) {
+        warnings.push({
+          type: "error",
+          message: "Your balance is not enough",
+          field: "balance",
+        });
+      }
+
+      if (side === "SELL" && estimatedQuantity > availableBalance) {
+        warnings.push({
+          type: "error",
+          message: "Insufficient balance to sell this quantity",
+          field: "quantity",
+        });
+      }
+
+      // Price deviation warning for limit orders
+      if (orderType === "LIMIT" && priceValue > 0 && currentPrice > 0) {
+        const deviation = Math.abs((priceValue - currentPrice) / currentPrice) * 100;
+        if (deviation > 5) {
+          warnings.push({
+            type: "warning",
+            message: `Price deviates ${deviation.toFixed(1)}% from market price`,
+            field: "price",
+          });
+        }
+      }
+
+      setCalculations({
+        estimatedCost,
+        estimatedQuantity,
+        estimatedTotal,
+        fees,
+        minOrderValue: symbolFilters?.minNotional || 0,
+        maxOrderValue: symbolFilters?.maxNotional || 0,
+        availableBalance,
+        warnings,
+      });
     };
-  }, [maxQuantity, price]);
 
-  return {
-    // Core calculations
-    maxQuantity,
-    tradeCalculation,
-    
-    // Form helpers
-    handlePercentageSelect,
-    percentageOptions,
-    
-    // Validation
-    isValidTrade,
-    canTrade,
-    
-    // Exchange filter validation
-    exchangeValidation,
-    
-    // Additional data
-    tradingLimits,
+    calculateTradingMetrics();
+  }, [
+    symbol,
     side,
-    
-    // Convenience getters
-    estimatedCost: tradeCalculation.estimatedCost,
-    formattedCost: tradeCalculation.formattedCost,
-    tradingFee: tradeCalculation.fee,
-    totalCost: tradeCalculation.total,
-    error: tradeCalculation.error
-  };
+    orderType,
+    price,
+    quantity,
+    percentage,
+    balance,
+    marketPrice,
+    symbolFilters,
+  ]);
+
+  return calculations;
 }

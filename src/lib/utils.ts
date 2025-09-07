@@ -53,3 +53,28 @@ export const extractBaseAsset = (symbol: string): string => {
   // Default: return the symbol as is if no known quote asset is found
   return symbol;
 };
+
+export const extractQuoteAsset = (symbol: string): string => {
+  // Handle common USDT pairs
+  if (symbol.endsWith('USDT')) {
+    return 'USDT';
+  }
+  // Handle BUSD pairs
+  if (symbol.endsWith('BUSD')) {
+    return 'BUSD';
+  }
+  // Handle BTC pairs
+  if (symbol.endsWith('BTC')) {
+    return 'BTC';
+  }
+  // Handle ETH pairs
+  if (symbol.endsWith('ETH')) {
+    return 'ETH';
+  }
+  // Handle BNB pairs
+  if (symbol.endsWith('BNB')) {
+    return 'BNB';
+  }
+  // Default: return USDT as the most common quote asset
+  return 'USDT';
+};

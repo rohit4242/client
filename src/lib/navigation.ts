@@ -69,7 +69,6 @@ export const navigationConfig: NavigationGroup[] = [
         url: "/signal-bot",
         icon: Bot,
         isActive: true,
-        badge: "New",
         badgeVariant: "secondary",
       },
     ],

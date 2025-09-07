@@ -20,11 +20,19 @@ export const getBalanceBySymbol = async (
   symbol: string
 ) => {
   const balances = await getBalance(configurationRestAPI);
+
+  console.log(
+    "hello ", balances
+  )
   
   // Extract the base asset from the trading pair symbol
   const baseAsset = extractBaseAsset(symbol);
+
+  console.log("hello-2: ", baseAsset)
   
   const asset = balances?.find((balance) => balance.asset === baseAsset);
+
+  console.log("asset: ", asset)
   return asset;
 };
 

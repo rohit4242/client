@@ -1,34 +1,33 @@
 import { CreateOrderData } from "@/db/schema/order";
-import { SpotRestAPI } from "@binance/spot";
 import { useMutation } from "@tanstack/react-query"
 import axios, { AxiosError } from "axios"
 import { toast } from "sonner";
 
 interface OrderResponse {
   success: boolean;
+  message: string;
   order: {
-    id: string;
+    orderId: number;
     symbol: string;
     side: string;
     type: string;
-    price: number;
-    quantity: number;
-    value: number;
+    quantity: string;
+    price?: string;
     status: string;
-    createdAt: string;
-    updatedAt: string;
+    transactTime: number;
+    fills: Array<{
+      price: string;
+      qty: string;
+      commission: string;
+      commissionAsset: string;
+    }>;
   };
-  binanceResponse: SpotRestAPI.NewOrderResponse;
-  message: string;
-  lotSizeAdjustments?: string[];
-  notionalAdjustments?: string[];
-  quantityAdjusted?: boolean;
 }
 
 interface OrderError {
   error: string;
-  details?: string;
-  orderId?: string;
+  message?: string;
+  code?: number;
 }
 
 export const useCreateOrder = () => {
@@ -38,33 +37,59 @@ export const useCreateOrder = () => {
                 const response = await axios.post("/api/order/create", orderData);
                 return response.data;
             } catch (error: unknown) {
-                if (error instanceof AxiosError) {
-                    throw { error: error.response?.data.error || "Network error occurred" };
+                if (error instanceof AxiosError && error.response?.data) {
+                    const errorData = error.response.data;
+                    throw { 
+                        error: errorData.error || "Order placement failed",
+                        message: errorData.message,
+                        code: errorData.code
+                    };
                 }
                 throw { error: "Network error occurred" };
             }
         },
         onSuccess: (data) => {
-            // Build description with adjustment info
-            let description = `${data.order.side} ${data.order.quantity} ${data.order.symbol} at ${data.order.price}`;
+            // Build description with order details
+            let description = `${data.order.side} ${data.order.quantity} ${data.order.symbol}`;
             
-            if (data.quantityAdjusted) {
-                const adjustments = [
-                    ...(data.lotSizeAdjustments || []),
-                    ...(data.notionalAdjustments || [])
-                ];
-                if (adjustments.length > 0) {
-                    description += `\n⚠️ Quantity adjusted: ${adjustments.join(', ')}`;
+            if (data.order.price) {
+                description += ` at ${data.order.price}`;
+            }
+            
+            // Add fill information for market orders
+            if (data.order.fills && data.order.fills.length > 0) {
+                const totalFilled = data.order.fills.reduce((sum, fill) => sum + parseFloat(fill.qty), 0);
+                const avgPrice = data.order.fills.reduce((sum, fill) => sum + (parseFloat(fill.price) * parseFloat(fill.qty)), 0) / totalFilled;
+                description += `\nFilled: ${totalFilled} at avg price ${avgPrice.toFixed(8)}`;
+                
+                // Show commission
+                const totalCommission = data.order.fills.reduce((sum, fill) => sum + parseFloat(fill.commission), 0);
+                const commissionAsset = data.order.fills[0]?.commissionAsset;
+                if (totalCommission > 0 && commissionAsset) {
+                    description += `\nCommission: ${totalCommission} ${commissionAsset}`;
                 }
             }
             
-            toast.success(data.message || "Order created successfully", {
+            description += `\nOrder ID: ${data.order.orderId}`;
+            description += `\nStatus: ${data.order.status}`;
+            
+            toast.success(data.message || "Order placed successfully", {
                 description,
+                duration: 10000, // Show longer for order confirmations
             });
         },
         onError: (error) => {
-            toast.error(error.error || "Failed to create order", {
-                description: error.details || "Please check your order details and try again",
+            const errorMessage = error.error || "Failed to place order";
+            let description = error.message || "Please check your order details and try again";
+            
+            // Add Binance error code if available
+            if (error.code) {
+                description += `\nError Code: ${error.code}`;
+            }
+            
+            toast.error(errorMessage, {
+                description,
+                duration: 8000,
             });
         }
     })

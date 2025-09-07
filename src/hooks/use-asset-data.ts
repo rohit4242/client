@@ -66,13 +66,14 @@ export function useAssetData(
     }
   }, [symbol, exchange, config.maxRetries]);
 
-  // Optimized balance fetcher
-  const fetchBalance = useCallback(async (): Promise<void> => {
+  // Optimized balance fetcher with retry logic
+  const fetchBalance = useCallback(async (retryCount = 0): Promise<void> => {
     if (!symbol || !exchange || !mountedRef.current) return;
 
     setLoadingStates(prev => ({ ...prev, balance: true }));
 
     try {
+      console.log("fetching balance: ", symbol, exchange)
       const result = await getAsset(symbol, exchange);
       
       if (mountedRef.current) {
@@ -86,10 +87,24 @@ export function useAssetData(
       console.error("Balance fetch error:", error);
       
       if (mountedRef.current) {
+        // Retry once if it's a timestamp error and we haven't retried yet
+        if (retryCount === 0 && error instanceof Error && 
+            (error.message.includes('recvWindow') || error.message.includes('timestamp'))) {
+          console.log(`Retrying balance fetch for ${symbol} due to timestamp error...`);
+          
+          // Wait 1 second before retrying
+          setTimeout(() => {
+            if (mountedRef.current) {
+              fetchBalance(1);
+            }
+          }, 1000);
+          return;
+        }
+        
         setData(prev => ({
           ...prev,
           balance: null,
-          error: "Failed to fetch balance",
+          error: retryCount > 0 ? "Failed to fetch balance after retry" : "Failed to fetch balance",
         }));
       }
     } finally {

@@ -24,7 +24,7 @@ export async function POST(
       apiKey: apiKey,
       apiSecret: apiSecret,
     };
-
+   
     const price = await getPriceBySymbol(configurationRestAPI, symbol);
     return NextResponse.json({ price }, { status: 200 });
   } catch (error) {

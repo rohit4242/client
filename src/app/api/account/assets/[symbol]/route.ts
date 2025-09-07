@@ -27,6 +27,9 @@ export async function POST(
     apiSecret: apiSecret,
   };
 
+  console.log("configurationRestAPI: ", configurationRestAPI)
+  console.log("symbol: ", symbol)
+
   const asset = await getBalanceBySymbol(configurationRestAPI, symbol);
   console.log("asset from the route: ", asset);
 
