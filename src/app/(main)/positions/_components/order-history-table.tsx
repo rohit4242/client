@@ -22,7 +22,21 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ProcessedOrder } from "@/db/actions/order/get-orders";
-import { ArrowUpDown, Search, Filter, Calendar, Copy, Clock, History } from "lucide-react";
+import { 
+  ArrowUpDown, 
+  Search, 
+  Clock, 
+  History, 
+  Copy, 
+  ExternalLink,
+  TrendingUp,
+  TrendingDown,
+  Activity,
+  CheckCircle,
+  XCircle,
+  AlertCircle,
+  Pause
+} from "lucide-react";
 import { formatCurrency } from "@/lib/mock-data";
 import { toast } from "sonner";
 
@@ -100,28 +114,64 @@ export function OrderHistoryTable({ orders }: OrderHistoryTableProps) {
   const getSideColor = (side: string) => {
     switch (side.toUpperCase()) {
       case "BUY":
-        return "text-green-600 bg-green-50 border-green-200";
+        return "text-emerald-700 bg-emerald-50 border-emerald-200 hover:bg-emerald-100";
       case "SELL":
-        return "text-red-600 bg-red-50 border-red-200";
+        return "text-rose-700 bg-rose-50 border-rose-200 hover:bg-rose-100";
       default:
-        return "text-gray-600 bg-gray-50 border-gray-200";
+        return "text-slate-700 bg-slate-50 border-slate-200 hover:bg-slate-100";
     }
   };
 
   const getStatusColor = (status: string) => {
     switch (status.toUpperCase()) {
       case "FILLED":
-        return "text-green-600 bg-green-50 border-green-200";
+        return "text-emerald-700 bg-emerald-50 border-emerald-200 hover:bg-emerald-100";
       case "PENDING":
       case "NEW":
-        return "text-yellow-600 bg-yellow-50 border-yellow-200";
+        return "text-amber-700 bg-amber-50 border-amber-200 hover:bg-amber-100";
       case "CANCELED":
       case "CANCELLED":
-        return "text-red-600 bg-red-50 border-red-200";
+        return "text-rose-700 bg-rose-50 border-rose-200 hover:bg-rose-100";
       case "PARTIALLY_FILLED":
-        return "text-blue-600 bg-blue-50 border-blue-200";
+        return "text-blue-700 bg-blue-50 border-blue-200 hover:bg-blue-100";
+      case "REJECTED":
+        return "text-red-700 bg-red-50 border-red-200 hover:bg-red-100";
+      case "EXPIRED":
+        return "text-gray-700 bg-gray-50 border-gray-200 hover:bg-gray-100";
       default:
-        return "text-gray-600 bg-gray-50 border-gray-200";
+        return "text-slate-700 bg-slate-50 border-slate-200 hover:bg-slate-100";
+    }
+  };
+
+  const getSideIcon = (side: string) => {
+    switch (side.toUpperCase()) {
+      case "BUY":
+        return <TrendingUp className="h-3 w-3" />;
+      case "SELL":
+        return <TrendingDown className="h-3 w-3" />;
+      default:
+        return <Activity className="h-3 w-3" />;
+    }
+  };
+
+  const getStatusIcon = (status: string) => {
+    switch (status.toUpperCase()) {
+      case "FILLED":
+        return <CheckCircle className="h-3 w-3" />;
+      case "PENDING":
+      case "NEW":
+        return <Clock className="h-3 w-3" />;
+      case "CANCELED":
+      case "CANCELLED":
+        return <XCircle className="h-3 w-3" />;
+      case "PARTIALLY_FILLED":
+        return <AlertCircle className="h-3 w-3" />;
+      case "REJECTED":
+        return <XCircle className="h-3 w-3" />;
+      case "EXPIRED":
+        return <Pause className="h-3 w-3" />;
+      default:
+        return <Activity className="h-3 w-3" />;
     }
   };
 
@@ -141,21 +191,52 @@ export function OrderHistoryTable({ orders }: OrderHistoryTableProps) {
     toast.success("Order ID copied to clipboard");
   };
 
+  const getOrderTypeColor = (type: string) => {
+    switch (type.toUpperCase()) {
+      case "MARKET":
+        return "text-purple-700 bg-purple-50 border-purple-200";
+      case "LIMIT":
+        return "text-blue-700 bg-blue-50 border-blue-200";
+      case "STOP_LOSS":
+      case "STOP":
+        return "text-red-700 bg-red-50 border-red-200";
+      case "TAKE_PROFIT":
+        return "text-green-700 bg-green-50 border-green-200";
+      default:
+        return "text-slate-700 bg-slate-50 border-slate-200";
+    }
+  };
+
+  // Calculate totals for summary
+  const calculateSummary = (orderList: ProcessedOrder[]) => {
+    const totalValue = orderList.reduce((sum, order) => sum + order.value, 0);
+    const totalOrders = orderList.length;
+    const avgOrderSize = totalOrders > 0 ? totalValue / totalOrders : 0;
+    
+    return { totalValue, totalOrders, avgOrderSize };
+  };
+
   // Render table for a given set of orders
   const renderOrderTable = (orderList: ProcessedOrder[], emptyMessage: string) => {
     if (orderList.length === 0) {
       return (
-        <div className="text-center py-12">
-          <Filter className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-          <h3 className="text-lg font-medium text-muted-foreground mb-2">
+        <div className="text-center py-16">
+          <div className="flex justify-center mb-4">
+            <div className="h-16 w-16 bg-muted/20 rounded-full flex items-center justify-center">
+              <History className="h-8 w-8 text-muted-foreground" />
+            </div>
+          </div>
+          <h3 className="text-lg font-semibold text-foreground mb-2">
             No orders found
           </h3>
-          <p className="text-sm text-muted-foreground">
+          <p className="text-sm text-muted-foreground max-w-md mx-auto">
             {emptyMessage}
           </p>
         </div>
       );
     }
+
+    const summary = calculateSummary(orderList);
 
     return (
       <>
@@ -227,51 +308,87 @@ export function OrderHistoryTable({ orders }: OrderHistoryTableProps) {
             </TableHeader>
             <TableBody>
               {orderList.map((order) => (
-                <TableRow key={order.id} className="hover:bg-muted/50">
+                <TableRow key={order.id} className="hover:bg-muted/30 transition-colors group">
                   <TableCell className="font-mono text-sm">
-                    {formatDate(order.createdAt)}
+                    <div className="flex flex-col">
+                      <span className="font-medium">
+                        {formatDate(order.createdAt).split(', ')[0]}
+                      </span>
+                      <span className="text-xs text-muted-foreground">
+                        {formatDate(order.createdAt).split(', ')[1]}
+                      </span>
+                    </div>
                   </TableCell>
                   <TableCell className="font-mono text-sm">
-                    <div className="flex items-center gap-1">
-                      <span>{order.orderId}</span>
+                    <div className="flex items-center gap-2">
+                      <span className="font-medium">#{order.orderId}</span>
                       <Button
                         variant="ghost"
                         size="sm"
-                        className="h-6 w-6 p-0"
+                        className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
                         onClick={() => copyOrderId(order.orderId)}
                       >
                         <Copy className="h-3 w-3" />
                       </Button>
                     </div>
                   </TableCell>
-                  <TableCell className="font-medium">
-                    {order.symbol}
+                  <TableCell>
+                    <div className="flex items-center gap-2">
+                      <div className="h-8 w-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white text-xs font-bold">
+                        {order.symbol.slice(0, 2)}
+                      </div>
+                      <span className="font-semibold">{order.symbol}</span>
+                    </div>
                   </TableCell>
                   <TableCell>
-                    <Badge variant="outline" className="text-xs">
+                    <Badge variant="outline" className={`text-xs font-medium ${getOrderTypeColor(order.type)}`}>
                       {order.type}
                     </Badge>
                   </TableCell>
                   <TableCell>
-                    <Badge variant="outline" className={`text-xs ${getSideColor(order.side)}`}>
+                    <Badge variant="outline" className={`text-xs font-medium flex items-center gap-1 w-fit ${getSideColor(order.side)}`}>
+                      {getSideIcon(order.side)}
                       {order.side}
                     </Badge>
                   </TableCell>
-                  <TableCell className="text-right font-mono">
-                    {order.price === 0 ? "Market" : order.price.toFixed(8)}
+                  <TableCell className="text-right">
+                    <div className="font-mono">
+                      {order.price === 0 ? (
+                        <span className="text-purple-600 font-medium">Market</span>
+                      ) : (
+                        <span>${order.price.toFixed(6)}</span>
+                      )}
+                    </div>
                   </TableCell>
                   <TableCell className="text-right font-mono">
-                    {order.quantity.toFixed(8)}
+                    <div className="flex flex-col items-end">
+                      <span>{order.quantity.toFixed(6)}</span>
+                      <span className="text-xs text-muted-foreground">
+                        {order.symbol.replace('USDT', '').replace('BUSD', '')}
+                      </span>
+                    </div>
                   </TableCell>
                   <TableCell className="text-right font-mono">
-                    {order.executedQty.toFixed(8)}
+                    <div className="flex flex-col items-end">
+                      <span className={order.executedQty > 0 ? "text-green-600" : "text-muted-foreground"}>
+                        {order.executedQty.toFixed(6)}
+                      </span>
+                      {order.quantity > 0 && (
+                        <span className="text-xs text-muted-foreground">
+                          {((order.executedQty / order.quantity) * 100).toFixed(1)}%
+                        </span>
+                      )}
+                    </div>
                   </TableCell>
-                  <TableCell className="text-right font-mono">
-                    {formatCurrency(order.value)}
+                  <TableCell className="text-right">
+                    <div className="font-mono font-semibold">
+                      {formatCurrency(order.value)}
+                    </div>
                   </TableCell>
                   <TableCell>
-                    <Badge variant="outline" className={`text-xs ${getStatusColor(order.status)}`}>
-                      {order.status}
+                    <Badge variant="outline" className={`text-xs font-medium flex items-center gap-1 w-fit ${getStatusColor(order.status)}`}>
+                      {getStatusIcon(order.status)}
+                      {order.status.replace('_', ' ')}
                     </Badge>
                   </TableCell>
                 </TableRow>
@@ -280,87 +397,156 @@ export function OrderHistoryTable({ orders }: OrderHistoryTableProps) {
           </Table>
         </div>
         
-        <div className="mt-4 text-sm text-muted-foreground">
-          Showing {orderList.length} orders
+        {/* Summary Statistics */}
+        <div className="mt-6 grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-950/50 dark:to-indigo-950/50 p-4 rounded-lg border border-blue-200 dark:border-blue-800">
+            <div className="flex items-center gap-2 mb-1">
+              <History className="h-4 w-4 text-blue-600" />
+              <span className="text-sm font-medium text-blue-900 dark:text-blue-100">Total Orders</span>
+            </div>
+            <div className="text-2xl font-bold text-blue-900 dark:text-blue-100">
+              {summary.totalOrders.toLocaleString()}
+            </div>
+          </div>
+          
+          <div className="bg-gradient-to-br from-emerald-50 to-green-50 dark:from-emerald-950/50 dark:to-green-950/50 p-4 rounded-lg border border-emerald-200 dark:border-emerald-800">
+            <div className="flex items-center gap-2 mb-1">
+              <TrendingUp className="h-4 w-4 text-emerald-600" />
+              <span className="text-sm font-medium text-emerald-900 dark:text-emerald-100">Total Volume</span>
+            </div>
+            <div className="text-2xl font-bold text-emerald-900 dark:text-emerald-100">
+              {formatCurrency(summary.totalValue)}
+            </div>
+          </div>
+          
+          <div className="bg-gradient-to-br from-purple-50 to-violet-50 dark:from-purple-950/50 dark:to-violet-950/50 p-4 rounded-lg border border-purple-200 dark:border-purple-800">
+            <div className="flex items-center gap-2 mb-1">
+              <Activity className="h-4 w-4 text-purple-600" />
+              <span className="text-sm font-medium text-purple-900 dark:text-purple-100">Avg Order Size</span>
+            </div>
+            <div className="text-2xl font-bold text-purple-900 dark:text-purple-100">
+              {formatCurrency(summary.avgOrderSize)}
+            </div>
+          </div>
+        </div>
+        
+        <div className="mt-4 flex items-center justify-between text-sm text-muted-foreground">
+          <span>Showing {orderList.length} orders</span>
+          <Button variant="outline" size="sm" className="gap-2">
+            <ExternalLink className="h-3 w-3" />
+            View on Binance
+          </Button>
         </div>
       </>
     );
   };
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <Calendar className="h-5 w-5" />
-          Orders ({orders.length} total)
-        </CardTitle>
+    <Card className="border-0 shadow-lg">
+      <CardHeader className="bg-gradient-to-r from-slate-50 to-gray-50 dark:from-slate-900 dark:to-gray-900 border-b">
+        <div className="flex items-center justify-between">
+          <CardTitle className="flex items-center gap-3">
+            <div className="h-10 w-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center">
+              <History className="h-5 w-5 text-white" />
+            </div>
+            <div>
+              <div className="text-xl font-bold">Order History</div>
+              <div className="text-sm text-muted-foreground font-normal">
+                {orders.length} total orders • {openOrders.length} active • {completedOrders.length} completed
+              </div>
+            </div>
+          </CardTitle>
+          
+          <div className="flex items-center gap-2">
+            <Badge variant="outline" className="bg-white dark:bg-slate-800">
+              <Activity className="h-3 w-3 mr-1" />
+              Binance
+            </Badge>
+            <Button variant="outline" size="sm" className="gap-2">
+              <ExternalLink className="h-3 w-3" />
+              Exchange
+            </Button>
+          </div>
+        </div>
         
-        {/* Filters */}
-        <div className="flex flex-col sm:flex-row gap-4 mt-4">
-          <div className="relative flex-1">
+        {/* Enhanced Filters */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-6">
+          <div className="relative">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
             <Input
-              placeholder="Search by symbol..."
+              placeholder="Search by symbol or order ID..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-9"
+              className="pl-9 bg-white dark:bg-slate-800"
             />
           </div>
           
           <Select value={statusFilter} onValueChange={setStatusFilter}>
-            <SelectTrigger className="w-full sm:w-[150px]">
-              <SelectValue placeholder="Status" />
+            <SelectTrigger className="bg-white dark:bg-slate-800">
+              <SelectValue placeholder="Filter by status" />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All Status</SelectItem>
-              <SelectItem value="FILLED">Filled</SelectItem>
-              <SelectItem value="NEW">New</SelectItem>
-              <SelectItem value="PARTIALLY_FILLED">Partially Filled</SelectItem>
-              <SelectItem value="CANCELED">Canceled</SelectItem>
+              <SelectItem value="FILLED">✅ Filled</SelectItem>
+              <SelectItem value="NEW">🔵 New</SelectItem>
+              <SelectItem value="PARTIALLY_FILLED">🔄 Partially Filled</SelectItem>
+              <SelectItem value="CANCELED">❌ Canceled</SelectItem>
+              <SelectItem value="REJECTED">🚫 Rejected</SelectItem>
+              <SelectItem value="EXPIRED">⏰ Expired</SelectItem>
             </SelectContent>
           </Select>
           
           <Select value={sideFilter} onValueChange={setSideFilter}>
-            <SelectTrigger className="w-full sm:w-[120px]">
-              <SelectValue placeholder="Side" />
+            <SelectTrigger className="bg-white dark:bg-slate-800">
+              <SelectValue placeholder="Filter by side" />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All Sides</SelectItem>
-              <SelectItem value="BUY">Buy</SelectItem>
-              <SelectItem value="SELL">Sell</SelectItem>
+              <SelectItem value="BUY">📈 Buy Orders</SelectItem>
+              <SelectItem value="SELL">📉 Sell Orders</SelectItem>
             </SelectContent>
           </Select>
         </div>
       </CardHeader>
       
-      <CardContent>
+      <CardContent className="p-6">
         <Tabs defaultValue="open" className="w-full">
-          <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger value="open" className="flex items-center gap-2">
-              <Clock className="h-4 w-4" />
-              Open Orders ({openOrders.length})
+          <TabsList className="grid w-full grid-cols-2 h-12 p-1 bg-muted/30">
+            <TabsTrigger value="open" className="flex items-center gap-2 h-10 data-[state=active]:bg-white data-[state=active]:shadow-sm">
+              <div className="flex items-center gap-2">
+                <Clock className="h-4 w-4" />
+                <span className="font-medium">Active Orders</span>
+                <Badge variant="secondary" className="text-xs font-semibold">
+                  {openOrders.length}
+                </Badge>
+              </div>
             </TabsTrigger>
-            <TabsTrigger value="history" className="flex items-center gap-2">
-              <History className="h-4 w-4" />
-              Order History ({completedOrders.length})
+            <TabsTrigger value="history" className="flex items-center gap-2 h-10 data-[state=active]:bg-white data-[state=active]:shadow-sm">
+              <div className="flex items-center gap-2">
+                <History className="h-4 w-4" />
+                <span className="font-medium">Completed Orders</span>
+                <Badge variant="secondary" className="text-xs font-semibold">
+                  {completedOrders.length}
+                </Badge>
+              </div>
             </TabsTrigger>
           </TabsList>
           
-          <TabsContent value="open" className="mt-6">
+          <TabsContent value="open" className="mt-6 space-y-0">
             {renderOrderTable(
               filteredOpenOrders,
               openOrders.length === 0
-                ? "No open orders found. Your pending and partially filled orders will appear here."
-                : "No open orders match your current filters."
+                ? "No active orders found. Your pending and partially filled orders will appear here when you place new orders."
+                : "No active orders match your current search and filter criteria. Try adjusting your filters."
             )}
           </TabsContent>
           
-          <TabsContent value="history" className="mt-6">
+          <TabsContent value="history" className="mt-6 space-y-0">
             {renderOrderTable(
               filteredCompletedOrders,
               completedOrders.length === 0
-                ? "No completed orders found. Your filled and canceled orders will appear here."
-                : "No completed orders match your current filters."
+                ? "No order history found. Your completed, filled, and canceled orders will appear here after trading."
+                : "No completed orders match your current search and filter criteria. Try adjusting your filters."
             )}
           </TabsContent>
         </Tabs>
