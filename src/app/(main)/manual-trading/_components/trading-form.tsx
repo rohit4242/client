@@ -21,7 +21,6 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
-import { Input } from "@/components/ui/input";
 import {
   Select,
   SelectContent,
@@ -36,6 +35,7 @@ import { useSymbolInfo } from "@/hooks/use-symbol-info";
 import { AssetInfoCard } from "./asset-info-card";
 import { ToggleButtonGroup } from "./toggle-button-group";
 import { TradingInputMode } from "./trading-input-mode";
+import { LimitOrderFields } from "./limit-order-fields";
 import { extractBaseAsset } from "@/lib/utils";
 import { useCreateOrder } from "@/db/actions/order/use-create-order";
 import { 
@@ -365,77 +365,14 @@ export function TradingForm({
               )}
             />
             {orderType === "LIMIT" && (
-              <>
-                <FormField
-                  control={form.control}
-                  name="timeInForce"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Time in Force</FormLabel>
-                      <Select
-                        onValueChange={field.onChange}
-                        value={field.value}
-                      >
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select time in force" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          <SelectItem value="GTC">
-                            Good &apos;til Cancelled
-                          </SelectItem>
-                          <SelectItem value="IOC">
-                            Immediate or Cancel
-                          </SelectItem>
-                          <SelectItem value="FOK">Fill or Kill</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="price"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Price</FormLabel>
-                      <FormControl>
-                        <Input 
-                          {...field} 
-                          placeholder="10000"
-                          onChange={(e) => {
-                            field.onChange(e);
-                            updateCostAndClearErrors();
-                          }}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="quantity"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Quantity</FormLabel>
-                      <FormControl>
-                        <Input 
-                          {...field} 
-                          placeholder="1"
-                          onChange={(e) => {
-                            field.onChange(e);
-                            updateCostAndClearErrors();
-                          }}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </>
+              <LimitOrderFields
+                form={form}
+                currentPrice={price}
+                baseAsset={baseAsset}
+                quoteAsset={quoteAsset}
+                constraints={tradingConstraints}
+                onFieldChange={updateCostAndClearErrors}
+              />
             )}
 
             {/* Market Order Fields - Improved UI with either/or logic */}

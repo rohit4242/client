@@ -106,7 +106,29 @@ export function calculateMaxBuy(
 // Validate if a quantity meets step size requirements
 export function validateStepSize(quantity: number, stepSize: number): number {
   if (stepSize <= 0) return quantity;
-  return Math.floor(quantity / stepSize) * stepSize;
+  
+  // Handle floating point precision issues
+  const ratio = quantity / stepSize;
+  const roundedRatio = Math.round(ratio);
+  
+  // If the quantity is already very close to a valid step, use the rounded value
+  if (Math.abs(ratio - roundedRatio) < 1e-10) {
+    return roundedRatio * stepSize;
+  }
+  
+  // Otherwise, floor to the nearest valid step
+  return Math.floor(ratio) * stepSize;
+}
+
+// Check if a quantity is valid according to step size (without modifying it)
+export function isValidStepSize(quantity: number, stepSize: number): boolean {
+  if (stepSize <= 0) return true;
+  
+  const ratio = quantity / stepSize;
+  const roundedRatio = Math.round(ratio);
+  
+  // Check if the quantity is very close to a valid step size multiple
+  return Math.abs(ratio - roundedRatio) < 1e-10;
 }
 
 // Validate if an order meets minimum notional requirements

@@ -1,5 +1,5 @@
 import { TradingFormData } from "@/db/schema/order";
-import { TradingConstraints, validateStepSize, validateMinNotional } from "./trading-constraints";
+import { TradingConstraints, validateStepSize, validateMinNotional, isValidStepSize } from "./trading-constraints";
 import { AssetBalance, AssetPrice } from "@/types/trading";
 
 export interface ValidationError {
@@ -143,15 +143,12 @@ function validateBuyOrder(
     }
 
     // Check step size
-    if (constraints?.stepSize) {
-      const validQuantity = validateStepSize(quantity, constraints.stepSize);
-      if (Math.abs(quantity - validQuantity) > 1e-8) {
-        errors.push({
-          field: "quantity",
-          message: `Quantity must be a multiple of ${constraints.stepSize} ${baseAsset}`,
-          code: "STEP_SIZE"
-        });
-      }
+    if (constraints?.stepSize && !isValidStepSize(quantity, constraints.stepSize)) {
+      errors.push({
+        field: "quantity",
+        message: `Quantity must be a multiple of ${constraints.stepSize} ${baseAsset}`,
+        code: "STEP_SIZE"
+      });
     }
 
     // Check sufficient balance (estimated cost)
@@ -214,15 +211,12 @@ function validateSellOrder(
   }
 
   // Check step size
-  if (constraints?.stepSize) {
-    const validQuantity = validateStepSize(quantity, constraints.stepSize);
-    if (Math.abs(quantity - validQuantity) > 1e-8) {
-      errors.push({
-        field: "quantity",
-        message: `Quantity must be a multiple of ${constraints.stepSize} ${baseAsset}`,
-        code: "STEP_SIZE"
-      });
-    }
+  if (constraints?.stepSize && !isValidStepSize(quantity, constraints.stepSize)) {
+    errors.push({
+      field: "quantity",
+      message: `Quantity must be a multiple of ${constraints.stepSize} ${baseAsset}`,
+      code: "STEP_SIZE"
+    });
   }
 
   // Check sufficient balance
@@ -280,15 +274,12 @@ function validateLimitOrder(
     });
   }
 
-  if (constraints?.stepSize) {
-    const validQuantity = validateStepSize(quantity, constraints.stepSize);
-    if (Math.abs(quantity - validQuantity) > 1e-8) {
-      errors.push({
-        field: "quantity",
-        message: `Quantity must be a multiple of ${constraints.stepSize} ${baseAsset}`,
-        code: "STEP_SIZE"
-      });
-    }
+  if (constraints?.stepSize && !isValidStepSize(quantity, constraints.stepSize)) {
+    errors.push({
+      field: "quantity",
+      message: `Quantity must be a multiple of ${constraints.stepSize} ${baseAsset}`,
+      code: "STEP_SIZE"
+    });
   }
 
   // Validate price constraints
@@ -308,15 +299,12 @@ function validateLimitOrder(
     });
   }
 
-  if (constraints?.tickSize) {
-    const validPrice = validateStepSize(price, constraints.tickSize);
-    if (Math.abs(price - validPrice) > 1e-8) {
-      errors.push({
-        field: "price",
-        message: `Price must be a multiple of ${constraints.tickSize} ${quoteAsset}`,
-        code: "TICK_SIZE"
-      });
-    }
+  if (constraints?.tickSize && !isValidStepSize(price, constraints.tickSize)) {
+    errors.push({
+      field: "price",
+      message: `Price must be a multiple of ${constraints.tickSize} ${quoteAsset}`,
+      code: "TICK_SIZE"
+    });
   }
 
   // Check minimum notional
