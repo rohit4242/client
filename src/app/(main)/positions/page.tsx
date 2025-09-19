@@ -26,7 +26,7 @@ async function getBotTrades(userId: string) {
         bot: {
           select: {
             name: true,
-            symbol: true,
+            symbols: true,
           },
         },
         signal: {
@@ -62,7 +62,7 @@ async function getOpenPositions(userId: string) {
         bot: {
           select: {
             name: true,
-            symbol: true,
+            symbols: true,
             portfolioPercent: true,
           },
         },

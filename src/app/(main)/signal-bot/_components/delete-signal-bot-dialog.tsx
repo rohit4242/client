@@ -65,7 +65,7 @@ export function DeleteSignalBotDialog({ bot, open, onOpenChange, onSuccess }: De
           <div className="font-medium">Bot Details:</div>
           <div className="space-y-1 text-muted-foreground">
             <div>• Name: {bot.name}</div>
-            <div>• Symbol: {bot.symbol}</div>
+            <div>• Symbols: {bot.symbols.join(', ')}</div>
             <div>• Total Trades: {bot.totalTrades}</div>
             <div>• Status: {bot.isActive ? "Active" : "Inactive"}</div>
           </div>

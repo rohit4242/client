@@ -67,18 +67,18 @@ model Verification {
 }
 
 model UserAccount {
-  id        String     @id @default(uuid())
-  userId    String
-  name      String     @default("Default Account")
+  id     String @id @default(uuid())
+  userId String
+  name   String @default("Default Account")
 
-  createdAt DateTime   @default(now())
-  updatedAt DateTime   @updatedAt
-  
-  exchanges Exchange[]
-  orders    Order[]
-  positions Position[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  exchanges  Exchange[]
+  orders     Order[]
+  positions  Position[]
   signalBots SignalBot[]
-  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user       User        @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("user_account")
 }
@@ -93,7 +93,7 @@ model Exchange {
   apiSecret     String
   isActive      Boolean      @default(true)
   positionMode  PositionMode @default(OneWay)
-  totalValue    Float?     @default(0)
+  totalValue    Float?       @default(0)
   lastSyncedAt  DateTime?
   createdAt     DateTime     @default(now())
   updatedAt     DateTime     @updatedAt
@@ -131,13 +131,13 @@ model Position {
   type             PositionType
   entryPrice       Float
   quantity         Float
-    entryValue       Float
+  entryValue       Float
   entryTime        DateTime
   status           PositionStatus @default(Open)
   exitPrice        Float?
   exitTime         DateTime?
   exitValue        Float?
-      profit           Float?
+  profit           Float?
   profitPercentage Float?
   leverage         Int?
   stopLoss         Float?
@@ -162,101 +162,103 @@ model PositionLog {
 }
 
 model SignalBot {
-  id               String    @id @default(uuid())
-  name             String
-  userAccountId    String
-  exchangeId       String
-  symbol           String
-  timeframe        String    @default("5m")
-  isActive         Boolean   @default(true)
-  
-  // Risk Management
-  portfolioPercent Float     @default(20) // Percentage of portfolio per trade
-  stopLoss         Float?    // Stop loss percentage
-  takeProfit       Float?    // Take profit percentage
-  trailingStop     Boolean   @default(false)
-  
-  // DCA Settings
-  dcaEnabled       Boolean   @default(false)
-  dcaSteps         Int?      @default(3)
-  dcaStepPercent   Float?    @default(2.0) // Percentage between DCA steps
-  
+  id            String   @id @default(uuid())
+  name          String
+  description   String? // Optional description for the bot
+  userAccountId String
+  exchangeId    String
+  symbols       String[] @default([]) // Trading pairs
+  isActive      Boolean  @default(true)
+
+  // Entry Settings - Simple
+  orderType OrderType @default(Market) // Market or Limit only
+
+  // Amount per Trade - Simplified
+  portfolioPercent Float  @default(20) // Percentage of portfolio per trade
+  leverage         Float? @default(1) // Leverage multiplier
+
+  // Exit Strategies - Simple
+  stopLoss   Float? // Stop loss percentage
+  takeProfit Float? // Take profit percentage
+
   // Webhook Configuration
-  webhookUrl       String?   // Generated webhook URL
-  webhookSecret    String?   // Secret for webhook validation
-  
-  // Alert Messages
-  enterLongMsg     String?
-  exitLongMsg      String?
-  enterShortMsg    String?
-  exitShortMsg     String?
-  exitAllMsg       String?
-  
+  webhookUrl    String? // Generated webhook URL
+  webhookSecret String? // Secret for webhook validation
+
+  // Alert Messages - Simple (4 signals only)
+  enterLongMsg  String?
+  exitLongMsg   String?
+  enterShortMsg String?
+  exitShortMsg  String?
+
   // Statistics
-  totalTrades      Int       @default(0)
-  winningTrades    Int       @default(0)
-  totalPnl         Float   @default(0)
-  
-  createdAt        DateTime  @default(now())
-  updatedAt        DateTime  @updatedAt
-  
-  userAccount      UserAccount @relation(fields: [userAccountId], references: [id], onDelete: Cascade)
-  exchange         Exchange    @relation(fields: [exchangeId], references: [id], onDelete: Cascade)
-  signals          Signal[]
-  botTrades        BotTrade[]
-  
+  totalTrades   Int   @default(0)
+  winningTrades Int   @default(0)
+  totalPnl      Float @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  userAccount UserAccount @relation(fields: [userAccountId], references: [id], onDelete: Cascade)
+  exchange    Exchange    @relation(fields: [exchangeId], references: [id], onDelete: Cascade)
+  signals     Signal[]
+  botTrades   BotTrade[]
+
   @@map("signal_bot")
 }
 
 model Signal {
-  id          String      @id @default(uuid())
+  id          String       @id @default(uuid())
   botId       String
   action      SignalAction
   symbol      String
   price       Float?
+  quantity    Float? // Custom quantity if specified
   message     String?
   strategy    String?
   timeframe   String?
-  processed   Boolean     @default(false)
+  processed   Boolean      @default(false)
   processedAt DateTime?
   error       String?
-  createdAt   DateTime    @default(now())
-  
-  bot         SignalBot   @relation(fields: [botId], references: [id], onDelete: Cascade)
-  botTrade    BotTrade?
-  
+  createdAt   DateTime     @default(now())
+
+  bot      SignalBot @relation(fields: [botId], references: [id], onDelete: Cascade)
+  botTrade BotTrade?
+
   @@map("signal")
 }
 
 model BotTrade {
-  id                String         @id @default(uuid())
-  botId             String
-  signalId          String?        @unique
-  symbol            String
-  side              PositionSide
-  entryPrice        Float
-  quantity          Float
-    entryValue        Float
-  entryTime         DateTime
-  status            BotTradeStatus @default(Open)
-  exitPrice         Float?
-  exitTime          DateTime?
-  exitValue         Float?
-  profit            Float?
-  profitPercentage  Float?
-  stopLoss          Float?
-  takeProfit        Float?
-  tradeType         BotTradeType   @default(Signal) // Signal, DCA, StopLoss, TakeProfit
-  parentTradeId     String?        // For DCA trades
-  
-  createdAt         DateTime       @default(now())
-  updatedAt         DateTime       @updatedAt
-  
-  bot               SignalBot      @relation(fields: [botId], references: [id], onDelete: Cascade)
-  signal            Signal?        @relation(fields: [signalId], references: [id], onDelete: SetNull)
-  parentTrade       BotTrade?      @relation("DCATrades", fields: [parentTradeId], references: [id])
-  dcaTrades         BotTrade[]     @relation("DCATrades")
-  
+  id               String         @id @default(uuid())
+  botId            String
+  signalId         String?        @unique
+  symbol           String
+  side             PositionSide
+  entryPrice       Float
+  quantity         Float
+  entryValue       Float
+  entryTime        DateTime
+  status           BotTradeStatus @default(Open)
+  exitPrice        Float?
+  exitTime         DateTime?
+  exitValue        Float?
+  profit           Float?
+  profitPercentage Float?
+
+  // Simple Exit Strategies
+  stopLoss   Float?
+  takeProfit Float?
+
+  // Order Details
+  orderType OrderType @default(Market)
+  leverage  Float?    @default(1)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  bot    SignalBot @relation(fields: [botId], references: [id], onDelete: Cascade)
+  signal Signal?   @relation(fields: [signalId], references: [id], onDelete: SetNull)
+
   @@map("bot_trade")
 }
 
@@ -303,18 +305,10 @@ enum SignalAction {
   EXIT_LONG
   ENTER_SHORT
   EXIT_SHORT
-  EXIT_ALL
 }
 
 enum BotTradeStatus {
   Open
   Closed
   Canceled
-}
-
-enum BotTradeType {
-  Signal
-  DCA
-  StopLoss
-  TakeProfit
 }

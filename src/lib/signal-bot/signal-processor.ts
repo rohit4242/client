@@ -1,17 +1,15 @@
 import db from "@/db";
 import { SignalAction, BotTradeStatus } from "@prisma/client";
-import { executeSignalTrade } from "./trade-executor";
+import { Signal, SignalBot, BotTrade } from "@/types/signal-bot";
 import { validateSignal } from "./signal-validator";
-import { calculatePositionSize } from "./position-calculator";
+import { executeSignalTrade } from "./trade-executor";
 import { getPriceBySymbol } from "@/lib/trading-utils";
-import { BotTrade, Signal, SignalBot } from "@/types/signal-bot";
 
 export interface SignalProcessingResult {
   success: boolean;
   signalId: string;
   tradeId?: string;
   error?: string;
-  message?: string;
   skipped?: boolean;
   skipReason?: string;
 }
@@ -48,7 +46,7 @@ export async function processSignal(signalId: string): Promise<SignalProcessingR
     const { bot } = signal;
 
     // Validate signal
-    const validation = await validateSignal(signal, bot);
+    const validation = await validateSignal(signal, bot as SignalBot);
     if (!validation.isValid) {
       await updateSignalError(signalId, validation.error || "Unknown error");
       return {
@@ -67,7 +65,7 @@ export async function processSignal(signalId: string): Promise<SignalProcessingR
     const priceData = await getPriceBySymbol(configurationRestAPI, signal.symbol);
     const currentPrice = parseFloat((priceData as unknown as { price: string }).price);
 
-    // Get existing positions for this bot
+    // Get existing positions for this bot and symbol
     const existingPositions = await db.botTrade.findMany({
       where: {
         botId: bot.id,
@@ -81,23 +79,19 @@ export async function processSignal(signalId: string): Promise<SignalProcessingR
 
     switch (signal.action) {
       case SignalAction.ENTER_LONG:
-        result = await processEnterLong(signal, bot, currentPrice, existingPositions);
+        result = await processEnterLong(signal, bot as SignalBot, currentPrice, existingPositions);
         break;
       
       case SignalAction.EXIT_LONG:
-        result = await processExitLong(signal, bot, currentPrice, existingPositions);
+        result = await processExitLong(signal, bot as SignalBot, currentPrice, existingPositions);
         break;
       
       case SignalAction.ENTER_SHORT:
-        result = await processEnterShort(signal, bot, currentPrice, existingPositions);
+        result = await processEnterShort(signal, bot as SignalBot, currentPrice, existingPositions);
         break;
       
       case SignalAction.EXIT_SHORT:
-        result = await processExitShort(signal, bot, currentPrice, existingPositions);
-        break;
-      
-      case SignalAction.EXIT_ALL:
-        result = await processExitAll(signal, bot, currentPrice, existingPositions);
+        result = await processExitShort(signal, bot as SignalBot, currentPrice, existingPositions);
         break;
       
       default:
@@ -130,188 +124,187 @@ export async function processSignal(signalId: string): Promise<SignalProcessingR
 
 async function processEnterLong(signal: Signal, bot: SignalBot, currentPrice: number, existingPositions: BotTrade[]): Promise<SignalProcessingResult> {
   // Check if already in long position
-  const existingLong = existingPositions.find(p => p.side === "Long");
-  if (existingLong) {
+  const hasLongPosition = existingPositions.some(p => p.side === "Long");
+  
+  if (hasLongPosition) {
     return {
-      success: true,
+      success: false,
       signalId: signal.id,
       skipped: true,
-      skipReason: "Already in long position",
-      message: `Already in long position (Trade ID: ${existingLong.id})`,
+      skipReason: "Already in long position for this symbol",
     };
-  }
-
-  // Close any short positions first
-  const existingShort = existingPositions.find(p => p.side === "Short");
-  if (existingShort) {
-    await executeSignalTrade({
-      bot,
-      signal,
-      action: "EXIT_SHORT",
-      currentPrice,
-      existingTrade: existingShort,
-    });
   }
 
   // Calculate position size
-  const positionSize = await calculatePositionSize(bot, currentPrice);
-  
-  // Execute long entry
-  const tradeResult = await executeSignalTrade({
-    bot,
-    signal,
-    action: "ENTER_LONG",
-    currentPrice,
-    quantity: positionSize.quantity,
-    value: positionSize.value,
-  });
+  const quantity = await calculatePositionSize(bot, signal, currentPrice);
+  const value = quantity * currentPrice;
 
-  return {
-    success: true,
-    signalId: signal.id,
-    tradeId: tradeResult.tradeId,
-    message: `Entered long position: ${positionSize.quantity} ${bot.symbol} at ${currentPrice}`,
-  };
+  try {
+    const tradeResult = await executeSignalTrade({
+      bot,
+      signal,
+      action: "ENTER_LONG",
+      currentPrice,
+      quantity,
+      value,
+    });
+
+    return {
+      success: true,
+      signalId: signal.id,
+      tradeId: tradeResult.tradeId,
+    };
+
+  } catch (error) {
+    return {
+      success: false,
+      signalId: signal.id,
+      error: error instanceof Error ? error.message : "Trade execution failed",
+    };
+  }
 }
 
 async function processExitLong(signal: Signal, bot: SignalBot, currentPrice: number, existingPositions: BotTrade[]): Promise<SignalProcessingResult> {
-  const existingLong = existingPositions.find(p => p.side === "Long");
+  // Find long position to exit
+  const longPosition = existingPositions.find(p => p.side === "Long");
   
-  if (!existingLong) {
+  if (!longPosition) {
     return {
-      success: true,
+      success: false,
       signalId: signal.id,
       skipped: true,
-      skipReason: "No long position to exit",
-      message: "No long position to exit",
+      skipReason: "No long position to exit for this symbol",
     };
   }
 
-  // Execute long exit
-  const tradeResult = await executeSignalTrade({
-    bot,
-    signal,
-    action: "EXIT_LONG",
-    currentPrice,
-    existingTrade: existingLong,
-  });
-
-  return {
-    success: true,
-    signalId: signal.id,
-    tradeId: tradeResult.tradeId,
-    message: `Exited long position: ${existingLong.quantity} ${bot.symbol} at ${currentPrice}`,
-  };
-}
-
-async function processEnterShort(signal: Signal, bot: SignalBot, currentPrice: number, existingPositions: BotTrade[]): Promise<SignalProcessingResult> {
-  // Check if already in short position
-  const existingShort = existingPositions.find(p => p.side === "Short");
-  if (existingShort) {
-    return {
-      success: true,
-      signalId: signal.id,
-      skipped: true,
-      skipReason: "Already in short position",
-      message: `Already in short position (Trade ID: ${existingShort.id})`,
-    };
-  }
-
-  // Close any long positions first
-  const existingLong = existingPositions.find(p => p.side === "Long");
-  if (existingLong) {
-    await executeSignalTrade({
+  try {
+    const tradeResult = await executeSignalTrade({
       bot,
       signal,
       action: "EXIT_LONG",
       currentPrice,
-      existingTrade: existingLong,
+      quantity: longPosition.quantity,
+      value: longPosition.quantity * currentPrice,
+      existingTrade: longPosition,
     });
+
+    return {
+      success: true,
+      signalId: signal.id,
+      tradeId: tradeResult.tradeId,
+    };
+
+  } catch (error) {
+    return {
+      success: false,
+      signalId: signal.id,
+      error: error instanceof Error ? error.message : "Trade execution failed",
+    };
+  }
+}
+
+async function processEnterShort(signal: Signal, bot: SignalBot, currentPrice: number, existingPositions: BotTrade[]): Promise<SignalProcessingResult> {
+  // Check if already in short position
+  const hasShortPosition = existingPositions.some(p => p.side === "Short");
+  
+  if (hasShortPosition) {
+    return {
+      success: false,
+      signalId: signal.id,
+      skipped: true,
+      skipReason: "Already in short position for this symbol",
+    };
   }
 
   // Calculate position size
-  const positionSize = await calculatePositionSize(bot, currentPrice);
-  
-  // Execute short entry
-  const tradeResult = await executeSignalTrade({
-    bot,
-    signal,
-    action: "ENTER_SHORT",
-    currentPrice,
-    quantity: positionSize.quantity,
-    value: positionSize.value,
-  });
+  const quantity = await calculatePositionSize(bot, signal, currentPrice);
+  const value = quantity * currentPrice;
 
-  return {
-    success: true,
-    signalId: signal.id,
-    tradeId: tradeResult.tradeId,
-    message: `Entered short position: ${positionSize.quantity} ${bot.symbol} at ${currentPrice}`,
-  };
-}
-
-async function processExitShort(signal: Signal, bot: SignalBot, currentPrice: number, existingPositions: BotTrade[]): Promise<SignalProcessingResult> {
-  const existingShort = existingPositions.find(p => p.side === "Short");
-  
-  if (!existingShort) {
-    return {
-      success: true,
-      signalId: signal.id,
-      skipped: true,
-      skipReason: "No short position to exit",
-      message: "No short position to exit",
-    };
-  }
-
-  // Execute short exit
-  const tradeResult = await executeSignalTrade({
-    bot,
-    signal,
-    action: "EXIT_SHORT",
-    currentPrice,
-    existingTrade: existingShort,
-  });
-
-  return {
-    success: true,
-    signalId: signal.id,
-    tradeId: tradeResult.tradeId,
-    message: `Exited short position: ${existingShort.quantity} ${bot.symbol} at ${currentPrice}`,
-  };
-}
-
-async function processExitAll(signal: Signal, bot: SignalBot, currentPrice: number, existingPositions: BotTrade[]): Promise<SignalProcessingResult> {
-  if (existingPositions.length === 0) {
-    return {
-      success: true,
-      signalId: signal.id,
-      skipped: true,
-      skipReason: "No positions to exit",
-      message: "No positions to exit",
-    };
-  }
-
-  const tradeIds: string[] = [];
-  
-  // Close all positions
-  for (const position of existingPositions) {
-    const action = position.side === "Long" ? "EXIT_LONG" : "EXIT_SHORT";
+  try {
     const tradeResult = await executeSignalTrade({
       bot,
       signal,
-      action,
+      action: "ENTER_SHORT",
       currentPrice,
-      existingTrade: position,
+      quantity,
+      value,
     });
-    tradeIds.push(tradeResult.tradeId);
+
+    return {
+      success: true,
+      signalId: signal.id,
+      tradeId: tradeResult.tradeId,
+    };
+
+  } catch (error) {
+    return {
+      success: false,
+      signalId: signal.id,
+      error: error instanceof Error ? error.message : "Trade execution failed",
+    };
+  }
+}
+
+async function processExitShort(signal: Signal, bot: SignalBot, currentPrice: number, existingPositions: BotTrade[]): Promise<SignalProcessingResult> {
+  // Find short position to exit
+  const shortPosition = existingPositions.find(p => p.side === "Short");
+  
+  if (!shortPosition) {
+    return {
+      success: false,
+      signalId: signal.id,
+      skipped: true,
+      skipReason: "No short position to exit for this symbol",
+    };
   }
 
-  return {
-    success: true,
-    signalId: signal.id,
-    tradeId: tradeIds.join(","),
-    message: `Closed ${existingPositions.length} position(s)`,
+  try {
+    const tradeResult = await executeSignalTrade({
+      bot,
+      signal,
+      action: "EXIT_SHORT",
+      currentPrice,
+      quantity: shortPosition.quantity,
+      value: shortPosition.quantity * currentPrice,
+      existingTrade: shortPosition,
+    });
+
+    return {
+      success: true,
+      signalId: signal.id,
+      tradeId: tradeResult.tradeId,
+    };
+
+  } catch (error) {
+    return {
+      success: false,
+      signalId: signal.id,
+      error: error instanceof Error ? error.message : "Trade execution failed",
+    };
+  }
+}
+
+async function calculatePositionSize(bot: SignalBot, signal: Signal, currentPrice: number): Promise<number> {
+  // If custom quantity is provided in signal, use it
+  if (signal.quantity && signal.quantity > 0) {
+    return signal.quantity;
+  }
+
+  // Get portfolio value
+  const configurationRestAPI = {
+    apiKey: bot.exchange!.apiKey,
+    apiSecret: bot.exchange!.apiSecret,
   };
+
+  const portfolioValue = await calculateTotalUSDValue(configurationRestAPI);
+  
+  // Calculate position value based on portfolio percentage
+  const positionValue = (portfolioValue * bot.portfolioPercent) / 100;
+  
+  // Calculate quantity
+  const quantity = positionValue / currentPrice;
+  
+  return quantity;
 }
 
 async function updateSignalError(signalId: string, error: string): Promise<void> {
@@ -324,3 +317,6 @@ async function updateSignalError(signalId: string, error: string): Promise<void>
     },
   });
 }
+
+// Import the calculateTotalUSDValue function
+import { calculateTotalUSDValue } from "@/lib/trading-utils";

@@ -1,43 +1,49 @@
 import { z } from "zod";
 
-// Signal Bot Configuration Schema
+// Simple Signal Bot Configuration Schema
 export const createSignalBotSchema = z.object({
+  // General Configuration
   name: z.string().min(1, "Bot name is required").max(50, "Bot name must be less than 50 characters"),
+  description: z.string().max(200, "Description must be less than 200 characters").optional(),
   exchangeId: z.string().uuid("Invalid exchange ID"),
-  symbol: z.string().min(1, "Symbol is required").regex(/^[A-Z]+USDT?$/, "Invalid symbol format"),
-  timeframe: z.string().default("5m"),
+  symbols: z.array(z.string().regex(/^[A-Z]+USDT?$/, "Invalid symbol format")).min(1, "At least one symbol is required").max(10, "Maximum 10 symbols allowed").default([]),
+  
+  // Entry Settings - Simple
+  orderType: z.enum(["Market", "Limit"]).default("Market"),
+  
+  // Amount per Trade - Simplified
   portfolioPercent: z.number().min(1, "Portfolio percentage must be at least 1%").max(100, "Portfolio percentage cannot exceed 100%").default(20),
+  leverage: z.number().min(1).max(125).default(1),
+  
+  // Exit Strategies - Simple
   stopLoss: z.number().min(0.1).max(50).nullable().optional(),
   takeProfit: z.number().min(0.1).max(100).nullable().optional(),
-  trailingStop: z.boolean().default(false),
-  dcaEnabled: z.boolean().default(false),
-  dcaSteps: z.number().min(2).max(10).nullable().optional(),
-  dcaStepPercent: z.number().min(0.5).max(10).nullable().optional(),
+  
+  // Alert Messages - Simple (4 signals only)
   enterLongMsg: z.string().max(100).optional(),
   exitLongMsg: z.string().max(100).optional(),
   enterShortMsg: z.string().max(100).optional(),
   exitShortMsg: z.string().max(100).optional(),
-  exitAllMsg: z.string().max(100).optional(),
 });
 
 export const updateSignalBotSchema = createSignalBotSchema.partial().extend({
   isActive: z.boolean().optional(),
 });
 
-// Signal Action Schema
+// Signal Action Schema - Only 4 actions
 export const signalActionSchema = z.enum([
   "ENTER_LONG",
   "EXIT_LONG", 
   "ENTER_SHORT",
-  "EXIT_SHORT",
-  "EXIT_ALL"
+  "EXIT_SHORT"
 ]);
 
-// TradingView Alert Schema
+// Simple TradingView Alert Schema
 export const tradingViewAlertSchema = z.object({
   action: z.string(),
   symbol: z.string(),
   price: z.number().positive().optional(),
+  quantity: z.number().positive().optional(),
   strategy: z.string().optional(),
   timeframe: z.string().optional(),
   message: z.string().optional(),
@@ -53,14 +59,14 @@ export const createSignalSchema = z.object({
   action: signalActionSchema,
   symbol: z.string(),
   price: z.number().positive().nullable().optional(),
+  quantity: z.number().positive().nullable().optional(),
   message: z.string().optional(),
   strategy: z.string().optional(),
   timeframe: z.string().optional(),
 });
 
-// Bot Trade Schema
+// Bot Trade Schema - Simplified
 export const botTradeStatusSchema = z.enum(["Open", "Closed", "Canceled"]);
-export const botTradeTypeSchema = z.enum(["Signal", "DCA", "StopLoss", "TakeProfit"]);
 
 export const createBotTradeSchema = z.object({
   botId: z.string().uuid(),
@@ -72,34 +78,12 @@ export const createBotTradeSchema = z.object({
   entryValue: z.number().positive(),
   stopLoss: z.number().positive().nullable().optional(),
   takeProfit: z.number().positive().nullable().optional(),
-  tradeType: botTradeTypeSchema.default("Signal"),
-  parentTradeId: z.string().uuid().nullable().optional(),
 });
 
 // Webhook Validation Schema
 export const webhookValidationSchema = z.object({
   botId: z.string().uuid().optional(),
   secret: z.string().min(8, "Webhook secret must be at least 8 characters"),
-});
-
-// Risk Management Schema
-export const riskManagementSchema = z.object({
-  maxPositionSize: z.number().min(1).max(100),
-  maxDailyTrades: z.number().min(1).max(100),
-  maxDailyLoss: z.number().min(1).max(50),
-  stopLossPercentage: z.number().min(0.1).max(50),
-  takeProfitPercentage: z.number().min(0.1).max(100),
-  trailingStopEnabled: z.boolean(),
-  trailingStopPercentage: z.number().min(0.1).max(20),
-});
-
-// DCA Configuration Schema
-export const dcaConfigSchema = z.object({
-  enabled: z.boolean(),
-  steps: z.number().min(2).max(10),
-  stepPercentage: z.number().min(0.5).max(10),
-  maxDCASteps: z.number().min(2).max(10),
-  dcaMultiplier: z.number().min(1).max(5),
 });
 
 // Type exports
@@ -109,46 +93,12 @@ export type SignalActionType = z.infer<typeof signalActionSchema>;
 export type TradingViewAlertData = z.infer<typeof tradingViewAlertSchema>;
 export type CreateSignalData = z.infer<typeof createSignalSchema>;
 export type BotTradeStatusType = z.infer<typeof botTradeStatusSchema>;
-export type BotTradeTypeType = z.infer<typeof botTradeTypeSchema>;
 export type CreateBotTradeData = z.infer<typeof createBotTradeSchema>;
-export type RiskManagementConfig = z.infer<typeof riskManagementSchema>;
-export type DCAConfig = z.infer<typeof dcaConfigSchema>;
 
-// Default configurations
-export const DEFAULT_RISK_CONFIG: RiskManagementConfig = {
-  maxPositionSize: 20,
-  maxDailyTrades: 10,
-  maxDailyLoss: 5,
-  stopLossPercentage: 2,
-  takeProfitPercentage: 4,
-  trailingStopEnabled: false,
-  trailingStopPercentage: 1,
-};
-
-export const DEFAULT_DCA_CONFIG: DCAConfig = {
-  enabled: false,
-  steps: 3,
-  stepPercentage: 2,
-  maxDCASteps: 5,
-  dcaMultiplier: 1.5,
-};
-
-// Timeframe options
-export const TIMEFRAME_OPTIONS = [
-  { label: "1 minute", value: "1m" },
-  { label: "3 minutes", value: "3m" },
-  { label: "5 minutes", value: "5m" },
-  { label: "15 minutes", value: "15m" },
-  { label: "30 minutes", value: "30m" },
-  { label: "1 hour", value: "1h" },
-  { label: "2 hours", value: "2h" },
-  { label: "4 hours", value: "4h" },
-  { label: "6 hours", value: "6h" },
-  { label: "8 hours", value: "8h" },
-  { label: "12 hours", value: "12h" },
-  { label: "1 day", value: "1d" },
-  { label: "3 days", value: "3d" },
-  { label: "1 week", value: "1w" },
+// Order Type Options
+export const ORDER_TYPE_OPTIONS = [
+  { label: "Market Order", value: "Market" },
+  { label: "Limit Order", value: "Limit" },
 ] as const;
 
 // Popular trading symbols for signal bots

@@ -32,11 +32,16 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Separator } from "@/components/ui/separator";
+import { Textarea } from "@/components/ui/textarea";
 
-import { updateSignalBotSchema, UpdateSignalBotData, TIMEFRAME_OPTIONS, SIGNAL_BOT_SYMBOLS } from "@/db/schema/signal-bot";
+import { 
+  updateSignalBotSchema, 
+  UpdateSignalBotData, 
+  SIGNAL_BOT_SYMBOLS,
+  ORDER_TYPE_OPTIONS 
+} from "@/db/schema/signal-bot";
 import { SignalBot } from "@/types/signal-bot";
 import { Exchange } from "@/types/exchange";
 
@@ -54,21 +59,18 @@ export function EditSignalBotDialog({ bot, open, onOpenChange, onSuccess }: Edit
     resolver: zodResolver(updateSignalBotSchema),
     defaultValues: {
       name: bot.name,
+      description: bot.description || "",
       exchangeId: bot.exchangeId,
-      symbol: bot.symbol,
-      timeframe: bot.timeframe,
+      symbols: bot.symbols,
+      orderType: bot.orderType as "Market" | "Limit",
       portfolioPercent: bot.portfolioPercent,
+      leverage: bot.leverage || 1,
       stopLoss: bot.stopLoss,
       takeProfit: bot.takeProfit,
-      trailingStop: bot.trailingStop,
-      dcaEnabled: bot.dcaEnabled,
-      dcaSteps: bot.dcaSteps,
-      dcaStepPercent: bot.dcaStepPercent,
       enterLongMsg: bot.enterLongMsg || "",
       exitLongMsg: bot.exitLongMsg || "",
       enterShortMsg: bot.enterShortMsg || "",
       exitShortMsg: bot.exitShortMsg || "",
-      exitAllMsg: bot.exitAllMsg || "",
     },
   });
 
@@ -76,21 +78,18 @@ export function EditSignalBotDialog({ bot, open, onOpenChange, onSuccess }: Edit
   useEffect(() => {
     form.reset({
       name: bot.name,
+      description: bot.description || "",
       exchangeId: bot.exchangeId,
-      symbol: bot.symbol,
-      timeframe: bot.timeframe,
+      symbols: bot.symbols,
+      orderType: bot.orderType as "Market" | "Limit",
       portfolioPercent: bot.portfolioPercent,
+      leverage: bot.leverage || 1,
       stopLoss: bot.stopLoss,
       takeProfit: bot.takeProfit,
-      trailingStop: bot.trailingStop,
-      dcaEnabled: bot.dcaEnabled,
-      dcaSteps: bot.dcaSteps,
-      dcaStepPercent: bot.dcaStepPercent,
       enterLongMsg: bot.enterLongMsg || "",
       exitLongMsg: bot.exitLongMsg || "",
       enterShortMsg: bot.enterShortMsg || "",
       exitShortMsg: bot.exitShortMsg || "",
-      exitAllMsg: bot.exitAllMsg || "",
     });
   }, [bot, form]);
 
@@ -113,7 +112,6 @@ export function EditSignalBotDialog({ bot, open, onOpenChange, onSuccess }: Edit
       toast.success("Signal bot updated successfully!");
       onSuccess();
     },
-
     onError: (error: AxiosError<{ error: string }>) => {
       toast.error(error.response?.data?.error || "Failed to update signal bot");
     },
@@ -135,18 +133,17 @@ export function EditSignalBotDialog({ bot, open, onOpenChange, onSuccess }: Edit
         <DialogHeader>
           <DialogTitle>Edit Signal Bot</DialogTitle>
           <DialogDescription>
-            Update your bot configuration and settings.
+            Update your bot configuration and settings. Keep it simple and effective.
           </DialogDescription>
         </DialogHeader>
 
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
             <Tabs defaultValue="basic" className="w-full">
-              <TabsList className="grid w-full grid-cols-4">
-                <TabsTrigger value="basic">Basic</TabsTrigger>
-                <TabsTrigger value="risk">Risk</TabsTrigger>
-                <TabsTrigger value="dca">DCA</TabsTrigger>
-                <TabsTrigger value="alerts">Alerts</TabsTrigger>
+              <TabsList className="grid w-full grid-cols-3">
+                <TabsTrigger value="basic">Basic Settings</TabsTrigger>
+                <TabsTrigger value="risk">Risk Management</TabsTrigger>
+                <TabsTrigger value="alerts">Alert Messages</TabsTrigger>
               </TabsList>
 
               <TabsContent value="basic" className="space-y-4">
@@ -161,6 +158,27 @@ export function EditSignalBotDialog({ bot, open, onOpenChange, onSuccess }: Edit
                       </FormControl>
                       <FormDescription>
                         Give your bot a unique, descriptive name.
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="description"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Description (Optional)</FormLabel>
+                      <FormControl>
+                        <Textarea 
+                          placeholder="Describe your trading strategy..."
+                          {...field}
+                          rows={3}
+                        />
+                      </FormControl>
+                      <FormDescription>
+                        Optional description of your bot&apos;s purpose or strategy.
                       </FormDescription>
                       <FormMessage />
                     </FormItem>
@@ -195,27 +213,61 @@ export function EditSignalBotDialog({ bot, open, onOpenChange, onSuccess }: Edit
                   )}
                 />
 
+                <FormField
+                  control={form.control}
+                  name="symbols"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Trading Symbols</FormLabel>
+                      <Select 
+                        onValueChange={(value) => field.onChange([value])} 
+                        value={field.value?.[0] || ""}
+                      >
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select trading pair" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {SIGNAL_BOT_SYMBOLS.map((symbol) => (
+                            <SelectItem key={symbol} value={symbol}>
+                              {symbol}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormDescription>
+                        Choose the cryptocurrency pair to trade. You can add more symbols later.
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
                 <div className="grid grid-cols-2 gap-4">
                   <FormField
                     control={form.control}
-                    name="symbol"
+                    name="orderType"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Trading Pair</FormLabel>
+                        <FormLabel>Order Type</FormLabel>
                         <Select onValueChange={field.onChange} value={field.value}>
                           <FormControl>
                             <SelectTrigger>
-                              <SelectValue placeholder="Select symbol" />
+                              <SelectValue placeholder="Select order type" />
                             </SelectTrigger>
                           </FormControl>
                           <SelectContent>
-                            {SIGNAL_BOT_SYMBOLS.map((symbol) => (
-                              <SelectItem key={symbol} value={symbol}>
-                                {symbol}
+                            {ORDER_TYPE_OPTIONS.map((option) => (
+                              <SelectItem key={option.value} value={option.value}>
+                                {option.label}
                               </SelectItem>
                             ))}
                           </SelectContent>
                         </Select>
+                        <FormDescription>
+                          Market orders execute immediately, limit orders at specific prices.
+                        </FormDescription>
                         <FormMessage />
                       </FormItem>
                     )}
@@ -223,24 +275,22 @@ export function EditSignalBotDialog({ bot, open, onOpenChange, onSuccess }: Edit
 
                   <FormField
                     control={form.control}
-                    name="timeframe"
+                    name="portfolioPercent"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Timeframe</FormLabel>
-                        <Select onValueChange={field.onChange} value={field.value}>
-                          <FormControl>
-                            <SelectTrigger>
-                              <SelectValue placeholder="Select timeframe" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            {TIMEFRAME_OPTIONS.map((option) => (
-                              <SelectItem key={option.value} value={option.value}>
-                                {option.label}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+                        <FormLabel>Portfolio Percentage (%)</FormLabel>
+                        <FormControl>
+                          <Input 
+                            type="number" 
+                            min="1" 
+                            max="100" 
+                            {...field}
+                            onChange={(e) => field.onChange(Number(e.target.value))}
+                          />
+                        </FormControl>
+                        <FormDescription>
+                          Percentage of portfolio to use per trade (1-100%).
+                        </FormDescription>
                         <FormMessage />
                       </FormItem>
                     )}
@@ -249,21 +299,22 @@ export function EditSignalBotDialog({ bot, open, onOpenChange, onSuccess }: Edit
 
                 <FormField
                   control={form.control}
-                  name="portfolioPercent"
+                  name="leverage"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Portfolio Percentage</FormLabel>
+                      <FormLabel>Leverage (Optional)</FormLabel>
                       <FormControl>
                         <Input 
                           type="number" 
                           min="1" 
-                          max="100" 
+                          max="125" 
                           {...field}
-                          onChange={(e) => field.onChange(Number(e.target.value))}
+                          onChange={(e) => field.onChange(e.target.value ? Number(e.target.value) : 1)}
+                          value={field.value || 1}
                         />
                       </FormControl>
                       <FormDescription>
-                        Percentage of your portfolio to use per trade (1-100%).
+                        Leverage multiplier (1x = no leverage, max 125x). Use with caution!
                       </FormDescription>
                       <FormMessage />
                     </FormItem>
@@ -272,6 +323,13 @@ export function EditSignalBotDialog({ bot, open, onOpenChange, onSuccess }: Edit
               </TabsContent>
 
               <TabsContent value="risk" className="space-y-4">
+                <div className="space-y-1 mb-4">
+                  <h4 className="text-sm font-medium">Risk Management</h4>
+                  <p className="text-sm text-muted-foreground">
+                    Set automatic stop loss and take profit levels to manage your risk.
+                  </p>
+                </div>
+
                 <div className="grid grid-cols-2 gap-4">
                   <FormField
                     control={form.control}
@@ -288,10 +346,11 @@ export function EditSignalBotDialog({ bot, open, onOpenChange, onSuccess }: Edit
                             {...field}
                             onChange={(e) => field.onChange(e.target.value ? Number(e.target.value) : null)}
                             value={field.value || ""}
+                            placeholder="e.g., 2.0"
                           />
                         </FormControl>
                         <FormDescription>
-                          Automatic stop loss percentage.
+                          Automatic stop loss percentage to limit losses.
                         </FormDescription>
                         <FormMessage />
                       </FormItem>
@@ -313,10 +372,11 @@ export function EditSignalBotDialog({ bot, open, onOpenChange, onSuccess }: Edit
                             {...field}
                             onChange={(e) => field.onChange(e.target.value ? Number(e.target.value) : null)}
                             value={field.value || ""}
+                            placeholder="e.g., 4.0"
                           />
                         </FormControl>
                         <FormDescription>
-                          Automatic take profit percentage.
+                          Automatic take profit percentage to secure gains.
                         </FormDescription>
                         <FormMessage />
                       </FormItem>
@@ -324,109 +384,25 @@ export function EditSignalBotDialog({ bot, open, onOpenChange, onSuccess }: Edit
                   />
                 </div>
 
-                <FormField
-                  control={form.control}
-                  name="trailingStop"
-                  render={({ field }) => (
-                    <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
-                      <div className="space-y-0.5">
-                        <FormLabel className="text-base">Trailing Stop</FormLabel>
-                        <FormDescription>
-                          Automatically adjust stop loss as price moves in your favor.
-                        </FormDescription>
-                      </div>
-                      <FormControl>
-                        <Switch
-                          checked={field.value}
-                          onCheckedChange={field.onChange}
-                        />
-                      </FormControl>
-                    </FormItem>
-                  )}
-                />
-              </TabsContent>
-
-              <TabsContent value="dca" className="space-y-4">
-                <FormField
-                  control={form.control}
-                  name="dcaEnabled"
-                  render={({ field }) => (
-                    <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
-                      <div className="space-y-0.5">
-                        <FormLabel className="text-base">Enable DCA</FormLabel>
-                        <FormDescription>
-                          Dollar Cost Averaging - buy more as price drops.
-                        </FormDescription>
-                      </div>
-                      <FormControl>
-                        <Switch
-                          checked={field.value}
-                          onCheckedChange={field.onChange}
-                        />
-                      </FormControl>
-                    </FormItem>
-                  )}
-                />
-
-                {form.watch("dcaEnabled") && (
-                  <div className="grid grid-cols-2 gap-4">
-                    <FormField
-                      control={form.control}
-                      name="dcaSteps"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>DCA Steps</FormLabel>
-                          <FormControl>
-                            <Input 
-                              type="number" 
-                              min="2" 
-                              max="10" 
-                              {...field}
-                              onChange={(e) => field.onChange(e.target.value ? Number(e.target.value) : null)}
-                              value={field.value || ""}
-                            />
-                          </FormControl>
-                          <FormDescription>
-                            Number of DCA buy orders (2-10).
-                          </FormDescription>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-
-                    <FormField
-                      control={form.control}
-                      name="dcaStepPercent"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Step Percentage</FormLabel>
-                          <FormControl>
-                            <Input 
-                              type="number" 
-                              step="0.1" 
-                              min="0.5" 
-                              max="10" 
-                              {...field}
-                              onChange={(e) => field.onChange(e.target.value ? Number(e.target.value) : null)}
-                              value={field.value || ""}
-                            />
-                          </FormControl>
-                          <FormDescription>
-                            Price drop % between DCA orders.
-                          </FormDescription>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
+                <div className="bg-blue-50 dark:bg-blue-950 p-4 rounded-lg">
+                  <div className="flex items-start space-x-2">
+                    <div className="w-4 h-4 bg-blue-500 rounded-full mt-0.5 flex-shrink-0"></div>
+                    <div className="text-sm">
+                      <p className="font-medium text-blue-900 dark:text-blue-100">Risk Management Tip</p>
+                      <p className="text-blue-700 dark:text-blue-300 mt-1">
+                        A good risk-reward ratio is 1:2 (e.g., 2% stop loss with 4% take profit). 
+                        Never risk more than you can afford to lose.
+                      </p>
+                    </div>
                   </div>
-                )}
+                </div>
               </TabsContent>
 
               <TabsContent value="alerts" className="space-y-4">
                 <div className="space-y-1 mb-4">
                   <h4 className="text-sm font-medium">Custom Alert Messages</h4>
                   <p className="text-sm text-muted-foreground">
-                    Configure custom messages to match your TradingView alerts (optional).
+                    Configure custom messages to match your TradingView alerts. Leave blank to use default actions.
                   </p>
                 </div>
 
@@ -440,6 +416,9 @@ export function EditSignalBotDialog({ bot, open, onOpenChange, onSuccess }: Edit
                         <FormControl>
                           <Input placeholder="BUY" {...field} />
                         </FormControl>
+                        <FormDescription>
+                          Custom message for entering long positions.
+                        </FormDescription>
                         <FormMessage />
                       </FormItem>
                     )}
@@ -454,6 +433,9 @@ export function EditSignalBotDialog({ bot, open, onOpenChange, onSuccess }: Edit
                         <FormControl>
                           <Input placeholder="SELL" {...field} />
                         </FormControl>
+                        <FormDescription>
+                          Custom message for exiting long positions.
+                        </FormDescription>
                         <FormMessage />
                       </FormItem>
                     )}
@@ -468,6 +450,9 @@ export function EditSignalBotDialog({ bot, open, onOpenChange, onSuccess }: Edit
                         <FormControl>
                           <Input placeholder="SHORT" {...field} />
                         </FormControl>
+                        <FormDescription>
+                          Custom message for entering short positions.
+                        </FormDescription>
                         <FormMessage />
                       </FormItem>
                     )}
@@ -482,28 +467,26 @@ export function EditSignalBotDialog({ bot, open, onOpenChange, onSuccess }: Edit
                         <FormControl>
                           <Input placeholder="COVER" {...field} />
                         </FormControl>
+                        <FormDescription>
+                          Custom message for exiting short positions.
+                        </FormDescription>
                         <FormMessage />
                       </FormItem>
                     )}
                   />
                 </div>
 
-                <FormField
-                  control={form.control}
-                  name="exitAllMsg"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Exit All Message</FormLabel>
-                      <FormControl>
-                        <Input placeholder="CLOSE_ALL" {...field} />
-                      </FormControl>
-                      <FormDescription>
-                        Message to close all positions.
-                      </FormDescription>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+                <div className="bg-gray-50 dark:bg-gray-900 p-4 rounded-lg">
+                  <div className="text-sm">
+                    <p className="font-medium mb-2">Example TradingView Alert Setup:</p>
+                    <div className="space-y-1 text-muted-foreground">
+                      <p>• Long Entry: <code className="bg-white dark:bg-gray-800 px-1 rounded">BUY</code></p>
+                      <p>• Long Exit: <code className="bg-white dark:bg-gray-800 px-1 rounded">SELL</code></p>
+                      <p>• Short Entry: <code className="bg-white dark:bg-gray-800 px-1 rounded">SHORT</code></p>
+                      <p>• Short Exit: <code className="bg-white dark:bg-gray-800 px-1 rounded">COVER</code></p>
+                    </div>
+                  </div>
+                </div>
               </TabsContent>
             </Tabs>
 

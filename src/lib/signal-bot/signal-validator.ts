@@ -36,6 +36,22 @@ export async function validateSignal(signal: Signal, bot: SignalBot): Promise<Si
       };
     }
 
+    // Validate symbol is in bot's configured symbols
+    if (!bot.symbols.includes(signal.symbol)) {
+      return {
+        isValid: false,
+        error: `Symbol ${signal.symbol} is not configured for this bot`,
+      };
+    }
+
+    // Validate custom quantity if provided
+    if (signal.quantity && signal.quantity <= 0) {
+      return {
+        isValid: false,
+        error: "Invalid custom quantity: must be greater than 0",
+      };
+    }
+
     // Check daily trade limits
     const today = new Date();
     today.setHours(0, 0, 0, 0);
@@ -151,7 +167,7 @@ export async function validateSignal(signal: Signal, bot: SignalBot): Promise<Si
   }
 }
 
-// Validate bot configuration before saving
+// Validate bot configuration before saving - Simplified
 export function validateBotConfiguration(botData: SignalBot): SignalValidationResult {
   const warnings: string[] = [];
 
@@ -160,46 +176,53 @@ export function validateBotConfiguration(botData: SignalBot): SignalValidationRe
     warnings.push("High portfolio percentage (>50%) increases risk");
   }
 
+  if (botData.portfolioPercent < 1) {
+    return {
+      isValid: false,
+      error: "Portfolio percentage must be at least 1%",
+    };
+  }
+
   // Check stop loss configuration
   if (!botData.stopLoss || botData.stopLoss > 10) {
     warnings.push("Consider setting a stop loss below 10%");
   }
 
   // Check take profit configuration
-  if (!botData.takeProfit) {
-    warnings.push("Consider setting a take profit target");
+  if (!botData.takeProfit || botData.takeProfit < 1) {
+    warnings.push("Consider setting a take profit above 1%");
   }
 
-  // Validate DCA settings
-  if (botData.dcaEnabled) {
-    if (!botData.dcaSteps || botData.dcaSteps < 2) {
-      return {
-        isValid: false,
-        error: "DCA steps must be at least 2",
-      };
-    }
-
-    if (!botData.dcaStepPercent || botData.dcaStepPercent < 0.5) {
-      return {
-        isValid: false,
-        error: "DCA step percentage must be at least 0.5%",
-      };
-    }
-
-    if (botData.portfolioPercent * botData.dcaSteps > 100) {
-      return {
-        isValid: false,
-        error: "DCA configuration would exceed 100% of portfolio",
-      };
-    }
-  }
-
-  // Validate custom messages
-  if (botData.enterLongMsg && botData.enterLongMsg === botData.exitLongMsg) {
+  // Validate symbols configuration
+  if (botData.symbols.length === 0) {
     return {
       isValid: false,
-      error: "Enter and exit messages cannot be the same",
+      error: "At least one trading symbol must be configured",
     };
+  }
+
+  if (botData.symbols.length > 10) {
+    return {
+      isValid: false,
+      error: "Maximum 10 trading symbols allowed",
+    };
+  }
+
+  // Validate leverage settings
+  if (botData.leverage && botData.leverage > 10) {
+    warnings.push("High leverage (>10x) significantly increases risk");
+  }
+
+  if (botData.leverage && botData.leverage < 1) {
+    return {
+      isValid: false,
+      error: "Leverage must be at least 1x",
+    };
+  }
+
+  // Validate stop loss and take profit relationship
+  if (botData.stopLoss && botData.takeProfit && botData.stopLoss >= botData.takeProfit) {
+    warnings.push("Stop loss should be lower than take profit for better risk-reward ratio");
   }
 
   return {
@@ -208,11 +231,12 @@ export function validateBotConfiguration(botData: SignalBot): SignalValidationRe
   };
 }
 
-// Check if a signal action is allowed based on current positions
-export async function isSignalActionAllowed(botId: string, action: SignalAction): Promise<boolean> {
+// Check if a signal action is allowed - Simplified for basic functionality
+export async function isSignalActionAllowed(botId: string, action: SignalAction, symbol: string): Promise<boolean> {
   const openPositions = await db.botTrade.findMany({
     where: {
       botId,
+      symbol,
       status: "Open",
     },
   });
@@ -222,19 +246,20 @@ export async function isSignalActionAllowed(botId: string, action: SignalAction)
 
   switch (action) {
     case "ENTER_LONG":
-      return !hasLongPosition; // Can't enter long if already long
+      // Can't enter long if already in long position (simple mode)
+      return !hasLongPosition;
     
     case "EXIT_LONG":
-      return hasLongPosition; // Can only exit if in long position
+      // Can only exit if in long position
+      return hasLongPosition;
     
     case "ENTER_SHORT":
-      return !hasShortPosition; // Can't enter short if already short
+      // Can't enter short if already in short position (simple mode)
+      return !hasShortPosition;
     
     case "EXIT_SHORT":
-      return hasShortPosition; // Can only exit if in short position
-    
-    case "EXIT_ALL":
-      return hasLongPosition || hasShortPosition; // Can exit if any position exists
+      // Can only exit if in short position
+      return hasShortPosition;
     
     default:
       return false;

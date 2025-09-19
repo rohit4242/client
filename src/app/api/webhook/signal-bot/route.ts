@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import db from "@/db";
-import { tradingViewAlertSchema, signalActionSchema } from "@/db/schema/signal-bot";
+import { tradingViewAlertSchema } from "@/db/schema/signal-bot";
 import { SignalAction } from "@prisma/client";
 import { processSignal } from "@/lib/signal-bot/signal-processor";
 import { SignalBot } from "@/types/signal-bot";
@@ -28,7 +28,7 @@ export async function POST(request: NextRequest) {
 
     const alert = validatedAlert.data;
 
-    // Find the target bot
+    // Find the target bot with all necessary relations
     let bot;
     if (alert.botId) {
       bot = await db.signalBot.findUnique({
@@ -86,53 +86,63 @@ export async function POST(request: NextRequest) {
     }
 
     // Validate symbol matches bot configuration
-    if (alert.symbol !== bot.symbol) {
-      console.warn(`Symbol mismatch: webhook=${alert.symbol}, bot=${bot.symbol}`);
-      // Could be flexible here - either reject or allow
+    if (!bot.symbols.includes(alert.symbol)) {
+      console.warn(`Symbol not configured: webhook=${alert.symbol}, bot symbols=${bot.symbols.join(', ')}`);
+      return NextResponse.json(
+        { error: `Symbol ${alert.symbol} is not configured for this bot. Configured symbols: ${bot.symbols.join(', ')}` },
+        { status: 400 }
+      );
     }
 
-    // Create signal record
+    // Validate custom quantity if provided
+    if (alert.quantity && alert.quantity <= 0) {
+      return NextResponse.json(
+        { error: "Invalid custom quantity: must be greater than 0" },
+        { status: 400 }
+      );
+    }
+
+    // Create the signal record
     const signal = await db.signal.create({
       data: {
         botId: bot.id,
         action: signalAction,
         symbol: alert.symbol,
-        price: alert.price ? Number(alert.price) : null,
+        price: alert.price || null,
+        quantity: alert.quantity || null,
         message: alert.message || null,
         strategy: alert.strategy || null,
-        timeframe: alert.timeframe || bot.timeframe,
+        timeframe: alert.timeframe || null,
       },
     });
 
-    console.log("Signal created:", signal);
+    console.log(`Signal created: ${signal.id}`);
 
     // Process the signal asynchronously
     try {
-      const result = await processSignal(signal.id);
-      console.log("Signal processing result:", result);
-      
-      return NextResponse.json({
-        success: true,
-        message: "Signal received and processed",
-        signalId: signal.id,
-        result,
-      });
-    } catch (processingError) {
-      console.error("Signal processing error:", processingError);
-      
-      // Update signal with error
-      await db.signal.update({
-        where: { id: signal.id },
-        data: {
-          processed: true,
-          processedAt: new Date(),
-          error: processingError instanceof Error ? processingError.message : "Processing failed",
-        },
-      });
+      const processingResult = await processSignal(signal.id);
+      console.log("Signal processing result:", processingResult);
 
+      if (processingResult.success) {
+        return NextResponse.json({
+          success: true,
+          signalId: signal.id,
+          tradeId: processingResult.tradeId,
+          message: "Signal processed successfully",
+        });
+      } else {
+        return NextResponse.json({
+          success: false,
+          signalId: signal.id,
+          error: processingResult.error,
+          skipped: processingResult.skipped,
+          skipReason: processingResult.skipReason,
+        });
+      }
+    } catch (processingError) {
+      console.error("Signal processing failed:", processingError);
       return NextResponse.json({
         success: false,
-        message: "Signal received but processing failed",
         signalId: signal.id,
         error: processingError instanceof Error ? processingError.message : "Processing failed",
       });
@@ -141,60 +151,59 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error("Webhook error:", error);
     return NextResponse.json(
-      { 
-        error: "Internal server error",
-        details: error instanceof Error ? error.message : "Unknown error"
-      },
+      { error: "Internal server error" },
       { status: 500 }
     );
   }
 }
 
-// Helper function to parse signal action from TradingView alert
 function parseSignalAction(action: string, bot: SignalBot): SignalAction | null {
-  const normalizedAction = action.toUpperCase().trim();
-  
-  // Direct mapping
-  const directMappings: Record<string, SignalAction> = {
-    "ENTER_LONG": SignalAction.ENTER_LONG,
-    "EXIT_LONG": SignalAction.EXIT_LONG,
-    "ENTER_SHORT": SignalAction.ENTER_SHORT,
-    "EXIT_SHORT": SignalAction.EXIT_SHORT,
-    "EXIT_ALL": SignalAction.EXIT_ALL,
-    "BUY": SignalAction.ENTER_LONG,
-    "SELL": SignalAction.EXIT_LONG,
-    "LONG": SignalAction.ENTER_LONG,
-    "SHORT": SignalAction.ENTER_SHORT,
-    "CLOSE": SignalAction.EXIT_ALL,
-    "CLOSE_LONG": SignalAction.EXIT_LONG,
-    "CLOSE_SHORT": SignalAction.EXIT_SHORT,
-  };
+  const actionUpper = action.toUpperCase();
 
-  if (directMappings[normalizedAction]) {
-    return directMappings[normalizedAction];
+  // Direct action mapping
+  switch (actionUpper) {
+    case "ENTER_LONG":
+    case "BUY":
+    case "LONG":
+      return SignalAction.ENTER_LONG;
+    
+    case "EXIT_LONG":
+    case "SELL_LONG":
+    case "CLOSE_LONG":
+      return SignalAction.EXIT_LONG;
+    
+    case "ENTER_SHORT":
+    case "SELL":
+    case "SHORT":
+      return SignalAction.ENTER_SHORT;
+    
+    case "EXIT_SHORT":
+    case "BUY_SHORT":
+    case "CLOSE_SHORT":
+      return SignalAction.EXIT_SHORT;
   }
 
-  // Custom message matching (if bot has custom messages configured)
-  if (bot.enterLongMsg && action.includes(bot.enterLongMsg)) {
+  // Check custom message mapping
+  if (bot.enterLongMsg && action === bot.enterLongMsg) {
     return SignalAction.ENTER_LONG;
   }
-  if (bot.exitLongMsg && action.includes(bot.exitLongMsg)) {
+  
+  if (bot.exitLongMsg && action === bot.exitLongMsg) {
     return SignalAction.EXIT_LONG;
   }
-  if (bot.enterShortMsg && action.includes(bot.enterShortMsg)) {
+  
+  if (bot.enterShortMsg && action === bot.enterShortMsg) {
     return SignalAction.ENTER_SHORT;
   }
-  if (bot.exitShortMsg && action.includes(bot.exitShortMsg)) {
+  
+  if (bot.exitShortMsg && action === bot.exitShortMsg) {
     return SignalAction.EXIT_SHORT;
-  }
-  if (bot.exitAllMsg && action.includes(bot.exitAllMsg)) {
-    return SignalAction.EXIT_ALL;
   }
 
   return null;
 }
 
-// GET endpoint to check webhook status
+// GET endpoint to check webhook status and provide setup information
 export async function GET(request: NextRequest) {
   const url = new URL(request.url);
   const botId = url.searchParams.get("botId");
@@ -209,14 +218,11 @@ export async function GET(request: NextRequest) {
   try {
     const bot = await db.signalBot.findUnique({
       where: { id: botId },
-      select: {
-        id: true,
-        name: true,
-        isActive: true,
-        webhookUrl: true,
+      include: {
         _count: {
           select: {
             signals: true,
+            botTrades: true,
           },
         },
       },
@@ -229,17 +235,82 @@ export async function GET(request: NextRequest) {
       );
     }
 
+    // Generate webhook information
+    const webhookEndpoint = `${process.env.NEXTAUTH_URL}/api/webhook/signal-bot`;
+    
+    // Get recent signals for status
+    const recentSignals = await db.signal.findMany({
+      where: { botId: bot.id },
+      orderBy: { createdAt: 'desc' },
+      take: 5,
+      select: {
+        id: true,
+        action: true,
+        symbol: true,
+        processed: true,
+        error: true,
+        createdAt: true,
+      },
+    });
+
     return NextResponse.json({
+      // Basic bot info
       botId: bot.id,
       botName: bot.name,
       isActive: bot.isActive,
+      
+      // Webhook configuration
+      webhookEndpoint,
       webhookUrl: bot.webhookUrl,
-      totalSignals: bot._count.signals,
-      webhookEndpoint: `${process.env.NEXTAUTH_URL}/api/webhook/signal-bot`,
+      webhookSecret: bot.webhookSecret ? "***configured***" : null,
+      
+      // Bot configuration summary
+      configuration: {
+        symbols: bot.symbols,
+        orderType: bot.orderType,
+        portfolioPercent: bot.portfolioPercent,
+        leverage: bot.leverage,
+        stopLoss: bot.stopLoss,
+        takeProfit: bot.takeProfit,
+      },
+      
+      // Statistics
+      statistics: {
+        totalSignals: bot._count.signals,
+        totalTrades: bot._count.botTrades,
+        totalPnl: bot.totalPnl,
+        winRate: bot.totalTrades > 0 ? (bot.winningTrades / bot.totalTrades) * 100 : 0,
+      },
+      
+      // Recent activity
+      recentSignals: recentSignals.map(signal => ({
+        id: signal.id,
+        action: signal.action,
+        symbol: signal.symbol,
+        processed: signal.processed,
+        hasError: !!signal.error,
+        timestamp: signal.createdAt,
+      })),
+      
+      // Webhook testing info
+      testingInfo: {
+        endpoint: webhookEndpoint,
+        method: "POST",
+        contentType: "application/json",
+        requiredFields: ["action", "symbol"],
+        optionalFields: ["price", "quantity"],
+        examplePayload: {
+          botId: bot.id,
+          ...(bot.webhookSecret && { secret: "your-webhook-secret" }),
+          action: "ENTER_LONG",
+          symbol: bot.symbols[0] || "BTCUSDT",
+          price: 50000,
+        },
+      },
     });
 
   } catch (error) {
-    console.error("Error fetching bot webhook status:", error);
+    console.error("GET webhook error:", error);
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }

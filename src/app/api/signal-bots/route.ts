@@ -5,6 +5,7 @@ import { auth } from "@/lib/auth";
 import { createSignalBotSchema } from "@/db/schema/signal-bot";
 import { validateBotConfiguration } from "@/lib/signal-bot/signal-validator";
 import { generateWebhookSecret } from "@/lib/utils";
+import { SignalBot } from "@/types/signal-bot";
 
 export async function GET() {
   try {
@@ -78,7 +79,7 @@ export async function POST(request: NextRequest) {
     const botData = validatedBot.data;
 
     // Validate bot configuration
-    const configValidation = validateBotConfiguration(botData);
+    const configValidation = validateBotConfiguration(botData as SignalBot);
     if (!configValidation.isValid) {
       return NextResponse.json(
         { error: configValidation.error },
@@ -132,7 +133,7 @@ export async function POST(request: NextRequest) {
     const webhookSecret = generateWebhookSecret();
     const webhookUrl = `${process.env.NEXTAUTH_URL}/api/webhook/signal-bot`;
 
-    // Create signal bot
+    // Create signal bot with simplified data
     const signalBot = await db.signalBot.create({
       data: {
         ...botData,

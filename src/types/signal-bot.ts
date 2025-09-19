@@ -1,35 +1,32 @@
-import { Decimal } from "@prisma/client/runtime/library";
-
 export interface SignalBot {
   id: string;
   name: string;
+  description?: string | null;
   userAccountId: string;
   exchangeId: string;
-  symbol: string;
-  timeframe: string;
+  symbols: string[];
   isActive: boolean;
   
-  // Risk Management
-  portfolioPercent: number;
-  stopLoss: number | null;
-  takeProfit: number | null;
-  trailingStop: boolean;
+  // Entry Settings - Simple
+  orderType: OrderType;
   
-  // DCA Settings
-  dcaEnabled: boolean;
-  dcaSteps: number | null;
-  dcaStepPercent: number | null;
+  // Amount per Trade - Simplified
+  portfolioPercent: number;
+  leverage?: number | null;
+  
+  // Exit Strategies - Simple
+  stopLoss?: number | null;
+  takeProfit?: number | null;
   
   // Webhook Configuration
   webhookUrl: string | null;
   webhookSecret: string | null;
   
-  // Alert Messages
+  // Alert Messages - Simple (4 signals only)
   enterLongMsg: string | null;
   exitLongMsg: string | null;
   enterShortMsg: string | null;
   exitShortMsg: string | null;
-  exitAllMsg: string | null;
   
   // Statistics
   totalTrades: number;
@@ -49,23 +46,30 @@ export interface SignalBot {
   updatedAt: Date;
 }
 
+export type OrderType = "Market" | "Limit" | "Stop";
+
 export interface CreateSignalBotData {
   name: string;
+  description?: string;
   exchangeId: string;
-  symbol: string;
-  timeframe?: string;
-  portfolioPercent?: number;
+  symbols: string[];
+  
+  // Entry Settings
+  orderType: OrderType;
+  
+  // Amount per Trade
+  portfolioPercent: number;
+  leverage?: number;
+  
+  // Exit Strategies
   stopLoss?: number | null;
   takeProfit?: number | null;
-  trailingStop?: boolean;
-  dcaEnabled?: boolean;
-  dcaSteps?: number | null;
-  dcaStepPercent?: number | null;
+  
+  // Alert Messages
   enterLongMsg?: string;
   exitLongMsg?: string;
   enterShortMsg?: string;
   exitShortMsg?: string;
-  exitAllMsg?: string;
 }
 
 export interface UpdateSignalBotData extends Partial<CreateSignalBotData> {
@@ -76,8 +80,7 @@ export type SignalAction =
   | "ENTER_LONG"
   | "EXIT_LONG" 
   | "ENTER_SHORT"
-  | "EXIT_SHORT"
-  | "EXIT_ALL";
+  | "EXIT_SHORT";
 
 export interface Signal {
   id: string;
@@ -85,6 +88,7 @@ export interface Signal {
   action: SignalAction;
   symbol: string;
   price: number | null;
+  quantity?: number | null;
   message: string | null;
   strategy: string | null;
   timeframe: string | null;
@@ -95,31 +99,37 @@ export interface Signal {
 }
 
 export type BotTradeStatus = "Open" | "Closed" | "Canceled";
-export type BotTradeType = "Signal" | "DCA" | "StopLoss" | "TakeProfit";
 
 export interface BotTrade {
   id: string;
   botId: string;
-  signalId: string | null;
+  signalId?: string | null;
   symbol: string;
-  side: "Long" | "Short";
+  side: PositionSide;
   entryPrice: number;
   quantity: number;
   entryValue: number;
   entryTime: Date;
   status: BotTradeStatus;
-  exitPrice: number | null;
-  exitTime: Date | null;
-  exitValue: number | null;
-  profit: number | null;
-  profitPercentage: number | null;
-  stopLoss: number | null;
-  takeProfit: number | null;
-  tradeType: BotTradeType;
-  parentTradeId: string | null;
+  exitPrice?: number | null;
+  exitTime?: Date | null;
+  exitValue?: number | null;
+  profit?: number | null;
+  profitPercentage?: number | null;
+  
+  // Simple Exit Strategies
+  stopLoss?: number | null;
+  takeProfit?: number | null;
+  
+  // Order Details
+  orderType: OrderType;
+  leverage?: number | null;
+  
   createdAt: Date;
   updatedAt: Date;
 }
+
+export type PositionSide = "Long" | "Short";
 
 // TradingView webhook payload interface
 export interface TradingViewAlert {
@@ -134,17 +144,6 @@ export interface TradingViewAlert {
   botName?: string;
   botId?: string;
   secret?: string;
-}
-
-// Parsed signal from TradingView alert
-export interface ParsedSignal {
-  action: SignalAction;
-  symbol: string;
-  price?: number;
-  strategy?: string;
-  timeframe?: string;
-  message?: string;
-  botIdentifier?: string; // Either botName or botId
 }
 
 // Signal processing result
@@ -166,28 +165,6 @@ export interface BotPerformanceMetrics {
   averageWin: number;
   averageLoss: number;
   profitFactor: number;
-  maxDrawdown: number;
-  sharpeRatio: number;
-}
-
-// Risk management configuration
-export interface RiskManagementConfig {
-  maxPositionSize: number; // Max percentage of portfolio per trade
-  maxDailyTrades: number;
-  maxDailyLoss: number;
-  stopLossPercentage: number;
-  takeProfitPercentage: number;
-  trailingStopEnabled: boolean;
-  trailingStopPercentage: number;
-}
-
-// DCA configuration
-export interface DCAConfig {
-  enabled: boolean;
-  steps: number;
-  stepPercentage: number; // Price drop percentage to trigger next DCA
-  maxDCASteps: number;
-  dcaMultiplier: number; // Multiplier for each DCA step size
 }
 
 // Bot execution context
@@ -198,5 +175,4 @@ export interface BotExecutionContext {
   portfolioValue: number;
   availableBalance: number;
   openPositions: BotTrade[];
-  riskConfig: RiskManagementConfig;
 }

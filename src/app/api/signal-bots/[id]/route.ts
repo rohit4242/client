@@ -4,6 +4,7 @@ import db from "@/db";
 import { auth } from "@/lib/auth";
 import { updateSignalBotSchema } from "@/db/schema/signal-bot";
 import { validateBotConfiguration } from "@/lib/signal-bot/signal-validator";
+import { SignalBot } from "@/types/signal-bot";
 
 interface RouteParams {
   params: Promise<{
@@ -98,8 +99,8 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
     const botData = validatedBot.data;
 
     // Validate bot configuration if significant changes
-    if (botData.portfolioPercent || botData.stopLoss || botData.takeProfit || botData.dcaEnabled) {
-      const configValidation = validateBotConfiguration(botData);
+    if (botData.portfolioPercent || botData.stopLoss || botData.takeProfitLevels || botData.dcaEnabled) {
+      const configValidation = validateBotConfiguration(botData as SignalBot);
       if (!configValidation.isValid) {
         return NextResponse.json(
           { error: configValidation.error },
@@ -164,7 +165,7 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
     const updatedBot = await db.signalBot.update({
       where: { id },
       data: {
-        ...botData,
+        ...(botData as SignalBot),
         updatedAt: new Date(),
       },
       include: {

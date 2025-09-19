@@ -148,7 +148,7 @@ export function SignalBotWidget() {
                   <div className="flex items-center space-x-2">
                     <div className="w-2 h-2 bg-green-500 rounded-full"></div>
                     <span>{bot.name}</span>
-                    <span className="text-muted-foreground">{bot.symbol}</span>
+                    <span className="text-muted-foreground">{bot.symbols.join(', ')}</span>
                   </div>
                   <div className="flex items-center space-x-1">
                     <Activity className="h-3 w-3" />
