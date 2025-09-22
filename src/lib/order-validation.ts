@@ -1,6 +1,7 @@
 import { TradingFormData } from "@/db/schema/order";
-import { TradingConstraints, validateStepSize, validateMinNotional, isValidStepSize } from "./trading-constraints";
+import { TradingConstraints, validateMinNotional, isValidStepSize } from "./trading-constraints";
 import { AssetBalance, AssetPrice } from "@/types/trading";
+
 
 export interface ValidationError {
   field: string;

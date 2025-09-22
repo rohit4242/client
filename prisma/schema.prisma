@@ -7,17 +7,19 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// Auth Models (Better Auth)
 model User {
-  id            String        @id
+  id            String   @id
   name          String
-  email         String        @unique
+  email         String   @unique
   emailVerified Boolean
   image         String?
-  createdAt     DateTime
-  updatedAt     DateTime
-  accounts      Account[]
-  sessions      Session[]
-  userAccounts  UserAccount[]
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  accounts     Account[]
+  sessions     Session[]
+  userAccounts UserAccount[]
 
   @@map("user")
 }
@@ -26,8 +28,8 @@ model Session {
   id        String   @id
   expiresAt DateTime
   token     String   @unique
-  createdAt DateTime
-  updatedAt DateTime
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
   ipAddress String?
   userAgent String?
   userId    String
@@ -48,8 +50,8 @@ model Account {
   refreshTokenExpiresAt DateTime?
   scope                 String?
   password              String?
-  createdAt             DateTime
-  updatedAt             DateTime
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
   user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("account")
@@ -60,141 +62,155 @@ model Verification {
   identifier String
   value      String
   expiresAt  DateTime
-  createdAt  DateTime?
-  updatedAt  DateTime?
+  createdAt  DateTime? @default(now())
+  updatedAt  DateTime? @updatedAt
 
   @@map("verification")
 }
 
+// Core Trading Models
 model UserAccount {
   id     String @id @default(uuid())
   userId String
-  name   String @default("Default Account")
+  name   String @default("Main Account")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  exchanges  Exchange[]
-  orders     Order[]
-  positions  Position[]
-  signalBots SignalBot[]
-  user       User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  exchanges Exchange[]
+  positions Position[]
+  orders    Order[]
+  bots      Bot[]
 
   @@map("user_account")
 }
 
 model Exchange {
-  id            String       @id @default(uuid())
-  userId        String
+  id            String  @id @default(uuid())
   userAccountId String
-  name          String
-  accountName   String?
-  apiKey        String
-  apiSecret     String
-  isActive      Boolean      @default(true)
-  positionMode  PositionMode @default(OneWay)
-  totalValue    Float?       @default(0)
-  lastSyncedAt  DateTime?
-  createdAt     DateTime     @default(now())
-  updatedAt     DateTime     @updatedAt
-  userAccount   UserAccount  @relation(fields: [userAccountId], references: [id], onDelete: Cascade)
-  signalBots    SignalBot[]
+  name          String  @default("Binance")
+  apiKey        String // Encrypted
+  apiSecret     String // Encrypted
+  isActive      Boolean @default(true)
+
+  positionMode PositionMode @default(Hedge)
+
+  // total value
+  totalValue String @default("0")
+
+  lastSyncedAt DateTime @default(now())
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  userAccount UserAccount @relation(fields: [userAccountId], references: [id], onDelete: Cascade)
+  bots        Bot[]
 
   @@map("exchange")
 }
 
-model Order {
-  id            String      @id @default(uuid())
-  symbol        String
-  side          OrderSide
-  type          OrderType
-  price         Float
-  quantity      Float
-  value         Float
-  status        OrderStatus
-  createdAt     DateTime    @default(now())
-  updatedAt     DateTime    @updatedAt
-  positionId    String?     @unique
-  userAccountId String
-  userAccount   UserAccount @relation(fields: [userAccountId], references: [id], onDelete: Cascade)
-  position      Position?
-
-  @@map("order")
-}
-
 model Position {
-  id               String         @id @default(uuid())
-  userAccountId    String
-  orderId          String?        @unique
-  symbol           String
-  side             PositionSide
-  type             PositionType
-  entryPrice       Float
-  quantity         Float
-  entryValue       Float
-  entryTime        DateTime
-  status           PositionStatus @default(Open)
-  exitPrice        Float?
-  exitTime         DateTime?
-  exitValue        Float?
-  profit           Float?
-  profitPercentage Float?
-  leverage         Int?
-  stopLoss         Float?
-  takeProfit       Float?
-  createdAt        DateTime       @default(now())
-  updatedAt        DateTime       @updatedAt
-  order            Order?         @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  userAccount      UserAccount    @relation(fields: [userAccountId], references: [id], onDelete: Cascade)
-  logs             PositionLog[]
+  id            String @id @default(uuid())
+  userAccountId String
+
+  // Core trade data
+  symbol     String
+  side       Side
+  type       OrderOrderType
+  entryPrice Float
+  quantity   Float
+  entryValue Float
+
+  // Current state
+  currentPrice Float?
+  status       Status @default(OPEN)
+
+  // Exit data (nullable until closed)
+  exitPrice  Float?
+  exitValue  Float?
+  pnl        Float  @default(0)
+  pnlPercent Float  @default(0)
+
+  // Risk management
+  stopLoss   Float?
+  takeProfit Float?
+
+  // Metadata
+  source Source  @default(MANUAL) // MANUAL, BOT
+  botId  String?
+
+  // Strategy information
+  strategyId String? // Unique strategy identifier
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  userAccount UserAccount @relation(fields: [userAccountId], references: [id], onDelete: Cascade)
+  bot         Bot?        @relation(fields: [botId], references: [id], onDelete: SetNull)
+  orders      Order[] // Position has many orders
 
   @@map("position")
 }
 
-model PositionLog {
-  id         String   @id @default(uuid())
-  positionId String
-  message    String
-  createdAt  DateTime @default(now())
-  position   Position @relation(fields: [positionId], references: [id], onDelete: Cascade)
+model Order {
+  id            String @id @default(uuid())
+  positionId    String
+  userAccountId String
 
-  @@map("position_log")
+  // Order identification
+  orderId   String // External order ID from exchange
+  symbol    String
+  type      OrderType      @default(ENTRY) // ENTRY, EXIT
+  side      OrderSide      @default(BUY) // BUY, SELL
+  orderType OrderOrderType @default(MARKET) // MARKET, LIMIT
+
+  // Order details
+  price    Float
+  quantity Float
+  value    Float // Total value (price * quantity)
+
+  // Order status
+  status      OrderStatus @default(NEW)
+  fillPercent Float       @default(0) // Fill percentage (0-100)
+
+  // P&L for this specific order
+  pnl Float @default(0)
+
+  // Details if invalid order like insufficient balance, etc.
+  details String?
+
+  // Timestamps
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relationships
+  position    Position    @relation(fields: [positionId], references: [id], onDelete: Cascade)
+  userAccount UserAccount @relation(fields: [userAccountId], references: [id], onDelete: Cascade)
+
+  @@map("order")
 }
 
-model SignalBot {
-  id            String   @id @default(uuid())
-  name          String
-  description   String? // Optional description for the bot
+model Bot {
+  id            String  @id @default(uuid())
   userAccountId String
   exchangeId    String
-  symbols       String[] @default([]) // Trading pairs
-  isActive      Boolean  @default(true)
+  name          String
+  isActive      Boolean @default(true)
 
-  // Entry Settings - Simple
-  orderType OrderType @default(Market) // Market or Limit only
+  // Simple settings
+  symbols         String[] @default([]) // ["BTCUSDT"]
+  positionPercent Float    @default(10) // % of portfolio per trade
+  stopLoss        Float? // % stop loss
+  takeProfit      Float? // % take profit
 
-  // Amount per Trade - Simplified
-  portfolioPercent Float  @default(20) // Percentage of portfolio per trade
-  leverage         Float? @default(1) // Leverage multiplier
+  // Webhook
+  webhookSecret String @default(uuid())
 
-  // Exit Strategies - Simple
-  stopLoss   Float? // Stop loss percentage
-  takeProfit Float? // Take profit percentage
-
-  // Webhook Configuration
-  webhookUrl    String? // Generated webhook URL
-  webhookSecret String? // Secret for webhook validation
-
-  // Alert Messages - Simple (4 signals only)
-  enterLongMsg  String?
-  exitLongMsg   String?
-  enterShortMsg String?
-  exitShortMsg  String?
-
-  // Statistics
-  totalTrades   Int   @default(0)
-  winningTrades Int   @default(0)
-  totalPnl      Float @default(0)
+  // Stats
+  totalTrades Int   @default(0)
+  winTrades   Int   @default(0)
+  totalPnl    Float @default(0)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -202,113 +218,82 @@ model SignalBot {
   userAccount UserAccount @relation(fields: [userAccountId], references: [id], onDelete: Cascade)
   exchange    Exchange    @relation(fields: [exchangeId], references: [id], onDelete: Cascade)
   signals     Signal[]
-  botTrades   BotTrade[]
+  positions   Position[]
 
-  @@map("signal_bot")
+  @@map("bot")
 }
 
 model Signal {
-  id          String       @id @default(uuid())
-  botId       String
-  action      SignalAction
-  symbol      String
-  price       Float?
-  quantity    Float? // Custom quantity if specified
-  message     String?
-  strategy    String?
-  timeframe   String?
-  processed   Boolean      @default(false)
-  processedAt DateTime?
-  error       String?
-  createdAt   DateTime     @default(now())
+  id    String @id @default(uuid())
+  botId String
 
-  bot      SignalBot @relation(fields: [botId], references: [id], onDelete: Cascade)
-  botTrade BotTrade?
+  action  Action
+  symbol  String
+  price   Float?
+  message String?
+
+  processed Boolean  @default(false)
+  error     String?
+  createdAt DateTime @default(now())
+
+  bot Bot @relation(fields: [botId], references: [id], onDelete: Cascade)
 
   @@map("signal")
 }
 
-model BotTrade {
-  id               String         @id @default(uuid())
-  botId            String
-  signalId         String?        @unique
-  symbol           String
-  side             PositionSide
-  entryPrice       Float
-  quantity         Float
-  entryValue       Float
-  entryTime        DateTime
-  status           BotTradeStatus @default(Open)
-  exitPrice        Float?
-  exitTime         DateTime?
-  exitValue        Float?
-  profit           Float?
-  profitPercentage Float?
-
-  // Simple Exit Strategies
-  stopLoss   Float?
-  takeProfit Float?
-
-  // Order Details
-  orderType OrderType @default(Market)
-  leverage  Float?    @default(1)
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  bot    SignalBot @relation(fields: [botId], references: [id], onDelete: Cascade)
-  signal Signal?   @relation(fields: [signalId], references: [id], onDelete: SetNull)
-
-  @@map("bot_trade")
-}
-
-enum OrderType {
-  Market
-  Limit
-  Stop
-}
-
-enum OrderStatus {
-  Pending
-  Filled
-  Canceled
-}
-
-enum OrderSide {
-  Buy
-  Sell
-}
-
-enum PositionSide {
-  Long
-  Short
-}
-
-enum PositionType {
-  Buy
-  Sell
-}
-
-enum PositionStatus {
-  Open
-  Closed
-  Canceled
-}
-
 enum PositionMode {
-  OneWay
+  One_Way
   Hedge
 }
 
-enum SignalAction {
+// Simple Enums
+enum Side {
+  LONG
+  SHORT
+}
+
+enum Status {
+  OPEN
+  CLOSED
+  CANCELED
+  MARKET_CLOSED
+  FAILED
+}
+
+enum Action {
   ENTER_LONG
   EXIT_LONG
   ENTER_SHORT
   EXIT_SHORT
 }
 
-enum BotTradeStatus {
-  Open
-  Closed
-  Canceled
+enum Source {
+  MANUAL
+  BOT
+}
+
+// Order-specific Enums
+enum OrderType {
+  ENTRY
+  EXIT
+}
+
+enum OrderSide {
+  BUY
+  SELL
+}
+
+enum OrderOrderType {
+  MARKET
+  LIMIT
+}
+
+enum OrderStatus {
+  NEW
+  PENDING
+  FILLED
+  COMPLETED
+  CANCELED
+  REJECTED
+  PARTIALLY_FILLED
 }

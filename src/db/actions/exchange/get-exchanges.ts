@@ -14,14 +14,25 @@ export const getExchanges = async () => {
       throw new Error("Unauthorized");
     }
 
-    const exchanges = await db.exchange.findMany({
+    console.log("user id: ", session.user.id)
+
+    
+    const userAccount = await db.userAccount.findFirst({
       where: {
         userId: session.user.id,
+      },
+    });
+
+    const exchanges = await db.exchange.findMany({
+      where: {
+        userAccountId: userAccount?.id,
       },
       orderBy: {
         createdAt: "desc",
       },
     });
+
+    console.log("exchange here: ", exchanges)
 
     // Convert Decimal to number and Date to string for client compatibility
     const processedExchanges = exchanges.map((exchange) => ({

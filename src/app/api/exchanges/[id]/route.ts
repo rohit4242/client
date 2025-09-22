@@ -28,7 +28,6 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     const exchange = await db.exchange.findFirst({
       where: {
         id,
-        userId: session.user.id,
       },
     });
 
@@ -51,7 +50,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     const updatedExchange = await db.exchange.update({
       where: { id },
       data: {
-        totalValue: totalPortfolioValue,
+        totalValue: totalPortfolioValue.toString(),
         lastSyncedAt: new Date(),
       },
     });
@@ -93,7 +92,7 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
     const existingExchange = await db.exchange.findFirst({
       where: {
         id,
-        userId: session.user.id,
+        userAccountId: session.user.id,
       },
     });
 
@@ -196,8 +195,6 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
       data: {
         ...updateData,
         name: updateData.name?.toUpperCase() || existingExchange.name,
-        accountName:
-          updateData.accountName?.toUpperCase() || existingExchange.accountName,
       },
     });
 
@@ -228,7 +225,7 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
     const existingExchange = await db.exchange.findFirst({
       where: {
         id,
-        userId: session.user.id,
+        userAccountId: session.user.id,
       },
     });
 

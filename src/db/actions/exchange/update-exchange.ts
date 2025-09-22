@@ -5,7 +5,7 @@ export interface UpdateExchangeData {
   accountName?: string;
   apiKey?: string;
   apiSecret?: string;
-  positionMode?: "OneWay" | "Hedge";
+  positionMode?: "One_Way" | "Hedge";
   isActive?: boolean;
 }
 

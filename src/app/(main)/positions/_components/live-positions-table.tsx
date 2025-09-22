@@ -320,7 +320,7 @@ export function LivePositionsTable({ positions }: LivePositionsTableProps) {
                 return (
                   <TableRow key={position.id} className="hover:bg-muted/50">
                     <TableCell className="font-mono text-sm">
-                      {formatDate(position.entryTime.toString())}
+                      {formatDate(position.entryTime.toLocaleString())}
                     </TableCell>
                     <TableCell className="font-medium">
                       {position.bot.name}

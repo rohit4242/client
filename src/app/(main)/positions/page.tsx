@@ -3,79 +3,59 @@ import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { getOrders } from "@/db/actions/order/get-orders";
+import { getPositions, getBotPositions } from "@/db/actions/position/get-positions";
+import { PositionData } from "@/types/position";
 import { OrderHistoryTable } from "@/app/(main)/positions/_components/order-history-table";
 import { BotTradesTable } from "@/app/(main)/positions/_components/bot-trades-table";
 import { LivePositionsTable } from "@/app/(main)/positions/_components/live-positions-table";
+import { AdvancedPositionsTable } from "@/app/(main)/positions/_components/advanced-positions-table";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { AlertTriangle, Bot, TrendingUp, Clock } from "lucide-react";
-import db from "@/db";
 
-async function getBotTrades(userId: string) {
-  try {
-    const botTrades = await db.botTrade.findMany({
-      where: {
-        bot: {
-          userAccount: {
-            userId: userId,
-          },
-        },
-      },
-      include: {
-        bot: {
-          select: {
-            name: true,
-            symbols: true,
-          },
-        },
-        signal: {
-          select: {
-            action: true,
-            strategy: true,
-          },
-        },
-      },
-      orderBy: {
-        createdAt: 'desc',
-      },
-    });
-    return botTrades;
-  } catch (error) {
-    console.error("Error fetching bot trades:", error);
-    return [];
-  }
+// Transform bot positions to the format expected by BotTradesTable
+function transformBotPositionsToBotTrades(positions: PositionData[]) {
+  return positions.map(position => ({
+    id: position.id,
+    symbol: position.symbol,
+    side: position.side === "Long" ? "LONG" : "SHORT",
+    entryPrice: position.entryPrice,
+    quantity: position.quantity,
+    entryTime: position.entryTime,
+    createdAt: position.entryTime,
+    status: position.status,
+    tradeType: position.strategy.name === "Signal Bot" ? "BOT" : "MANUAL",
+    exitPrice: position.exitTime ? position.currentPrice : null,
+    profit: position.unrealizedPnl,
+    profitPercentage: position.pnlPercent,
+    bot: {
+      name: position.strategy.name,
+      portfolioPercent: position.portfolioPercent
+    }
+  }));
 }
 
-async function getOpenPositions(userId: string) {
-  try {
-    const openPositions = await db.botTrade.findMany({
-      where: {
-        bot: {
-          userAccount: {
-            userId: userId,
-          },
-        },
-        status: 'Open',
-      },
-      include: {
-        bot: {
-          select: {
-            name: true,
-            symbols: true,
-            portfolioPercent: true,
-          },
-        },
-      },
-      orderBy: {
-        createdAt: 'desc',
-      },
-    });
-    return openPositions;
-  } catch (error) {
-    console.error("Error fetching open positions:", error);
-    return [];
-  }
+// Transform positions to the format expected by LivePositionsTable
+function transformPositionsToLivePositions(positions: PositionData[]) {
+  return positions.map(position => ({
+    id: position.id,
+    symbol: position.symbol,
+    side: position.side,
+    entryPrice: position.entryPrice,
+    quantity: position.quantity,
+    currentValue: position.currentPrice * position.quantity,
+    pnl: position.unrealizedPnl,
+    pnlPercent: position.pnlPercent,
+    status: position.status,
+    createdAt: position.entryTime,
+    lastUpdated: position.lastUpdated,
+    entryTime: position.entryTime,
+    bot: {
+      name: position.strategy.name,
+      portfolioPercent: position.portfolioPercent
+    }
+  }));
 }
 
 async function OrderHistoryContent() {
@@ -107,11 +87,11 @@ async function OrderHistoryContent() {
   }
 }
 
-async function BotTradesContent({ userId }: { userId: string }) {
+async function BotTradesContent() {
   try {
-    const botTrades = await getBotTrades(userId);
+    const botPositions = await getBotPositions();
     
-    if (botTrades.length === 0) {
+    if (botPositions.length === 0) {
       return (
         <Alert>
           <AlertTriangle className="h-4 w-4" />
@@ -122,6 +102,7 @@ async function BotTradesContent({ userId }: { userId: string }) {
       );
     }
     
+    const botTrades = transformBotPositionsToBotTrades(botPositions);
     return <BotTradesTable trades={botTrades} />;
   } catch (error) {
     console.error("Error loading bot trades:", error);
@@ -136,11 +117,11 @@ async function BotTradesContent({ userId }: { userId: string }) {
   }
 }
 
-async function LivePositionsContent({ userId }: { userId: string }) {
+async function LivePositionsContent() {
   try {
-    const openPositions = await getOpenPositions(userId);
+    const positions = await getPositions();
     
-    if (openPositions.length === 0) {
+    if (positions.length === 0) {
       return (
         <Alert>
           <AlertTriangle className="h-4 w-4" />
@@ -151,7 +132,8 @@ async function LivePositionsContent({ userId }: { userId: string }) {
       );
     }
     
-    return <LivePositionsTable positions={openPositions} />;
+    const livePositions = transformPositionsToLivePositions(positions);
+    return <LivePositionsTable positions={livePositions} />;
   } catch (error) {
     console.error("Error loading open positions:", error);
     return (
@@ -159,6 +141,35 @@ async function LivePositionsContent({ userId }: { userId: string }) {
         <AlertTriangle className="h-4 w-4" />
         <AlertDescription>
           Failed to load open positions. Please try again.
+        </AlertDescription>
+      </Alert>
+    );
+  }
+}
+
+async function RealPositionsContent() {
+  try {
+    const positions = await getPositions();
+    
+    if (positions.length === 0) {
+      return (
+        <Alert>
+          <AlertTriangle className="h-4 w-4" />
+          <AlertDescription>
+            No positions found. Create some positions by placing orders to see them here.
+          </AlertDescription>
+        </Alert>
+      );
+    }
+    
+    return <AdvancedPositionsTable positions={positions} />;
+  } catch (error) {
+    console.error("Error loading positions:", error);
+    return (
+      <Alert variant="destructive">
+        <AlertTriangle className="h-4 w-4" />
+        <AlertDescription>
+          Failed to load positions. Please try again.
         </AlertDescription>
       </Alert>
     );
@@ -216,40 +227,49 @@ export default async function PositionsPage() {
         </p>
       </div>
 
-      <Tabs defaultValue="positions" className="w-full">
-        <TabsList className="grid w-full grid-cols-3">
-          <TabsTrigger value="positions" className="flex items-center gap-2">
-            <TrendingUp className="h-4 w-4" />
-            Live Positions
-          </TabsTrigger>
-          <TabsTrigger value="bot-trades" className="flex items-center gap-2">
-            <Bot className="h-4 w-4" />
-            Bot Trades
-          </TabsTrigger>
-          <TabsTrigger value="orders" className="flex items-center gap-2">
-            <Clock className="h-4 w-4" />
-            Order History
-          </TabsTrigger>
-        </TabsList>
+      {/* Real Positions Table - matches the UI from screenshots */}
+      <Suspense fallback={<OrderHistoryLoading />}>
+        <RealPositionsContent />
+      </Suspense>
 
-        <TabsContent value="positions" className="mt-6">
-          <Suspense fallback={<OrderHistoryLoading />}>
-            <LivePositionsContent userId={session.user.id} />
-          </Suspense>
-        </TabsContent>
+      {/* Original Tabs for reference/fallback */}
+      <div className="mt-12 pt-8 border-t">
+        <h2 className="text-xl font-semibold mb-4">Additional Views</h2>
+        <Tabs defaultValue="positions" className="w-full">
+          <TabsList className="grid w-full grid-cols-3">
+            <TabsTrigger value="positions" className="flex items-center gap-2">
+              <TrendingUp className="h-4 w-4" />
+              Live Positions
+            </TabsTrigger>
+            <TabsTrigger value="bot-trades" className="flex items-center gap-2">
+              <Bot className="h-4 w-4" />
+              Bot Trades
+            </TabsTrigger>
+            <TabsTrigger value="orders" className="flex items-center gap-2">
+              <Clock className="h-4 w-4" />
+              Order History
+            </TabsTrigger>
+          </TabsList>
 
-        <TabsContent value="bot-trades" className="mt-6">
-          <Suspense fallback={<OrderHistoryLoading />}>
-            <BotTradesContent userId={session.user.id} />
-          </Suspense>
-        </TabsContent>
+          <TabsContent value="positions" className="mt-6">
+            <Suspense fallback={<OrderHistoryLoading />}>
+              <LivePositionsContent />
+            </Suspense>
+          </TabsContent>
 
-        <TabsContent value="orders" className="mt-6">
-          <Suspense fallback={<OrderHistoryLoading />}>
-            <OrderHistoryContent />
-          </Suspense>
-        </TabsContent>
-      </Tabs>
+          <TabsContent value="bot-trades" className="mt-6">
+            <Suspense fallback={<OrderHistoryLoading />}>
+              <BotTradesContent />
+            </Suspense>
+          </TabsContent>
+
+          <TabsContent value="orders" className="mt-6">
+            <Suspense fallback={<OrderHistoryLoading />}>
+              <OrderHistoryContent />
+            </Suspense>
+          </TabsContent>
+        </Tabs>
+      </div>
     </div>
   );
 }

@@ -34,10 +34,10 @@ interface ConnectExchangeDialogProps {
 }
 
 const formSchema = z.object({
-  accountName: z.string().min(1, "Account name is required"),
+  name: z.string().min(1, "Account name is required"),
   apiKey: z.string().min(1, "API key is required"),
   apiSecret: z.string().min(1, "API secret is required"),
-  positionMode: z.enum(["OneWay", "Hedge"]),
+  positionMode: z.enum(["One_Way", "Hedge"]),
 });
 
 type FormData = z.infer<typeof formSchema>;
@@ -53,10 +53,10 @@ export function ConnectExchangeDialog({
   const form = useForm<FormData>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      accountName: exchange?.accountName || "",
+      name: exchange?.name || "",
       apiKey: exchange?.apiKey || "",
       apiSecret: exchange?.apiSecret || "",
-      positionMode: exchange?.positionMode || "OneWay",
+      positionMode: exchange?.positionMode || "One_Way",
     },
   });
 
@@ -80,8 +80,7 @@ export function ConnectExchangeDialog({
       if (exchange) {
         // Update existing exchange
         response = await updateExchange(exchange.id, {
-          name: data.accountName,
-          accountName: data.accountName,
+          name: data.name,
           apiKey: data.apiKey,
           apiSecret: data.apiSecret,
           positionMode: data.positionMode,
@@ -89,8 +88,7 @@ export function ConnectExchangeDialog({
       } else {
         // Create new exchange
         response = await createExchange({
-          name: data.accountName,
-          accountName: data.accountName,
+          name: data.name,
           apiKey: data.apiKey,
           apiSecret: data.apiSecret,
           positionMode: data.positionMode,
@@ -130,7 +128,7 @@ export function ConnectExchangeDialog({
   useEffect(() => {
     if (exchange) {
       form.reset({
-        accountName: exchange.accountName || "",
+        name: exchange.name || "",
         apiKey: exchange.apiKey,
         apiSecret: exchange.apiSecret,
         positionMode: exchange.positionMode,
@@ -186,7 +184,7 @@ export function ConnectExchangeDialog({
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
             <FormField
               control={form.control}
-              name="accountName"
+              name="name"
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Account Name</FormLabel>

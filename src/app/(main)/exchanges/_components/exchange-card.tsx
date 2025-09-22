@@ -80,7 +80,7 @@ export function ExchangeCard({
         </div>
       </TableCell>
       <TableCell className="font-medium">
-        {exchange.accountName || "N/A"}
+        {exchange.name || "N/A"}
       </TableCell>
       <TableCell>
         <div className="flex items-center space-x-2">

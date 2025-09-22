@@ -1,6 +1,7 @@
 import { configurationRestAPI } from "@/types/binance";
 import { Spot } from "@binance/spot";
 import { extractBaseAsset } from "@/lib/utils";
+import { AssetPrice } from "@/types/trading";
 
 export const getBalance = async (
   configurationRestAPI: configurationRestAPI
@@ -46,7 +47,7 @@ export const getPriceBySymbol = async (
   const response = await client.restAPI.tickerPrice({
     symbol: symbol,
   });
-  const price = await response.data();
+  const price = await response.data() as AssetPrice;
   console.log("price from the getPriceBySymbol function: ", price);
   return price;
 };

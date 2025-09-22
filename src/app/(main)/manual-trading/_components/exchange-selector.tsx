@@ -100,7 +100,7 @@ export function ExchangeSelector({
                   <div className="flex items-center gap-2">
                     <span className="font-medium">{selectedExchange.name}</span>
                     <Badge variant="secondary" className="text-xs">
-                      {selectedExchange.accountName}
+                      {selectedExchange.name}
                     </Badge>
                   </div>
                 )}
@@ -112,7 +112,7 @@ export function ExchangeSelector({
                   <div className="flex items-center gap-2">
                     <span className="font-medium">{exchange.name}</span>
                     <Badge variant="secondary" className="text-xs">
-                      {exchange.accountName}
+                      {exchange.name}
                     </Badge>
                   </div>
                 </SelectItem>
@@ -157,7 +157,7 @@ export function ExchangeSelector({
             {/* Additional Info */}
             <div className="pt-2 border-t border-border/50">
               <div className="flex items-center justify-between text-xs text-muted-foreground">
-                <span>Account: {selectedExchange.accountName}</span>
+                <span>Account: {selectedExchange.name}</span>
                 {selectedExchange.lastSyncedAt && (
                   <span>
                     Last Sync:{" "}

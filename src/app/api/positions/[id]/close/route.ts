@@ -2,12 +2,19 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
 import db from "@/db";
-import { executeSignalTrade } from "@/lib/signal-bot/trade-executor";
-import { SignalAction } from "@/types/signal-bot";
+import { placeCloseOrder } from "@/db/actions/order/create-order";
+import { closePosition } from "@/db/actions/position/close-position";
 
+interface RouteParams {
+  params: Promise<{
+    id: string;
+  }>;
+}
+
+// Market Close Position - Execute opposite order (Buy -> Sell, Sell -> Buy)
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: RouteParams
 ) {
   try {
     const session = await auth.api.getSession({
@@ -21,133 +28,114 @@ export async function POST(
       );
     }
 
-    const positionId = params.id;
+    const body = await request.json();
+    const { id } = await params;
 
-    // Get the position with bot and exchange info
-    const position = await db.botTrade.findFirst({
-      where: {
-        id: positionId,
-        bot: {
-          userAccount: {
-            userId: session.user.id,
-          },
-        },
-        status: "Open",
-      },
+    console.log("body", body);
+    console.log("positionId", id);
+
+    // Find the position with user account
+    const position = await db.position.findUnique({
+      where: { id: id },
       include: {
-        bot: {
+        userAccount: {
           include: {
-            exchange: true,
+            exchanges: true,
           },
         },
-        signal: true,
       },
     });
 
     if (!position) {
       return NextResponse.json(
-        { error: "Position not found or already closed" },
+        { error: "Position not found" },
         { status: 404 }
       );
     }
 
-    // Get current price for the symbol
-    const currentPrice = 50000; // You should fetch this from your price service
+    if (position.status !== "OPEN") {
+      return NextResponse.json(
+        { error: "Position is not open" },
+        { status: 400 }
+      );
+    }
 
-    // Execute close trade
-    const action = position.side === "Long" ? "EXIT_LONG" : "EXIT_SHORT";
+    // Verify position belongs to the authenticated user
+    if (position.userAccount.userId !== session.user.id) {
+      return NextResponse.json(
+        { error: "Unauthorized to close this position" },
+        { status: 403 }
+      );
+    }
+
+    // Get the active exchange for this user
+    const activeExchange = position.userAccount.exchanges.find(ex => ex.isActive);
     
-    await executeSignalTrade({
-      bot: {
-        ...position.bot,
-        // Provide defaults for missing required fields
-        multipleEntries: position.bot.multipleEntries || false,
-        swingTrade: position.bot.swingTrade || false,
-        botStartSource: position.bot.botStartSource || "TRADINGVIEW",
-        botSettingsFormat: position.bot.botSettingsFormat || "FORM",
-        orderType: position.bot.orderType || "Market",
-        limitOrderDeviation: position.bot.limitOrderDeviation,
-        limitOrderDeviationType: position.bot.limitOrderDeviationType || "PERCENTAGE",
-        timeInForce: position.bot.timeInForce || 60,
-        amountType: position.bot.amountType || "PORTFOLIO_PERCENT",
-        quoteAmount: position.bot.quoteAmount,
-        contractAmount: position.bot.contractAmount,
-        leverage: position.bot.leverage || 1,
-        customQuantity: position.bot.customQuantity || false,
-        moveStopToBreakeven: position.bot.moveStopToBreakeven || false,
-        breakEvenTrigger: position.bot.breakEvenTrigger,
-        trailingStopActivation: position.bot.trailingStopActivation,
-        trailingStopDistance: position.bot.trailingStopDistance,
-        reduceOnlyOrders: position.bot.reduceOnlyOrders || false,
-        conditionalOrders: position.bot.conditionalOrders || false,
-        dcaTakeProfitType: position.bot.dcaTakeProfitType || "AVERAGE_PRICE",
-        dcaStopLossType: position.bot.dcaStopLossType || "AVERAGE_PRICE",
-        dcaOrderSizeMultiplier: position.bot.dcaOrderSizeMultiplier || 1,
-        dcaPriceDeviationMultiplier: position.bot.dcaPriceDeviationMultiplier || 1,
-        customQuantityMsg: position.bot.customQuantityMsg,
-        stopLoss: position.bot.stopLoss ? Number(position.bot.stopLoss) : null,
-        totalPnl: Number(position.bot.totalPnl),
-      },
-      signal: position.signal ? {
-        id: position.signal.id,
-        botId: position.signal.botId,
-        action: position.signal.action,
-        symbol: position.signal.symbol,
-        price: position.signal.price ? Number(position.signal.price) : null,
-        quantity: position.signal.quantity ? Number(position.signal.quantity) : null,
-        message: position.signal.message,
-        strategy: position.signal.strategy,
-        timeframe: position.signal.timeframe,
-        processed: position.signal.processed,
-        processedAt: position.signal.processedAt,
-        error: position.signal.error,
-        createdAt: position.signal.createdAt,
-      } : {
-        id: "manual-close",
-        botId: position.botId,
-        action: action as SignalAction,
+    if (!activeExchange) {
+      return NextResponse.json(
+        { error: "No active exchange found for this user" },
+        { status: 400 }
+      );
+    }
+
+    console.log("Using exchange:", activeExchange.name);
+
+    const configurationRestAPI = {
+      apiKey: activeExchange.apiKey,
+      apiSecret: activeExchange.apiSecret,
+    };
+
+    // Place close order on Binance (opposite side)
+    const closeOrderResult = await placeCloseOrder(
+      {
         symbol: position.symbol,
-        price: currentPrice,
-        quantity: null,
-        message: "Manual position close",
-        strategy: null,
-        timeframe: null,
-        processed: false,
-        processedAt: null,
-        error: null,
-        createdAt: new Date(),
+        side: position.side,
+        quantity: position.quantity,
       },
-      action,
-      currentPrice,
-      existingTrade: {
-        ...position,
-        entryPrice: Number(position.entryPrice),
-        quantity: Number(position.quantity),
-        entryValue: Number(position.entryValue),
-        exitPrice: position.exitPrice ? Number(position.exitPrice) : null,
-        exitValue: position.exitValue ? Number(position.exitValue) : null,
-        profit: position.profit ? Number(position.profit) : null,
-        profitPercentage: position.profitPercentage ? Number(position.profitPercentage) : null,
-        stopLoss: position.stopLoss ? Number(position.stopLoss) : null,
-        originalStopLoss: position.originalStopLoss ? Number(position.originalStopLoss) : null,
-        trailingStopPrice: position.trailingStopPrice ? Number(position.trailingStopPrice) : null,
-        leverage: position.leverage ? Number(position.leverage) : null,
-        // Provide defaults for missing required fields
-        stopLossMovedToBreakeven: position.stopLossMovedToBreakeven || false,
-        trailingStopActivated: position.trailingStopActivated || false,
-        orderType: position.orderType || "Market",
-        reduceOnly: position.reduceOnly || false,
-        takeProfitLevels: [],
-        dcaLevel: position.dcaLevel,
-      },
+      configurationRestAPI
+    );
+
+    console.log("Close order result:", closeOrderResult);
+
+    if (!closeOrderResult.success) {
+      return NextResponse.json(
+        {
+          error: closeOrderResult.message || "Failed to place close order",
+          code: closeOrderResult.code,
+          errors: closeOrderResult.errors,
+          warnings: closeOrderResult.warnings,
+        },
+        { status: 400 }
+      );
+    }
+
+    // Update position with close order details
+    const closePositionResult = await closePosition({
+      positionId: position.id,
+      binanceResponse: closeOrderResult.data,
     });
 
-    return NextResponse.json({ success: true });
+    console.log("Position close result:", closePositionResult);
+
+    return NextResponse.json({
+      success: true,
+      message: "Position closed successfully",
+      position: {
+        id: closePositionResult.positionId,
+        status: closePositionResult.status,
+        pnl: closePositionResult.pnl,
+        pnlPercent: closePositionResult.pnlPercent,
+      },
+      closeOrder: closeOrderResult.data,
+    });
 
   } catch (error) {
     console.error("Error closing position:", error);
     return NextResponse.json(
-      { error: "Failed to close position" },
+      { 
+        error: "Internal server error",
+        message: error instanceof Error ? error.message : "Unknown error"
+      },
       { status: 500 }
     );
   }

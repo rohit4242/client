@@ -17,13 +17,14 @@ export async function GET() {
 
     const exchanges = await db.exchange.findMany({
       where: {
-        userId: session.user.id,
+        userAccountId: session.user.id,
       },
       orderBy: {
         createdAt: "desc",
       },
     });
 
+    console.log(" exchanges: ", exchanges);
     for (const exchange of exchanges) {
       if (exchange.isActive) {
         const configurationRestAPI = {
@@ -38,7 +39,7 @@ export async function GET() {
         await db.exchange.update({
           where: { id: exchange.id },
           data: {
-            totalValue: totalPortfolioValue,
+            totalValue: totalPortfolioValue.toString(),
             lastSyncedAt: new Date(),
           },
         });
@@ -139,15 +140,13 @@ export async function POST(request: NextRequest) {
 
     const exchange = await db.exchange.create({
       data: {
-        userId: session.user.id,
         userAccountId: userAccount.id,
         name: name.toUpperCase(),
-        accountName: name.toUpperCase(),
         apiKey,
         apiSecret,
         positionMode: positionMode,
         isActive: true,
-        totalValue: totalPortfolioValue,
+        totalValue: totalPortfolioValue.toString(),
       },
     });
 
