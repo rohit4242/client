@@ -10,7 +10,7 @@ export interface CreatePositionRequest {
   quantity: number;
   stopLoss?: number;
   takeProfit?: number;
-  userAccountId: string;
+  portfolioId: string;
 }
 
 export async function createPosition(
@@ -31,7 +31,7 @@ export async function createPosition(
     // Create position in database
     const position = await db.position.create({
       data: {
-        userAccountId: request.userAccountId,
+        portfolioId: request.portfolioId,
         symbol: request.symbol,
         side: request.side === "Long" ? "LONG" : "SHORT",
         type: request.type === "Market" ? "MARKET" : "LIMIT",
@@ -41,6 +41,7 @@ export async function createPosition(
         status: "OPEN",
         stopLoss: request.stopLoss,
         takeProfit: request.takeProfit,
+        source: "MANUAL",
       },
     });
 
@@ -48,7 +49,7 @@ export async function createPosition(
     const order = await db.order.create({
       data: {
         positionId: position.id,
-        userAccountId: request.userAccountId,
+        portfolioId: request.portfolioId,
         orderId: "", // Will be updated with Binance order ID
         symbol: request.symbol,
         type: "ENTRY", // This is an entry order
@@ -60,6 +61,7 @@ export async function createPosition(
         status: "NEW",
         fillPercent: 0,
         pnl: 0,
+        
       },
     });
 

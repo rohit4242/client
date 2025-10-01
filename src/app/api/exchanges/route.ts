@@ -15,16 +15,26 @@ export async function GET() {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
+    
+    const portfolio = await db.portfolio.findFirst({
+      where: {
+        userId: session.user.id,
+      },
+    });
+
+    if (!portfolio) {
+      return NextResponse.json({ error: "User account not found" }, { status: 404 });
+    }
+
     const exchanges = await db.exchange.findMany({
       where: {
-        userAccountId: session.user.id,
+        portfolioId: portfolio?.id,
       },
       orderBy: {
         createdAt: "desc",
       },
     });
 
-    console.log(" exchanges: ", exchanges);
     for (const exchange of exchanges) {
       if (exchange.isActive) {
         const configurationRestAPI = {
@@ -78,15 +88,15 @@ export async function POST(request: NextRequest) {
 
     console.log(name, apiKey, apiSecret, positionMode);
 
-    let userAccount = await db.userAccount.findFirst({
+    let portfolio = await db.portfolio.findFirst({
       where: {
         userId: session.user.id,
       },
     });
 
     // create user account if not exists
-    if (!userAccount) {
-      userAccount = await db.userAccount.create({
+    if (!portfolio) {
+      portfolio = await db.portfolio.create({
         data: {
           userId: session.user.id,
           name: name.toUpperCase(),
@@ -94,7 +104,7 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    console.log(userAccount);
+    console.log(portfolio);
 
     // check if the exchange already exists
     const existingExchange = await db.exchange.findFirst({
@@ -140,7 +150,7 @@ export async function POST(request: NextRequest) {
 
     const exchange = await db.exchange.create({
       data: {
-        userAccountId: userAccount.id,
+        portfolioId: portfolio.id,
         name: name.toUpperCase(),
         apiKey,
         apiSecret,

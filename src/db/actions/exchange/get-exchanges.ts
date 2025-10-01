@@ -17,7 +17,7 @@ export const getExchanges = async () => {
     console.log("user id: ", session.user.id)
 
     
-    const userAccount = await db.userAccount.findFirst({
+    const portfolio = await db.portfolio.findFirst({
       where: {
         userId: session.user.id,
       },
@@ -25,7 +25,7 @@ export const getExchanges = async () => {
 
     const exchanges = await db.exchange.findMany({
       where: {
-        userAccountId: userAccount?.id,
+        portfolioId: portfolio?.id,
       },
       orderBy: {
         createdAt: "desc",

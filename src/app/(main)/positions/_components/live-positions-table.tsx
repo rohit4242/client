@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useMemo } from "react";
 import {
   Table,
   TableBody,
@@ -17,6 +17,8 @@ import { ArrowUpDown, Search, TrendingUp, X } from "lucide-react";
 import { formatCurrency } from "@/lib/mock-data";
 import { toast } from "sonner";
 import axios from "axios";
+import { TrendPrice } from "@/components/ui/live-price";
+import { useLivePrices } from "@/hooks/use-live-price";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -51,43 +53,16 @@ export function LivePositionsTable({ positions }: LivePositionsTableProps) {
   const [searchTerm, setSearchTerm] = useState("");
   const [sortField, setSortField] = useState<SortField>("createdAt");
   const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
-  const [currentPrices, setCurrentPrices] = useState<{ [key: string]: number }>({});
-  const [loadingPrices, setLoadingPrices] = useState(true);
   const [closingPosition, setClosingPosition] = useState<string | null>(null);
 
-  // Fetch current prices for all symbols
-  useEffect(() => {
-    const fetchPrices = async () => {
-      const symbols = [...new Set(positions.map(p => p.symbol))];
-      const pricePromises = symbols.map(async (symbol) => {
-        try {
-          const response = await axios.get(`/api/trading/price/${symbol}`);
-          return { symbol, price: parseFloat(response.data.price) };
-        } catch (error) {
-          console.error(`Error fetching price for ${symbol}:`, error);
-          return { symbol, price: 0 };
-        }
-      });
-
-      const prices = await Promise.all(pricePromises);
-      const priceMap = prices.reduce((acc, { symbol, price }) => {
-        acc[symbol] = price;
-        return acc;
-      }, {} as { [key: string]: number });
-
-      setCurrentPrices(priceMap);
-      setLoadingPrices(false);
-    };
-
-    if (positions.length > 0) {
-      fetchPrices();
-      // Update prices every 30 seconds
-      const interval = setInterval(fetchPrices, 30000);
-      return () => clearInterval(interval);
-    } else {
-      setLoadingPrices(false);
-    }
-  }, [positions]);
+  // Get unique symbols from positions (memoized to prevent infinite re-renders)
+  const symbols = useMemo(() => 
+    [...new Set(positions.map(p => p.symbol))], 
+    [positions]
+  );
+  
+  // Use the new live prices hook
+  const { prices: currentPrices } = useLivePrices(symbols);
 
   // Filter function
   const filterPositions = () => {
@@ -337,19 +312,11 @@ export function LivePositionsTable({ positions }: LivePositionsTableProps) {
                       ${Number(position.entryPrice).toFixed(4)}
                     </TableCell>
                     <TableCell className="text-right font-mono">
-                      {loadingPrices || !currentPrice ? (
-                        <span className="text-muted-foreground">Loading...</span>
-                      ) : (
-                        <span className={
-                          currentPrice > Number(position.entryPrice) 
-                            ? "text-green-600" 
-                            : currentPrice < Number(position.entryPrice)
-                            ? "text-red-600"
-                            : ""
-                        }>
-                          ${currentPrice.toFixed(4)}
-                        </span>
-                      )}
+                      <TrendPrice
+                        symbol={position.symbol}
+                        entryPrice={Number(position.entryPrice)}
+                        fallbackPrice={Number(position.entryPrice)}
+                      />
                     </TableCell>
                     <TableCell className="text-right font-mono">
                       {Number(position.quantity).toFixed(6)}
@@ -358,7 +325,7 @@ export function LivePositionsTable({ positions }: LivePositionsTableProps) {
                       {currentValue > 0 ? formatCurrency(currentValue) : "-"}
                     </TableCell>
                     <TableCell className="text-right font-mono">
-                      {!loadingPrices && currentPrice ? (
+                      {currentPrice ? (
                         <div className="flex flex-col items-end">
                           <span className={pnl >= 0 ? "text-green-600" : "text-red-600"}>
                             {pnl >= 0 ? "+" : ""}{formatCurrency(pnl)}

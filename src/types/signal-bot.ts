@@ -40,6 +40,7 @@ export interface SignalBot {
     apiKey: string;
     apiSecret: string;
     isActive: boolean;
+    totalValue?: string;
   };
   
   createdAt: Date;

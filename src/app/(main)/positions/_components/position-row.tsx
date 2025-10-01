@@ -11,6 +11,7 @@ import { PositionActions } from "./position-actions";
 import { OrderHistory } from "./order-history";
 import { cn, formatDate } from "@/lib/utils";
 import { useLivePrice } from "@/hooks/use-live-price";
+import { MarkPrice } from "@/components/ui/live-price";
 
 interface PositionRowProps {
   position: PositionData;
@@ -30,7 +31,7 @@ export function PositionRow({
   const [actionLoading, setActionLoading] = useState(false);
 
   // Use live price hook to get real-time market price
-  const { price: livePrice, loading: priceLoading } = useLivePrice(position.symbol);
+  const { price: livePrice } = useLivePrice(position.symbol);
   
   // Priority: passed currentPrice > live price > position.currentPrice > entryPrice as fallback
   const price = currentPrice || livePrice || position.currentPrice || position.entryPrice;
@@ -191,7 +192,7 @@ export function PositionRow({
         </TableCell>
         <TableCell className="text-right">
           <span className="font-mono text-sm">
-            {position.entryPrice.toFixed(2)}
+            ${position.entryPrice?.toFixed(4) || "0.0000"}
           </span>
         </TableCell>
         <TableCell className="text-right">
@@ -205,18 +206,18 @@ export function PositionRow({
           </span>
         </TableCell>
         <TableCell className="text-right">
-          <span className="text-muted-foreground">
-            {position.takeProfit ? `$${position.takeProfit.toFixed(2)}` : "-"}
+          <span className="text-muted-foreground font-mono">
+            {position.takeProfit ? `$${position.takeProfit.toFixed(4)}` : "-"}
           </span>
         </TableCell>
         <TableCell className="text-right">
-          <span className="text-muted-foreground">
-            {position.stopLoss ? `$${position.stopLoss.toFixed(2)}` : "-"}
+          <span className="text-muted-foreground font-mono">
+            {position.stopLoss ? `$${position.stopLoss.toFixed(4)}` : "-"}
           </span>
         </TableCell>
         <TableCell className="text-right">
-          <span className="text-muted-foreground">
-            {position.breakEven ? `$${position.breakEven.toFixed(2)}` : "-"}
+          <span className="text-muted-foreground font-mono">
+            {position.breakEven ? `$${position.breakEven.toFixed(4)}` : "-"}
           </span>
         </TableCell>
         <TableCell className="text-right">
@@ -250,18 +251,11 @@ export function PositionRow({
         </TableCell>
         <TableCell className="text-center">
           {getStatusBadge(position.status)}
-          <div className="text-xs text-muted-foreground mt-1">
-            Mark price: {priceLoading ? (
-              <span className="animate-pulse">Loading...</span>
-            ) : (
-              <span className={cn(
-                "font-mono",
-                livePrice ? "text-green-600" : "text-muted-foreground"
-              )}>
-                {price.toFixed(2)}
-              </span>
-            )}
-          </div>
+          <MarkPrice 
+            symbol={position.symbol} 
+            fallbackPrice={position.currentPrice || position.entryPrice}
+            className="mt-1"
+          />
         </TableCell>
         <TableCell className="text-center">
           <PositionActions
@@ -318,7 +312,7 @@ export function PositionRow({
                   <span className="font-medium text-muted-foreground">
                     Amount:
                   </span>
-                  <span className="ml-2">{position.quantity.toFixed(4)}</span>
+                  <span className="ml-2">{position.quantity}</span>
                 </div>
                 <div>
                   <span className="font-medium text-muted-foreground">

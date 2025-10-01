@@ -252,12 +252,13 @@ export type PriceData = {
 export interface PositionTransformContext {
   currentPrices?: Record<string, number>;
   exchangeInfo?: Record<string, unknown>;
-  userAccount?: {
+  portfolio?: {
     id: string;
     name: string;
     exchanges: Array<{
       id: string;
       name: string;
+      portfolioId: string;
     }>;
   };
 }

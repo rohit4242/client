@@ -78,7 +78,7 @@ export async function closePosition(request: ClosePositionRequest) {
     const closeOrder = await db.order.create({
       data: {
         positionId: existingPosition.id,
-        userAccountId: existingPosition.userAccountId,
+        portfolioId: existingPosition.portfolioId,
         orderId: request.binanceResponse.orderId?.toString() || "",
         symbol: existingPosition.symbol,
         type: "EXIT", // This is an exit order

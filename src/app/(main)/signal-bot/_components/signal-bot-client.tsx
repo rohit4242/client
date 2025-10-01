@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { SignalBotList } from "./signal-bot-list";
-import { CreateSignalBotDialog } from "./create-signal-bot-dialog";
+import { CreateSignalBotDialog } from "./dialogs/create-signal-bot-dialog";
 import { SignalBotHeader } from "./signal-bot-header";
 import { SignalBotStats } from "./signal-bot-stats";
 import { EmptyState } from "./empty-state";

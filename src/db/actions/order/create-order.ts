@@ -8,18 +8,8 @@ export interface PlaceOrderResult {
   success: boolean;
   errors?: ValidationError[];
   warnings?: string[];
-  data?: {
-    orderId: string;
-    symbol: string;
-    side: string;
-    type: string;
-    quantity: string;
-    price?: string;
-    status: string;
-    transactTime: number;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    fills: any[];
-  };
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  data?: any;
   message?: string;
   code?: number;
 }
@@ -141,17 +131,7 @@ export async function placeOrder(
     return {
       success: true,
       message: "Order placed successfully",
-      data: {
-        orderId: data.orderId?.toString() || "",
-        symbol: data.symbol || "",
-        side: data.side || "",
-        type: data.type || "",
-        quantity: data.origQty || "0",
-        price: data.price || "",
-        status: data.status || "",
-        transactTime: data.transactTime || 0,
-        fills: data.fills || [],
-      },
+      data : data,
       warnings: [],
     };
   } catch (error: unknown) {
@@ -250,17 +230,7 @@ export async function placeCloseOrder(
     return {
       success: true,
       message: "Close order placed successfully",
-      data: {
-        orderId: data.orderId?.toString() || "",
-        symbol: data.symbol || "",
-        side: data.side || "",
-        type: data.type || "",
-        quantity: data.origQty || "0",
-        price: data.price || "",
-        status: data.status || "",
-        transactTime: data.transactTime || 0,
-        fills: data.fills || [],
-      },
+      data,
       warnings: [],
     };
   } catch (error: unknown) {

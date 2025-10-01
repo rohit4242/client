@@ -200,7 +200,7 @@ export function EditSignalBotDialog({ bot, open, onOpenChange, onSuccess }: Edit
                         <SelectContent>
                           {activeExchanges.map((exchange) => (
                             <SelectItem key={exchange.id} value={exchange.id}>
-                              {exchange.name} {exchange.accountName && `(${exchange.accountName})`}
+                              {exchange.name} {exchange.name && `(${exchange.name})`}
                             </SelectItem>
                           ))}
                         </SelectContent>

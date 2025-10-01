@@ -45,6 +45,8 @@ import {
   ORDER_TYPE_OPTIONS 
 } from "@/db/schema/signal-bot";
 import { Exchange } from "@/types/exchange";
+import { SignalBot } from "@/types/signal-bot";
+import { PositionConfirmationDialog } from "./position-confirmation-dialog";
 
 interface CreateSignalBotDialogProps {
   open: boolean;
@@ -54,6 +56,8 @@ interface CreateSignalBotDialogProps {
 
 export function CreateSignalBotDialog({ open, onOpenChange, onSuccess }: CreateSignalBotDialogProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [createdBot, setCreatedBot] = useState<SignalBot | null>(null);
+  const [showPositionDialog, setShowPositionDialog] = useState(false);
 
   const form = useForm({
     resolver: zodResolver(createSignalBotSchema),
@@ -89,10 +93,12 @@ export function CreateSignalBotDialog({ open, onOpenChange, onSuccess }: CreateS
       const response = await axios.post("/api/signal-bots", data);
       return response.data;
     },
-    onSuccess: () => {
+    onSuccess: (data: SignalBot) => {
       toast.success("Signal bot created successfully!");
       form.reset();
-      onSuccess();
+      setCreatedBot(data);
+      onOpenChange(false); // Close create dialog
+      setShowPositionDialog(true); // Show position dialog
     },
     onError: (error: AxiosError<{ error: string }>) => {
       toast.error(error.response?.data?.error || "Failed to create signal bot");
@@ -109,8 +115,15 @@ export function CreateSignalBotDialog({ open, onOpenChange, onSuccess }: CreateS
 
   const activeExchanges = exchanges.filter(exchange => exchange.isActive);
 
+  const handlePositionDialogComplete = () => {
+    setShowPositionDialog(false);
+    setCreatedBot(null);
+    onSuccess(); // Refresh the bot list
+  };
+
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <>
+      <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center space-x-2">
@@ -202,7 +215,7 @@ export function CreateSignalBotDialog({ open, onOpenChange, onSuccess }: CreateS
                             <SelectContent>
                               {activeExchanges.map((exchange) => (
                                 <SelectItem key={exchange.id} value={exchange.id}>
-                                  {exchange.name} {exchange.accountName && `(${exchange.accountName})`}
+                                  {exchange.name} {exchange.name && `(${exchange.name})`}
                                 </SelectItem>
                               ))}
                             </SelectContent>
@@ -528,5 +541,16 @@ export function CreateSignalBotDialog({ open, onOpenChange, onSuccess }: CreateS
         </Form>
       </DialogContent>
     </Dialog>
+
+    {/* Position Confirmation Dialog */}
+    {createdBot && (
+      <PositionConfirmationDialog
+        bot={createdBot}
+        open={showPositionDialog}
+        onOpenChange={setShowPositionDialog}
+        onSuccess={handlePositionDialogComplete}
+      />
+    )}
+    </>
   );
 }

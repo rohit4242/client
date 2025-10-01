@@ -38,6 +38,9 @@ interface PositionActionsProps {
 export function PositionActions({ position, onAction, disabled = false }: PositionActionsProps) {
   const [isClosing, setIsClosing] = useState(false);
   const [showCloseDialog, setShowCloseDialog] = useState(false);
+  
+  // Check if position is closed
+  const isClosedPosition = position.status === "CLOSED" || position.status === "MARKET_CLOSED";
 
 
   const handleClosePosition = async () => {
@@ -84,30 +87,31 @@ export function PositionActions({ position, onAction, disabled = false }: Positi
   return (
     <TooltipProvider>
       <div className="flex items-center justify-center gap-1">
-        {/* Close Position */}
-        <AlertDialog open={showCloseDialog} onOpenChange={setShowCloseDialog}>
-          <AlertDialogTrigger asChild>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button 
-                  variant="ghost" 
-                  size="sm" 
-                  className="h-8 w-8 p-0 hover:bg-red-50 hover:text-red-600"
-                  disabled={disabled || isClosing}
-                  onClick={() => setShowCloseDialog(true)}
-                >
-                  {isClosing ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <X className="h-4 w-4" />
-                  )}
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>
-                <p>Close Position (Market {getCloseOrderType()})</p>
-              </TooltipContent>
-            </Tooltip>
-          </AlertDialogTrigger>
+        {/* Close Position - only show for open positions */}
+        {!isClosedPosition && (
+          <AlertDialog open={showCloseDialog} onOpenChange={setShowCloseDialog}>
+            <AlertDialogTrigger asChild>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    className="h-8 w-8 p-0 hover:bg-red-50 hover:text-red-600"
+                    disabled={disabled || isClosing}
+                    onClick={() => setShowCloseDialog(true)}
+                  >
+                    {isClosing ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <X className="h-4 w-4" />
+                    )}
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>Close Position (Market {getCloseOrderType()})</p>
+                </TooltipContent>
+              </Tooltip>
+            </AlertDialogTrigger>
           <AlertDialogContent>
             <AlertDialogHeader>
               <AlertDialogTitle>Close Position - {position.symbol}</AlertDialogTitle>
@@ -167,26 +171,29 @@ export function PositionActions({ position, onAction, disabled = false }: Positi
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
+        )}
 
-        {/* Edit Position */}
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button 
-              variant="ghost" 
-              size="sm" 
-              className="h-8 w-8 p-0 hover:bg-blue-50 hover:text-blue-600"
-              disabled={disabled}
-              onClick={() => {
-                toast.info("Edit position functionality coming soon");
-              }}
-            >
-              <Edit className="h-4 w-4" />
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent>
-            <p>Edit Position (Stop Loss, Take Profit)</p>
-          </TooltipContent>
-        </Tooltip>
+        {/* Edit Position - only show for open positions */}
+        {!isClosedPosition && (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                className="h-8 w-8 p-0 hover:bg-blue-50 hover:text-blue-600"
+                disabled={disabled}
+                onClick={() => {
+                  toast.info("Edit position functionality coming soon");
+                }}
+              >
+                <Edit className="h-4 w-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>
+              <p>Edit Position (Stop Loss, Take Profit)</p>
+            </TooltipContent>
+          </Tooltip>
+        )}
 
         {/* View Chart */}
         <Tooltip>

@@ -24,9 +24,9 @@ import {
   DropdownMenuTrigger 
 } from "@/components/ui/dropdown-menu";
 import { SignalBot } from "@/types/signal-bot";
-import { EditSignalBotDialog } from "./edit-signal-bot-dialog";
-import { DeleteSignalBotDialog } from "./delete-signal-bot-dialog";
-import { WebhookInfoDialog } from "./webhook-info-dialog";
+import { EditSignalBotDialog } from "./dialogs/edit-signal-bot-dialog";
+import { DeleteSignalBotDialog } from "./dialogs/delete-signal-bot-dialog";
+import { WebhookInfoDialog } from "./dialogs/webhook-info-dialog";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import { useMutation } from "@tanstack/react-query";
 import axios, { AxiosError } from "axios";
@@ -116,7 +116,7 @@ export function SignalBotCard({ bot, onBotUpdated }: SignalBotCardProps) {
                   </DropdownMenuItem>
                   <DropdownMenuItem onClick={() => setShowWebhookDialog(true)}>
                     <Link className="h-4 w-4 mr-2" />
-                    Webhook Info
+                    Webhook & Alerts
                   </DropdownMenuItem>
                   <DropdownMenuItem 
                     onClick={() => setShowDeleteDialog(true)}
@@ -257,6 +257,7 @@ export function SignalBotCard({ bot, onBotUpdated }: SignalBotCardProps) {
         open={showWebhookDialog}
         onOpenChange={setShowWebhookDialog}
       />
+
     </>
   );
 }

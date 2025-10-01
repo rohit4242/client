@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import {
   Table,
   TableBody,
@@ -29,96 +29,6 @@ interface AdvancedPositionsTableProps {
   positions?: PositionData[];
 }
 
-// Mock data for demonstration
-const mockPositions: PositionData[] = [
-  {
-    id: "68ccffc2cc647bcc9b703a0",
-    symbol: "ETHUSDT",
-    side: "Long",
-    entryPrice: 4528.28,
-    currentPrice: 4523.48,
-    quantity: 0.0023,
-    filledQuantity: 0.0023,
-    remainingQuantity: 0,
-    maxDrawdown: -0.02,
-    takeProfit: undefined,
-    stopLoss: undefined,
-    breakEven: undefined,
-    trailing: undefined,
-    portfolioPercent: 95,
-    pnlPercent: -0.02,
-    roiPercent: 0.00,
-    unrealizedPnl: -0.11,
-    realizedPnl: 0,
-    status: "ENTERED",
-    entryTime: new Date("2025-09-19T08:01:25"),
-    exitTime: undefined,
-    lastUpdated: new Date(),
-    exchange: "BINANCE-SPOT",
-    strategy: {
-      id: "68ccffc2cc6...",
-      name: "Testing",
-      description: "Testing strategy for ETHUSDT"
-    },
-    account: {
-      id: "68ccffc2cc6...",
-      name: "Testing",
-      exchange: {
-        id: "68ccffc2cc6...",
-        userAccountId: "68ccffc2cc6...",
-        name: "BINANCE-SPOT",
-        apiKey: "1234567890",
-        apiSecret: "1234567890",
-        isActive: true,
-        positionMode: "One_Way",
-        totalValue: 0,
-        lastSyncedAt: new Date().toISOString(),
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString()
-      },
-      accountType: "SPOT"
-    },
-    orders: [
-      {
-        id: "68ccf_entry",
-        type: "ENTRY",
-        side: "BUY",
-        price: 4528.28,
-        amount: 0.0023,
-        filled: 0.0023,
-        remaining: 0,
-        createdAt: new Date("2025-09-19T08:01:25"),
-        lastUpdatedAt: new Date("2025-09-19T08:01:25"),
-        status: "COMPLETED",
-        fill: 100,
-        volume: 10.41,
-        pnl: 0.00,
-        fees: 0.01041
-      },
-      {
-        id: "68ccf_exit",
-        type: "EXIT",
-        side: "SELL",
-        price: 0,
-        amount: 0,
-        filled: 0,
-        remaining: 0,
-        createdAt: new Date(),
-        lastUpdatedAt: new Date(),
-        status: "NEW",
-        fill: 0,
-        volume: 0,
-        pnl: 0,
-        fees: 0
-      }
-    ],
-    totalVolume: 10.41,
-    profitLoss: -0.11,
-    fees: 0.01041,
-    tags: ["automated", "signal-bot"],
-    riskLevel: "MEDIUM"
-  }
-];
 
 export function AdvancedPositionsTable({ positions: propPositions }: AdvancedPositionsTableProps) {
   const [selectedTab, setSelectedTab] = useState("live");
@@ -128,12 +38,20 @@ export function AdvancedPositionsTable({ positions: propPositions }: AdvancedPos
   const [positions, setPositions] = useState<PositionData[]>(propPositions || []);
   const [loading, setLoading] = useState(false);
 
-  // Get unique symbols for live price fetching
-  const symbols = [...new Set(positions.map(p => p.symbol))];
+  // Get unique symbols for live price fetching (memoized to prevent infinite re-renders)
+  const symbols = useMemo(() => 
+    [...new Set(positions.map(p => p.symbol))], 
+    [positions]
+  );
   const { prices: livePrices } = useLivePrices(symbols);
 
-  // Fetch positions from API
+  // Fetch positions from API (only if no props positions provided)
   const fetchPositions = useCallback(async () => {
+    // If positions are provided via props, don't fetch from API
+    if (propPositions && propPositions.length > 0) {
+      return;
+    }
+    
     try {
       setLoading(true);
       const params = new URLSearchParams();
@@ -148,25 +66,25 @@ export function AdvancedPositionsTable({ positions: propPositions }: AdvancedPos
         setPositions(response.data.data || []);
       } else {
         toast.error("Failed to fetch positions");
+        setPositions([]); // Set empty array instead of mock data
       }
     } catch (error) {
       console.error("Error fetching positions:", error);
       toast.error("Failed to fetch positions");
-      // Fallback to mock data if API fails
-      setPositions(mockPositions);
+      setPositions([]); // Set empty array instead of mock data
     } finally {
       setLoading(false);
     }
-  }, [filters]);
+  }, [filters, propPositions]);
 
   // Fetch positions on component mount and when filters change
   useEffect(() => {
     fetchPositions();
   }, [fetchPositions]);
 
-  // Update positions when propPositions change
+  // Update positions when props change
   useEffect(() => {
-    if (propPositions && propPositions.length > 0) {
+    if (propPositions) {
       setPositions(propPositions);
     }
   }, [propPositions]);

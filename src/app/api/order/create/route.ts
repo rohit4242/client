@@ -36,11 +36,11 @@ export async function POST(request: NextRequest) {
     console.log("order: ", order);
 
     // Get user account
-    const userAccount = await db.userAccount.findFirst({
+    const portfolio = await db.portfolio.findFirst({
       where: { userId: session.user.id },
     });
 
-    if (!userAccount) {
+    if (!portfolio) {
       return NextResponse.json(
         { error: "User account not found" },
         { status: 404 }
@@ -64,7 +64,8 @@ export async function POST(request: NextRequest) {
       type: order.type === "MARKET" ? "Market" : "Limit",
       entryPrice: parseFloat(currentPrice.price),
       quantity: order.quantity ? parseFloat(order.quantity) : 0,
-      userAccountId: userAccount.id,
+      portfolioId: portfolio.id,
+      
     });
 
     if (!positionResult.success) {

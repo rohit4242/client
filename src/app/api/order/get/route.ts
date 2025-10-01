@@ -33,11 +33,11 @@ export async function POST(request: NextRequest) {
 
     console.log("exchange: ", exchange);
     // Get user account
-    const userAccount = await db.userAccount.findFirst({
+    const portfolio = await db.portfolio.findFirst({
       where: { userId: session.user.id },
     });
 
-    if (!userAccount) {
+    if (!portfolio) {
       return NextResponse.json(
         { error: "User account not found" },
         { status: 404 }

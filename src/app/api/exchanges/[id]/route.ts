@@ -92,7 +92,7 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
     const existingExchange = await db.exchange.findFirst({
       where: {
         id,
-        userAccountId: session.user.id,
+        portfolioId: session.user.id,
       },
     });
 
@@ -225,7 +225,7 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
     const existingExchange = await db.exchange.findFirst({
       where: {
         id,
-        userAccountId: session.user.id,
+        portfolioId: session.user.id,
       },
     });
 

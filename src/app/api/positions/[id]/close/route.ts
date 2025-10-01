@@ -38,7 +38,7 @@ export async function POST(
     const position = await db.position.findUnique({
       where: { id: id },
       include: {
-        userAccount: {
+        portfolio: {
           include: {
             exchanges: true,
           },
@@ -61,7 +61,7 @@ export async function POST(
     }
 
     // Verify position belongs to the authenticated user
-    if (position.userAccount.userId !== session.user.id) {
+    if (position.portfolio.userId !== session.user.id) {
       return NextResponse.json(
         { error: "Unauthorized to close this position" },
         { status: 403 }
@@ -69,7 +69,7 @@ export async function POST(
     }
 
     // Get the active exchange for this user
-    const activeExchange = position.userAccount.exchanges.find(ex => ex.isActive);
+    const activeExchange = position.portfolio.exchanges.find(ex => ex.isActive);
     
     if (!activeExchange) {
       return NextResponse.json(
@@ -90,7 +90,7 @@ export async function POST(
       {
         symbol: position.symbol,
         side: position.side,
-        quantity: position.quantity,
+        quantity: Number(position.quantity.toFixed(8)),
       },
       configurationRestAPI
     );

@@ -54,7 +54,7 @@ export const getOrders = async (symbol?: string, limit: number = 500) => {
     }
 
     // Get user's exchange credentials
-    const userAccount = await db.userAccount.findFirst({
+    const portfolio = await db.portfolio.findFirst({
       where: {
         userId: session.user.id,
       },
@@ -68,12 +68,12 @@ export const getOrders = async (symbol?: string, limit: number = 500) => {
       },
     });
 
-    if (!userAccount || !userAccount.exchanges.length) {
+    if (!portfolio || !portfolio.exchanges.length) {
       console.log("No active exchange found for user");
       return [];
     }
 
-    const exchange = userAccount.exchanges[0];
+    const exchange = portfolio.exchanges[0];
 
     // Configure Binance client
     const configurationRestAPI = {

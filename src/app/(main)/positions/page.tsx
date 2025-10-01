@@ -7,7 +7,6 @@ import { getPositions, getBotPositions } from "@/db/actions/position/get-positio
 import { PositionData } from "@/types/position";
 import { OrderHistoryTable } from "@/app/(main)/positions/_components/order-history-table";
 import { BotTradesTable } from "@/app/(main)/positions/_components/bot-trades-table";
-import { LivePositionsTable } from "@/app/(main)/positions/_components/live-positions-table";
 import { AdvancedPositionsTable } from "@/app/(main)/positions/_components/advanced-positions-table";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -36,27 +35,6 @@ function transformBotPositionsToBotTrades(positions: PositionData[]) {
   }));
 }
 
-// Transform positions to the format expected by LivePositionsTable
-function transformPositionsToLivePositions(positions: PositionData[]) {
-  return positions.map(position => ({
-    id: position.id,
-    symbol: position.symbol,
-    side: position.side,
-    entryPrice: position.entryPrice,
-    quantity: position.quantity,
-    currentValue: position.currentPrice * position.quantity,
-    pnl: position.unrealizedPnl,
-    pnlPercent: position.pnlPercent,
-    status: position.status,
-    createdAt: position.entryTime,
-    lastUpdated: position.lastUpdated,
-    entryTime: position.entryTime,
-    bot: {
-      name: position.strategy.name,
-      portfolioPercent: position.portfolioPercent
-    }
-  }));
-}
 
 async function OrderHistoryContent() {
   try {
@@ -117,35 +95,6 @@ async function BotTradesContent() {
   }
 }
 
-async function LivePositionsContent() {
-  try {
-    const positions = await getPositions();
-    
-    if (positions.length === 0) {
-      return (
-        <Alert>
-          <AlertTriangle className="h-4 w-4" />
-          <AlertDescription>
-            No open positions found. Open positions from your Signal Bots will appear here.
-          </AlertDescription>
-        </Alert>
-      );
-    }
-    
-    const livePositions = transformPositionsToLivePositions(positions);
-    return <LivePositionsTable positions={livePositions} />;
-  } catch (error) {
-    console.error("Error loading open positions:", error);
-    return (
-      <Alert variant="destructive">
-        <AlertTriangle className="h-4 w-4" />
-        <AlertDescription>
-          Failed to load open positions. Please try again.
-        </AlertDescription>
-      </Alert>
-    );
-  }
-}
 
 async function RealPositionsContent() {
   try {
@@ -232,15 +181,11 @@ export default async function PositionsPage() {
         <RealPositionsContent />
       </Suspense>
 
-      {/* Original Tabs for reference/fallback */}
+      {/* Additional Views */}
       <div className="mt-12 pt-8 border-t">
         <h2 className="text-xl font-semibold mb-4">Additional Views</h2>
-        <Tabs defaultValue="positions" className="w-full">
-          <TabsList className="grid w-full grid-cols-3">
-            <TabsTrigger value="positions" className="flex items-center gap-2">
-              <TrendingUp className="h-4 w-4" />
-              Live Positions
-            </TabsTrigger>
+        <Tabs defaultValue="bot-trades" className="w-full">
+          <TabsList className="grid w-full grid-cols-2">
             <TabsTrigger value="bot-trades" className="flex items-center gap-2">
               <Bot className="h-4 w-4" />
               Bot Trades
@@ -250,12 +195,6 @@ export default async function PositionsPage() {
               Order History
             </TabsTrigger>
           </TabsList>
-
-          <TabsContent value="positions" className="mt-6">
-            <Suspense fallback={<OrderHistoryLoading />}>
-              <LivePositionsContent />
-            </Suspense>
-          </TabsContent>
 
           <TabsContent value="bot-trades" className="mt-6">
             <Suspense fallback={<OrderHistoryLoading />}>

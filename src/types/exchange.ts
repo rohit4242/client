@@ -1,6 +1,6 @@
 export interface Exchange {
   id: string;
-  userAccountId: string;
+  portfolioId: string;
   name: string;
   apiKey: string;
   apiSecret: string;

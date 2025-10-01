@@ -27,7 +27,7 @@ export const exchangeSchema = z.object({
   lastSyncedAt: z.string().nullable(),
   createdAt: z.string(),
   updatedAt: z.string(),
-  userAccountId: z.string(),
+  portfolioId: z.string(),
   totalValue: z.number().nullable(),
 });
 

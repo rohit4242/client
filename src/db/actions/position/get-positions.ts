@@ -2,9 +2,13 @@ import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
 import db from "@/db";
 import { PositionStatus, PositionData, PositionOrder } from "@/types/position";
-import { Exchange } from "@/types/exchange";
-import { Status, Side, OrderStatus, OrderSide, OrderType } from "@prisma/client";
-
+import {
+  Status,
+  Side,
+  OrderStatus,
+  OrderSide,
+  OrderType,
+} from "@prisma/client";
 
 export async function getPositions(filters?: {
   status?: PositionStatus;
@@ -24,26 +28,28 @@ export async function getPositions(filters?: {
     // Get positions from the database
     const positions = await db.position.findMany({
       where: {
-        userAccount: {
+        portfolio: {
           userId: session.user.id,
         },
-        ...(filters?.status && { status: mapPositionStatusToDatabase(filters.status) }),
+        ...(filters?.status && {
+          status: mapPositionStatusToDatabase(filters.status),
+        }),
         ...(filters?.symbol && { symbol: filters.symbol }),
       },
       include: {
-        userAccount: {
+        portfolio: {
           include: {
             exchanges: true,
           },
         },
         orders: {
           orderBy: {
-            createdAt: 'desc',
+            createdAt: "desc",
           },
         },
       },
       orderBy: {
-        createdAt: 'desc',
+        createdAt: "desc",
       },
       ...(filters?.limit && { take: filters.limit }),
     });
@@ -74,26 +80,28 @@ export async function getRawPositions(filters?: {
   try {
     const positions = await db.position.findMany({
       where: {
-        userAccount: {
+        portfolio: {
           userId: session.user.id,
         },
-        ...(filters?.status && { status: mapPositionStatusToDatabase(filters.status) }),
+        ...(filters?.status && {
+          status: mapPositionStatusToDatabase(filters.status),
+        }),
         ...(filters?.symbol && { symbol: filters.symbol }),
       },
       include: {
-        userAccount: {
+        portfolio: {
           include: {
             exchanges: true,
           },
         },
         orders: {
           orderBy: {
-            createdAt: 'desc',
+            createdAt: "desc",
           },
         },
       },
       orderBy: {
-        createdAt: 'desc',
+        createdAt: "desc",
       },
       ...(filters?.limit && { take: filters.limit }),
     });
@@ -107,15 +115,15 @@ export async function getRawPositions(filters?: {
 
 function mapPositionStatusToDatabase(status: PositionStatus): Status {
   switch (status) {
-    case 'OPEN':
+    case "OPEN":
       return Status.OPEN;
-    case 'CLOSED':
+    case "CLOSED":
       return Status.CLOSED;
-    case 'CANCELED':
+    case "CANCELED":
       return Status.CANCELED;
-    case 'MARKET_CLOSED':
+    case "MARKET_CLOSED":
       return Status.MARKET_CLOSED;
-    case 'FAILED':
+    case "FAILED":
       return Status.FAILED;
     default:
       return Status.OPEN;
@@ -125,18 +133,18 @@ function mapPositionStatusToDatabase(status: PositionStatus): Status {
 function mapDatabaseStatusToPositionStatus(dbStatus: Status): PositionStatus {
   switch (dbStatus) {
     case Status.OPEN:
-      return 'OPEN';
+      return "OPEN";
     case Status.CLOSED:
-      return 'CLOSED';
+      return "CLOSED";
     case Status.CANCELED:
-      return 'CANCELED';
+      return "CANCELED";
     case Status.MARKET_CLOSED:
-      return 'MARKET_CLOSED';
+      return "MARKET_CLOSED";
     case Status.FAILED:
-      return 'FAILED';
+      return "FAILED";
 
     default:
-      return 'OPEN';
+      return "OPEN";
   }
 }
 
@@ -172,16 +180,16 @@ interface DatabasePosition {
   stopLoss: number | null;
   source: "MANUAL" | "BOT";
   strategyId: string | null;
-  userAccountId: string;
+  portfolioId: string;
   createdAt: Date;
   updatedAt: Date;
-  userAccount: {
+  portfolio: {
     exchanges: Array<{
       name: string;
       id: string;
+      portfolioId: string;
       createdAt: Date;
       updatedAt: Date;
-      userAccountId: string;
       apiKey: string;
       apiSecret: string;
       isActive: boolean;
@@ -194,7 +202,9 @@ interface DatabasePosition {
 }
 
 // Transform database order to PositionOrder format
-function transformDatabaseOrderToPositionOrder(order: DatabaseOrder): PositionOrder {
+function transformDatabaseOrderToPositionOrder(
+  order: DatabaseOrder
+): PositionOrder {
   return {
     id: order.id,
     type: order.type,
@@ -205,11 +215,18 @@ function transformDatabaseOrderToPositionOrder(order: DatabaseOrder): PositionOr
     remaining: order.quantity - (order.quantity * order.fillPercent) / 100,
     createdAt: order.updatedAt,
     lastUpdatedAt: order.updatedAt,
-    status: order.status === OrderStatus.FILLED ? "COMPLETED" : 
-            order.status === OrderStatus.CANCELED ? "CANCELED" :
-            order.status === OrderStatus.PARTIALLY_FILLED ? "PARTIALLY_FILLED" :
-            order.status === OrderStatus.REJECTED ? "REJECTED" :
-            order.status === OrderStatus.PENDING ? "NEW" : "NEW",
+    status:
+      order.status === OrderStatus.FILLED
+        ? "COMPLETED"
+        : order.status === OrderStatus.CANCELED
+        ? "CANCELED"
+        : order.status === OrderStatus.PARTIALLY_FILLED
+        ? "PARTIALLY_FILLED"
+        : order.status === OrderStatus.REJECTED
+        ? "REJECTED"
+        : order.status === OrderStatus.PENDING
+        ? "NEW"
+        : "NEW",
     fill: order.fillPercent,
     volume: order.value,
     pnl: order.pnl,
@@ -218,19 +235,31 @@ function transformDatabaseOrderToPositionOrder(order: DatabaseOrder): PositionOr
 }
 
 // Transform database position to PositionData format
-function transformDatabasePositionToPositionData(position: DatabasePosition): PositionData {
+function transformDatabasePositionToPositionData(
+  position: DatabasePosition
+): PositionData {
   // Calculate current values
-  const isClosedPosition = position.status === Status.CLOSED || position.status === Status.MARKET_CLOSED;
-  const currentPrice = isClosedPosition ? (position.exitPrice ?? position.entryPrice) : (position.currentPrice ?? position.entryPrice);
-  
+  const isClosedPosition =
+    position.status === Status.CLOSED ||
+    position.status === Status.MARKET_CLOSED;
+  const currentPrice = isClosedPosition
+    ? position.exitPrice ?? position.entryPrice
+    : position.currentPrice ?? position.entryPrice;
+
   // For closed positions, use actual PnL from database, for open positions calculate unrealized PnL
-  const unrealizedPnl = isClosedPosition ? 0 : (currentPrice - position.entryPrice) * position.quantity;
+  const unrealizedPnl = isClosedPosition
+    ? 0
+    : (currentPrice - position.entryPrice) * position.quantity;
   const realizedPnl = isClosedPosition ? position.pnl : 0;
   const totalPnl = isClosedPosition ? position.pnl : unrealizedPnl;
-  const pnlPercent = position.entryPrice > 0 ? (totalPnl / (position.entryPrice * position.quantity)) * 100 : 0;
-  
+  const pnlPercent =
+    position.entryPrice > 0
+      ? (totalPnl / (position.entryPrice * position.quantity)) * 100
+      : 0;
+
   // Transform orders
-  const transformedOrders = position.orders?.map(transformDatabaseOrderToPositionOrder) || [];
+  const transformedOrders =
+    position.orders?.map(transformDatabaseOrderToPositionOrder) || [];
 
   return {
     id: position.id,
@@ -254,59 +283,67 @@ function transformDatabasePositionToPositionData(position: DatabasePosition): Po
     realizedPnl: realizedPnl,
     status: mapDatabaseStatusToPositionStatus(position.status),
     entryTime: position.createdAt,
-    exitTime: position.status === Status.CLOSED ? position.updatedAt : undefined,
+    exitTime:
+      position.status === Status.CLOSED ? position.updatedAt : undefined,
     lastUpdated: position.updatedAt,
-    exchange: position.userAccount?.exchanges?.[0]?.name || "UNKNOWN",
+    exchange: position.portfolio?.exchanges?.[0]?.name || "UNKNOWN",
     strategy: {
       id: position.strategyId ?? position.id,
       name: position.source === "BOT" ? "Signal Bot" : "Manual",
-      description: position.source === "BOT" ? "Automated trading strategy" : "Manual trade"
+      description:
+        position.source === "BOT"
+          ? "Automated trading strategy"
+          : "Manual trade",
     },
     account: {
-      id: position.userAccountId,
-      name: position.userAccount?.exchanges?.[0]?.name || "Unknown Account",
-      exchange: position.userAccount?.exchanges?.[0] ? {
-        id: position.userAccount.exchanges[0].id,
-        userAccountId: position.userAccount.exchanges[0].userAccountId,
-        name: position.userAccount.exchanges[0].name,
-        apiKey: position.userAccount.exchanges[0].apiKey,
-        apiSecret: position.userAccount.exchanges[0].apiSecret,
-        isActive: position.userAccount.exchanges[0].isActive,
-        positionMode: position.userAccount.exchanges[0].positionMode,
-        totalValue: parseFloat(position.userAccount.exchanges[0].totalValue) || 0,
-        lastSyncedAt: position.userAccount.exchanges[0].lastSyncedAt.toISOString(),
-        createdAt: position.userAccount.exchanges[0].createdAt.toISOString(),
-        updatedAt: position.userAccount.exchanges[0].updatedAt.toISOString(),
-      } : {
-        id: "",
-        userAccountId: position.userAccountId,
-        name: "UNKNOWN",
-        apiKey: "",
-        apiSecret: "",
-        isActive: false,
-        positionMode: "One_Way" as const,
-        totalValue: 0,
-        lastSyncedAt: null,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      },
-      accountType: "SPOT"
+      id: position.portfolioId,
+      name: position.portfolio?.exchanges?.[0]?.name || "Unknown Account",
+      exchange: position.portfolio?.exchanges?.[0]
+        ? {
+            id: position.portfolio.exchanges[0].id,
+            portfolioId: position.portfolioId,
+            name: position.portfolio.exchanges[0].name,
+            apiKey: position.portfolio.exchanges[0].apiKey,
+            apiSecret: position.portfolio.exchanges[0].apiSecret,
+            isActive: position.portfolio.exchanges[0].isActive,
+            positionMode: position.portfolio.exchanges[0].positionMode,
+            totalValue:
+              parseFloat(position.portfolio.exchanges[0].totalValue) || 0,
+            lastSyncedAt:
+              position.portfolio.exchanges[0].lastSyncedAt.toISOString(),
+            createdAt: position.portfolio.exchanges[0].createdAt.toISOString(),
+            updatedAt: position.portfolio.exchanges[0].updatedAt.toISOString(),
+          }
+        : {
+            id: "",
+            portfolioId: position.portfolioId,
+            name: "UNKNOWN",
+            apiKey: "",
+            apiSecret: "",
+            isActive: false,
+            positionMode: "One_Way" as const,
+            totalValue: 0,
+            lastSyncedAt: null,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          },
+      accountType: "SPOT",
     },
     orders: transformedOrders,
     totalVolume: position.entryValue,
     profitLoss: totalPnl,
     fees: 0, // Calculate if needed
     tags: position.source === "BOT" ? ["automated", "signal-bot"] : ["manual"],
-    riskLevel: "MEDIUM"
+    riskLevel: "MEDIUM",
   };
 }
 
 export async function getOpenPositions(): Promise<PositionData[]> {
-  return getPositions({ status: 'OPEN' });
+  return getPositions({ status: "OPEN" });
 }
 
 export async function getClosedPositions(): Promise<PositionData[]> {
-  return getPositions({ status: 'CLOSED' });
+  return getPositions({ status: "CLOSED" });
 }
 
 // Get positions for bot trades (filtered by source)
@@ -322,25 +359,25 @@ export async function getBotPositions(): Promise<PositionData[]> {
   try {
     const positions = await db.position.findMany({
       where: {
-        userAccount: {
+        portfolio: {
           userId: session.user.id,
         },
         source: "BOT",
       },
       include: {
-        userAccount: {
+        portfolio: {
           include: {
             exchanges: true,
           },
         },
         orders: {
           orderBy: {
-            createdAt: 'desc',
+            createdAt: "desc",
           },
         },
       },
       orderBy: {
-        createdAt: 'desc',
+        createdAt: "desc",
       },
     });
 
@@ -364,25 +401,25 @@ export async function getManualPositions(): Promise<PositionData[]> {
   try {
     const positions = await db.position.findMany({
       where: {
-        userAccount: {
+        portfolio: {
           userId: session.user.id,
         },
         source: "MANUAL",
       },
       include: {
-        userAccount: {
+        portfolio: {
           include: {
             exchanges: true,
           },
         },
         orders: {
           orderBy: {
-            createdAt: 'desc',
+            createdAt: "desc",
           },
         },
       },
       orderBy: {
-        createdAt: 'desc',
+        createdAt: "desc",
       },
     });
 

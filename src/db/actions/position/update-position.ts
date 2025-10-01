@@ -18,9 +18,18 @@ export async function updatePosition(request: UpdatePositionRequest) {
     throw new Error("User not authenticated");
   }
 
+  console.log("updating position: ", request.binanceResponse);
+
   // Calculate values from Binance response
   const orderQuantity = request.binanceResponse.origQty || "0";
-  const orderPrice = request.binanceResponse.price || "0";
+  
+  // For MARKET orders, price is in fills array, not in response.price
+  let orderPrice = request.binanceResponse.price || "0";
+  if (parseFloat(orderPrice) === 0 && request.binanceResponse.fills && request.binanceResponse.fills.length > 0) {
+    // Use weighted average price from fills for market orders
+    orderPrice = request.binanceResponse.fills[0].price;
+  }
+  
   const orderValue =
     request.binanceResponse.cummulativeQuoteQty ||
     (parseFloat(orderQuantity) * parseFloat(orderPrice)).toString();
@@ -63,6 +72,17 @@ export async function updatePosition(request: UpdatePositionRequest) {
       orderStatus = "PENDING";
       positionStatus = "OPEN";
   }
+
+  console.log("updating position: ", {
+    positionId: request.positionId,
+    orderId: request.orderId,
+    binanceResponse: request.binanceResponse,
+    orderPrice,
+    orderQuantity,
+    orderValue,
+    orderStatus,
+    positionStatus,
+  });
 
   // Update the order with Binance response
   await db.order.update({
