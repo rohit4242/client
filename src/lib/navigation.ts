@@ -85,7 +85,6 @@ export const navigationConfig: NavigationGroup[] = [
         icon: Wallet,
         isActive: true,
       },
-     
     ],
   },
 ];

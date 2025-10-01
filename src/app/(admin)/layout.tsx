@@ -3,8 +3,7 @@ import {
   SidebarProvider,
   SidebarTrigger,
 } from "@/components/ui/sidebar";
-import { auth } from "@/lib/auth";
-import { headers } from "next/headers";
+import { getUserWithRole } from "@/lib/auth-utils";
 import { redirect } from "next/navigation";
 import { AppSidebar } from "./_components/app-sidebar";
 import { MobileNav } from "./_components/mobile-nav";
@@ -13,17 +12,21 @@ import { NavigationBreadcrumb } from "./_components/navigation-breadcrumb";
 import { NavigationSearch } from "./_components/navigation-search";
 import { NavigationProvider } from "@/contexts/navigation-context";
 
-export default async function MainLayout({
+export default async function AdminLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  const session = await auth.api.getSession({
-    headers: await headers(),
-  });
+  const user = await getUserWithRole();
 
-  if (!session) {
+  // Redirect to sign-in if not authenticated
+  if (!user) {
     redirect("/sign-in");
+  }
+
+  // Only ADMIN can access admin portal
+  if (user.role !== "ADMIN") {
+    redirect("/customer/dashboard");
   }
 
   return (

@@ -2,6 +2,7 @@ import { PositionSide } from "@/types/signal-bot";
 import { clsx, type ClassValue } from "clsx";
 import { toast } from "sonner";
 import { twMerge } from "tailwind-merge";
+import { UserRole } from "./auth-utils";
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -222,4 +223,12 @@ export function calculateExitPrices(
   }
 
   return { stopLossPrice, takeProfitPrice };
+}
+
+
+/**
+ * Get the appropriate dashboard URL based on user role
+ */
+export function getDashboardUrlByRole(role: UserRole): string {
+  return role === "ADMIN" ? "/dashboard" : "/customer/dashboard";
 }

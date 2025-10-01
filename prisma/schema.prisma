@@ -13,8 +13,10 @@ model User {
   email         String   @unique
   emailVerified Boolean
   image         String?
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  role          UserRole @default(CUSTOMER)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   accounts   Account[]
   sessions   Session[]
@@ -71,6 +73,36 @@ model Portfolio {
   id     String @id @default(uuid())
   userId String
   name   String @default("Main Portfolio")
+
+  // Performance Metrics (auto-calculated)
+  totalPnl        Float @default(0) // Total profit/loss
+  totalPnlPercent Float @default(0) // Overall P/L percentage
+  totalWins       Int   @default(0) // Number of winning trades
+  totalLosses     Int   @default(0) // Number of losing trades
+  winRate         Float @default(0) // Win rate percentage
+
+  // Portfolio value tracking
+  initialBalance   Float @default(0) // Starting balance
+  currentBalance   Float @default(0) // Current total balance
+  totalDeposits    Float @default(0) // Sum of deposits
+  totalWithdrawals Float @default(0) // Sum of withdrawals
+
+  // Time-based analytics
+  dailyPnl   Float @default(0) // Today's P/L
+  weeklyPnl  Float @default(0) // This week's P/L
+  monthlyPnl Float @default(0) // This month's P/L
+
+  // Statistics
+  totalTrades   Int   @default(0) // Total number of trades
+  activeTrades  Int   @default(0) // Currently open positions
+  avgWinAmount  Float @default(0) // Average winning trade
+  avgLossAmount Float @default(0) // Average losing trade
+  largestWin    Float @default(0) // Biggest win
+  largestLoss   Float @default(0) // Biggest loss
+  profitFactor  Float @default(0) // Gross profit / Gross loss
+
+  // Last updated
+  lastCalculatedAt DateTime @default(now()) // When stats were last recalculated
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -202,7 +234,7 @@ model Bot {
   positionPercent Float    @default(10) // % of portfolio per trade
   orderType       String   @default("Market") // Market, Limit, Stop
   leverage        Float?   @default(1) // Leverage multiplier
-  
+
   // Risk management
   stopLoss   Float? // % stop loss
   takeProfit Float? // % take profit
@@ -224,8 +256,8 @@ model Bot {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  portfolio Portfolio @relation(fields: [portfolioId], references: [id], onDelete: Cascade)
-  exchange  Exchange  @relation(fields: [exchangeId], references: [id], onDelete: Cascade)
+  portfolio Portfolio  @relation(fields: [portfolioId], references: [id], onDelete: Cascade)
+  exchange  Exchange   @relation(fields: [exchangeId], references: [id], onDelete: Cascade)
   signals   Signal[]
   positions Position[]
 
@@ -305,4 +337,9 @@ enum OrderStatus {
   CANCELED
   REJECTED
   PARTIALLY_FILLED
+}
+
+enum UserRole {
+  ADMIN
+  CUSTOMER
 }

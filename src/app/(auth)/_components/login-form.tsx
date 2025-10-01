@@ -54,7 +54,6 @@ export function LoginForm({
       {
         email: values.email,
         password: values.password,
-        callbackURL: "/dashboard",
       },
       {
         onRequest: () => {
@@ -62,11 +61,23 @@ export function LoginForm({
             id: "login-toast",
           });
         },
-        onSuccess: () => {
-          router.push("/dashboard");
-          toast.success("Login successful", {
-            id: "login-toast",
-          });
+        onSuccess: async () => {
+          // Fetch user role and redirect accordingly
+          const response = await fetch("/api/auth/user-role");
+          if (response.ok) {
+            const { role } = await response.json();
+            const redirectUrl = role === "ADMIN" ? "/dashboard" : "/customer/dashboard";
+            router.push(redirectUrl);
+            toast.success("Login successful", {
+              id: "login-toast",
+            });
+          } else {
+            // Fallback to default dashboard
+            router.push("/dashboard");
+            toast.success("Login successful", {
+              id: "login-toast",
+            });
+          }
         },
         onError: ({ error }) => {
           setError(error.message);
@@ -78,18 +89,30 @@ export function LoginForm({
     );
   };
 
-  const onSubmitSocial = (provider: "google" | "github") => {
+  const onSubmitSocial = async (provider: "google" | "github") => {
     setError(null);
-    authClient.signIn.social(
+    await authClient.signIn.social(
       {
         provider,
-        callbackURL: "/dashboard",
       },
       {
-        onSuccess: () => {
-          toast.success("Sign in successful", {
-            id: "login-toast",
-          });
+        onSuccess: async () => {
+          // Fetch user role and redirect accordingly
+          const response = await fetch("/api/auth/user-role");
+          if (response.ok) {
+            const { role } = await response.json();
+            const redirectUrl = role === "ADMIN" ? "/dashboard" : "/customer/dashboard";
+            router.push(redirectUrl);
+            toast.success("Sign in successful", {
+              id: "login-toast",
+            });
+          } else {
+            // Fallback to default dashboard
+            router.push("/dashboard");
+            toast.success("Sign in successful", {
+              id: "login-toast",
+            });
+          }
         },
         onError: ({ error }) => {
           setError(error.message);

@@ -1,15 +1,14 @@
 import { LoginForm } from "@/app/(auth)/_components/login-form";
-import { auth } from "@/lib/auth";
-import { headers } from "next/headers";
+import { getUserWithRole } from "@/lib/auth-utils";
+import { getDashboardUrlByRole } from "@/lib/utils";
 import { redirect } from "next/navigation";
 
 const SignInPage = async () => {
-  const session = await auth.api.getSession({
-    headers: await headers(),
-  });
+  const user = await getUserWithRole();
 
-  if (!!session) {
-    redirect("/dashboard");
+  if (user) {
+    // Redirect based on user role
+    redirect(getDashboardUrlByRole(user.role));
   }
 
   return (
