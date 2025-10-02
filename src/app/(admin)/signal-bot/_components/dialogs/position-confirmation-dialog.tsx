@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useMutation } from "@tanstack/react-query";
 import axios, { AxiosError } from "axios";
 import { toast } from "sonner";
@@ -43,10 +43,42 @@ export function PositionConfirmationDialog({
 }: PositionConfirmationDialogProps) {
   const [selectedSide, setSelectedSide] = useState<"Long" | "Short" | null>(null);
   const [isCreatingPosition, setIsCreatingPosition] = useState(false);
+  const [fallbackPrice, setFallbackPrice] = useState<number | null>(null);
+  const [isFetchingFallback, setIsFetchingFallback] = useState(false);
 
   // Get live price for the first symbol (could be enhanced to handle multiple symbols)
   const primarySymbol = bot.symbols[0] || "BTCUSDT";
   const { price: currentPrice, isUpdating: priceLoading } = useLivePrice(primarySymbol);
+
+  // Fallback: Fetch price from API if WebSocket fails or takes too long
+  useEffect(() => {
+    if (!open) return;
+    
+    // If still loading after 3 seconds, fetch from API as fallback
+    const fallbackTimer = setTimeout(async () => {
+      if (!currentPrice && !isFetchingFallback) {
+        console.log('⚠️ WebSocket price not available, fetching from API...');
+        setIsFetchingFallback(true);
+        try {
+          const response = await axios.get(`/api/trading/price/${primarySymbol}`);
+          if (response.data?.price) {
+            setFallbackPrice(parseFloat(response.data.price));
+            console.log('✅ Fallback price fetched:', response.data.price);
+          }
+        } catch (error) {
+          console.error('❌ Failed to fetch fallback price:', error);
+        } finally {
+          setIsFetchingFallback(false);
+        }
+      }
+    }, 3000);
+
+    return () => clearTimeout(fallbackTimer);
+  }, [open, currentPrice, primarySymbol, isFetchingFallback]);
+
+  // Use WebSocket price if available, otherwise use fallback
+  const displayPrice = currentPrice || fallbackPrice;
+  const isLoading = priceLoading && !displayPrice && !isFetchingFallback;
 
   const createPositionMutation = useMutation({
     mutationFn: async (side: "Long" | "Short") => {
@@ -85,17 +117,17 @@ export function PositionConfirmationDialog({
   // Use exchange totalValue if available, otherwise fallback to placeholder
   const portfolioValue = bot.exchange?.totalValue ? parseFloat(bot.exchange.totalValue.toString()) : 10000;
   const positionValue = (portfolioValue * bot.portfolioPercent) / 100;
-  const quantity = currentPrice ? positionValue / currentPrice : 0;
+  const quantity = displayPrice ? positionValue / displayPrice : 0;
 
   // Calculate stop loss and take profit prices
-  const stopLossPrice = currentPrice && bot.stopLoss ? {
-    long: currentPrice * (1 - bot.stopLoss / 100),
-    short: currentPrice * (1 + bot.stopLoss / 100),
+  const stopLossPrice = displayPrice && bot.stopLoss ? {
+    long: displayPrice * (1 - bot.stopLoss / 100),
+    short: displayPrice * (1 + bot.stopLoss / 100),
   } : null;
 
-  const takeProfitPrice = currentPrice && bot.takeProfit ? {
-    long: currentPrice * (1 + bot.takeProfit / 100),
-    short: currentPrice * (1 - bot.takeProfit / 100),
+  const takeProfitPrice = displayPrice && bot.takeProfit ? {
+    long: displayPrice * (1 + bot.takeProfit / 100),
+    short: displayPrice * (1 - bot.takeProfit / 100),
   } : null;
 
   return (
@@ -159,7 +191,18 @@ export function PositionConfirmationDialog({
                 <div>
                   <span className="text-muted-foreground">Current Price:</span>
                   <span className="ml-2 font-mono font-medium">
-                    {priceLoading ? "Loading..." : `$${currentPrice?.toFixed(4) || "N/A"}`}
+                    {isLoading ? (
+                      <span className="text-muted-foreground">Loading...</span>
+                    ) : displayPrice ? (
+                      <>
+                        ${displayPrice.toFixed(4)}
+                        {fallbackPrice && !currentPrice && (
+                          <Badge variant="outline" className="ml-2 text-xs">API</Badge>
+                        )}
+                      </>
+                    ) : (
+                      <span className="text-destructive">N/A</span>
+                    )}
                   </span>
                 </div>
                 <div>
@@ -200,7 +243,7 @@ export function PositionConfirmationDialog({
                 <CardContent className="space-y-2 text-xs">
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Entry:</span>
-                    <span className="font-mono">${currentPrice?.toFixed(4) || "N/A"}</span>
+                    <span className="font-mono">${displayPrice?.toFixed(4) || "N/A"}</span>
                   </div>
                   {stopLossPrice && (
                     <div className="flex justify-between">
@@ -236,7 +279,7 @@ export function PositionConfirmationDialog({
                 <CardContent className="space-y-2 text-xs">
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Entry:</span>
-                    <span className="font-mono">${currentPrice?.toFixed(4) || "N/A"}</span>
+                    <span className="font-mono">${displayPrice?.toFixed(4) || "N/A"}</span>
                   </div>
                   {stopLossPrice && (
                     <div className="flex justify-between">
