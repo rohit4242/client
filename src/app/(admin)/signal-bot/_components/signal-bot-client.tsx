@@ -1,8 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { Plus } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { useState, } from "react";
 import { SignalBotList } from "./signal-bot-list";
 import { CreateSignalBotDialog } from "./dialogs/create-signal-bot-dialog";
 import { SignalBotHeader } from "./signal-bot-header";

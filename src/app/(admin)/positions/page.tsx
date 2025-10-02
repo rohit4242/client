@@ -2,16 +2,11 @@ import { Suspense } from "react";
 import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
-import { getOrders } from "@/db/actions/order/get-orders";
-import { getPositions, getBotPositions } from "@/db/actions/position/get-positions";
-import { PositionData } from "@/types/position";
-import { OrderHistoryTable } from "@/app/(admin)/positions/_components/order-history-table";
-import { BotTradesTable } from "@/app/(admin)/positions/_components/bot-trades-table";
+import { getPositions } from "@/db/actions/position/get-positions";
 import { AdvancedPositionsTable } from "@/app/(admin)/positions/_components/advanced-positions-table";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { AlertTriangle, Bot, TrendingUp, Clock } from "lucide-react";
+import { AlertTriangle} from "lucide-react";
 import { getSelectedUser } from "@/lib/selected-user-server";
 
 // Transform bot positions to the format expected by BotTradesTable

@@ -38,7 +38,7 @@ export const getBalanceBySymbol = async (
 export const getPriceBySymbol = async (
   configurationRestAPI: configurationRestAPI,
   symbol: string
-) => {
+): Promise<AssetPrice> => {
   const client = new Spot({ configurationRestAPI });
   const response = await client.restAPI.tickerPrice({
     symbol,
@@ -46,47 +46,9 @@ export const getPriceBySymbol = async (
   const price = await response.data();
   console.log("price from the getPriceBySymbol function:", price);
 
-  return price;
+  return price as AssetPrice;
 };
 
-export const getPriceBySymbolV2 = async (
-  configurationRestAPI: configurationRestAPI,
-  symbol: string
-) => {
-  const configurationWebsocketAPI = {
-    apiKey: configurationRestAPI.apiKey,
-    apiSecret: configurationRestAPI.apiSecret,
-    wsUrl: "wss://ws-api.binance.com/ws-api/v3",
-  };
-  const client = new Spot({ configurationWebsocketAPI });
-
-  // Use WebSocket API to fetch ticker price (real-time), following the example
-  let connection: Awaited<
-    ReturnType<typeof client.websocketAPI.connect>
-  > | null = null;
-
-  try {
-    connection = await client.websocketAPI.connect();
-
-    const response = await connection.tickerPrice({ symbol });
-
-    const rateLimits = response.rateLimits;
-    if (rateLimits) {
-      console.log("tickerPrice() rate limits:", rateLimits);
-    }
-
-    const data = response.data as AssetPrice;
-    console.log("price from the getPriceBySymbol function:", data);
-    return data;
-  } catch (error) {
-    console.error("getPriceBySymbol error:", error);
-    throw error;
-  } finally {
-    if (connection) {
-      await connection.disconnect();
-    }
-  }
-};
 export const getPriceBySymbols = async (
   configurationRestAPI: configurationRestAPI,
   symbols: string[]

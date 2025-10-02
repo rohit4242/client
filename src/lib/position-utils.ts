@@ -1,4 +1,4 @@
-import { PositionData, PositionCalculations, PriceData } from "@/types/position";
+import { PositionData, PositionCalculations } from "@/types/position";
 
 /**
  * Calculate position metrics including P&L, percentages, and values

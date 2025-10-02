@@ -23,6 +23,7 @@ import { Customer } from "@/db/actions/admin/get-customers";
 import { GeneratedAvatar } from "@/components/generated-avatar";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import Image from "next/image";
 
 interface UserSelectorProps {
   customers: Customer[];
@@ -46,10 +47,12 @@ export function UserSelector({ customers }: UserSelectorProps) {
                 <>
                   <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground">
                     {selectedUser.image ? (
-                      <img
+                      <Image
                         src={selectedUser.image || ""}
                         alt={selectedUser.name}
                         className="size-8 rounded-lg"
+                        width={32}
+                        height={32}
                       />
                     ) : (
                       <GeneratedAvatar
@@ -112,10 +115,12 @@ export function UserSelector({ customers }: UserSelectorProps) {
                   >
                     <div className="flex size-8 items-center justify-center rounded-sm border">
                       {customer.image ? (
-                        <img
+                        <Image
                           src={customer.image}
                           alt={customer.name}
                           className="size-8 rounded-sm"
+                          width={32}
+                          height={32}
                         />
                       ) : (
                         <GeneratedAvatar

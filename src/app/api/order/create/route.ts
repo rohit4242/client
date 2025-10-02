@@ -34,7 +34,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { exchange, order, userId: requestUserId, portfolioId: requestPortfolioId } = validatedOrder.data;
+    const { exchange, order, userId: requestUserId } = validatedOrder.data;
 
     console.log("exchange: ", exchange);
     console.log("order: ", order);

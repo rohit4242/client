@@ -1,6 +1,6 @@
 import { PortfolioStats } from "@/db/actions/customer/get-portfolio-stats";
 import { Card, CardContent } from "@/components/ui/card";
-import { TrendingUp, TrendingDown, DollarSign, Target, Activity, Award } from "lucide-react";
+import { TrendingUp, TrendingDown, Target, Activity, Award } from "lucide-react";
 
 interface PerformanceOverviewProps {
   stats: PortfolioStats | null;

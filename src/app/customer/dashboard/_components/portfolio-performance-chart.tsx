@@ -1,7 +1,6 @@
 "use client";
 
-import { useState } from "react";
-import { Line, LineChart, CartesianGrid, XAxis, YAxis, Tooltip, ResponsiveContainer, Area, AreaChart } from "recharts";
+import {  CartesianGrid, XAxis, YAxis, Tooltip, ResponsiveContainer, Area, AreaChart } from "recharts";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { ChartDataPoint } from "@/db/actions/customer/get-portfolio-chart-data";
 import { TrendingUp, TrendingDown } from "lucide-react";

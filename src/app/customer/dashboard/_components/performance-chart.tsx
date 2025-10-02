@@ -2,7 +2,7 @@
 
 import { PortfolioStats } from "@/db/actions/customer/get-portfolio-stats";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { TrendingUp, DollarSign, Percent, Award } from "lucide-react";
+import { TrendingUp, Percent, Award } from "lucide-react";
 
 interface PerformanceChartProps {
   stats: PortfolioStats | null;

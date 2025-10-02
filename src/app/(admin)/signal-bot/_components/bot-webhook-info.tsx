@@ -22,7 +22,6 @@ import {
   Key, 
   Settings, 
   BarChart3,
-  ExternalLink,
   Eye,
   EyeOff
 } from "lucide-react";
@@ -51,7 +50,7 @@ export function BotWebhookInfo({ bot, open, onOpenChange }: BotWebhookInfoProps)
     try {
       await navigator.clipboard.writeText(text);
       toast.success(`${label} copied to clipboard!`);
-    } catch (error) {
+    } catch {
       toast.error(`Failed to copy ${label}`);
     }
   };

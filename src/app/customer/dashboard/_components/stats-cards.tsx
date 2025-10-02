@@ -1,5 +1,5 @@
 import { PortfolioStats } from "@/db/actions/customer/get-portfolio-stats";
-import { TrendingUp, TrendingDown, Activity, Target, DollarSign, Award } from "lucide-react";
+import { TrendingUp, TrendingDown, Activity, Target, DollarSign } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 
 interface StatsCardsProps {

@@ -87,7 +87,7 @@ export function AdvancedPositionsTable({
     } finally {
       setLoading(false);
     }
-  }, [filters, propPositions]);
+  }, [filters, propPositions, selectedUser?.id]);
 
   // Fetch positions on component mount and when filters change
   useEffect(() => {
