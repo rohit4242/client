@@ -7,6 +7,7 @@ import { placeOrder } from "@/db/actions/order/create-order";
 import { createPosition } from "@/db/actions/position";
 import { getPriceBySymbol } from "@/lib/trading-utils";
 import { updatePosition } from "@/db/actions/position/update-position";
+import { recalculatePortfolioStats } from "@/db/actions/admin/update-portfolio-stats";
 
 export async function POST(request: NextRequest) {
   try {
@@ -19,8 +20,11 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
+    
+    // Validate the full body first
     const validatedOrder = createOrderDataSchema.safeParse(body);
     if (!validatedOrder.success) {
+      console.error("Validation error:", validatedOrder.error);
       return NextResponse.json(
         {
           error: "Invalid order data",
@@ -30,15 +34,25 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { exchange, order } = validatedOrder.data;
+    const { exchange, order, userId: requestUserId, portfolioId: requestPortfolioId } = validatedOrder.data;
 
     console.log("exchange: ", exchange);
     console.log("order: ", order);
 
+    // Use userId from request if provided (admin action), otherwise use session user
+    const targetUserId = requestUserId || session.user.id;
+
     // Get user account
-    const portfolio = await db.portfolio.findFirst({
-      where: { userId: session.user.id },
+    let portfolio = await db.portfolio.findFirst({
+      where: { userId: targetUserId },
     });
+
+    // Create portfolio if it doesn't exist
+    if (!portfolio && requestUserId) {
+      portfolio = await db.portfolio.create({
+        data: { userId: targetUserId },
+      });
+    }
 
     if (!portfolio) {
       return NextResponse.json(
@@ -120,6 +134,9 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       );
     }
+
+    // Recalculate portfolio stats after successful order
+    await recalculatePortfolioStats(targetUserId);
 
     return NextResponse.json({
       success: true,

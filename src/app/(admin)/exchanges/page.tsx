@@ -1,19 +1,25 @@
-import { auth } from '@/lib/auth';
-import { headers } from 'next/headers';
-import { redirect } from 'next/navigation';
-import { getExchanges } from "@/db/actions/exchange/get-exchanges";
+"use client";
+
+import { useSelectedUser } from "@/contexts/selected-user-context";
+import { NoUserSelected } from "../_components/no-user-selected";
 import { ExchangesClient } from './_components/exchanges-client';
 
-export default async function ExchangesPage() {
-  const session = await auth.api.getSession({
-    headers: await headers(),
-  });
+export default function ExchangesPage() {
+  const { selectedUser } = useSelectedUser();
 
-  if (!session) {
-    redirect('/sign-in');
+  if (!selectedUser) {
+    return (
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">Exchange Accounts</h1>
+          <p className="text-muted-foreground">
+            Connect and manage exchange accounts
+          </p>
+        </div>
+        <NoUserSelected />
+      </div>
+    );
   }
 
-  const exchanges = await getExchanges();
-  
-  return <ExchangesClient initialExchanges={exchanges} />;
+  return <ExchangesClient selectedUser={selectedUser} />;
 }

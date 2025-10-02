@@ -395,6 +395,16 @@ export async function POST(
     // Update bot statistics
     await updateBotStats(botId);
 
+    // Recalculate portfolio stats after position creation
+    try {
+      const { recalculatePortfolioStats } = await import("@/db/actions/admin/update-portfolio-stats");
+      await recalculatePortfolioStats(session.user.id);
+      console.log(`Portfolio stats recalculated for user ${session.user.id}`);
+    } catch (statsError) {
+      console.error("Error recalculating portfolio stats:", statsError);
+      // Don't fail the request if stats calculation fails
+    }
+
     return NextResponse.json(
       {
         success: true,

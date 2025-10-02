@@ -8,9 +8,10 @@ interface LivePriceHookResult {
   isUpdating: boolean;
   error: string | null;
   refreshPrice: () => void;
+  userId?: string;
 }
 
-export function useLivePrice(symbol: string): LivePriceHookResult {
+export function useLivePrice(symbol: string, userId?: string): LivePriceHookResult {
   const [price, setPrice] = useState<number | null>(null);
   const [isUpdating, setIsUpdating] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -29,7 +30,12 @@ export function useLivePrice(symbol: string): LivePriceHookResult {
       }
       setError(null);
       
-      const response = await axios.get(`/api/trading/price/${symbol}`);
+      // Build URL with query params instead of body
+      const url = userId 
+        ? `/api/trading/price/${symbol}?userId=${userId}`
+        : `/api/trading/price/${symbol}`;
+      
+      const response = await axios.get(url);
       
       let priceValue: number | null = null;
       
@@ -57,7 +63,7 @@ export function useLivePrice(symbol: string): LivePriceHookResult {
     } finally {
       setIsUpdating(false);
     }
-  }, [symbol]);
+  }, [symbol, userId]);
 
   const refreshPrice = useCallback(() => {
     fetchPrice();
@@ -98,7 +104,7 @@ export function useLivePrice(symbol: string): LivePriceHookResult {
 }
 
 // Hook for multiple symbols
-export function useLivePrices(symbols: string[]) {
+export function useLivePrices(symbols: string[], userId?: string) {
   const [prices, setPrices] = useState<Record<string, number>>({});
   const [isUpdating, setIsUpdating] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -120,7 +126,12 @@ export function useLivePrices(symbols: string[]) {
       // Fetch prices for all symbols in parallel
       const pricePromises = symbols.map(async (symbol) => {
         try {
-          const response = await axios.get(`/api/trading/price/${symbol}`);
+          // Build URL with query params instead of body
+          const url = userId 
+            ? `/api/trading/price/${symbol}?userId=${userId}`
+            : `/api/trading/price/${symbol}`;
+          
+          const response = await axios.get(url);
           
           let priceValue: number | null = null;
           
@@ -164,7 +175,7 @@ export function useLivePrices(symbols: string[]) {
     } finally {
       setIsUpdating(false);
     }
-  }, [symbols.join(',')]); // Use symbols.join(',') to create a stable dependency
+  }, [symbols.join(','), userId]); // Use symbols.join(',') to create a stable dependency
 
   const refreshPrices = useCallback(() => {
     fetchPrices();

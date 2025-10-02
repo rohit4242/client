@@ -77,7 +77,8 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const validatedExchange = createExchangeSchema.safeParse(body);
+    const { userId, ...exchangeData } = body;
+    const validatedExchange = createExchangeSchema.safeParse(exchangeData);
     if (!validatedExchange.success) {
       return NextResponse.json(
         { error: validatedExchange.error.message },
@@ -88,9 +89,12 @@ export async function POST(request: NextRequest) {
 
     console.log(name, apiKey, apiSecret, positionMode);
 
+    // Use userId from body if provided (admin creating for customer), otherwise use session user
+    const targetUserId = userId || session.user.id;
+
     let portfolio = await db.portfolio.findFirst({
       where: {
-        userId: session.user.id,
+        userId: targetUserId,
       },
     });
 
@@ -98,7 +102,7 @@ export async function POST(request: NextRequest) {
     if (!portfolio) {
       portfolio = await db.portfolio.create({
         data: {
-          userId: session.user.id,
+          userId: targetUserId,
           name: name.toUpperCase(),
         },
       });
@@ -161,6 +165,16 @@ export async function POST(request: NextRequest) {
     });
 
     console.log("Exchange created successfully");
+
+    // Sync portfolio balance from the exchange (sets initial balance if not set)
+    try {
+      const { syncPortfolioBalance } = await import("@/db/actions/admin/sync-portfolio-balance");
+      await syncPortfolioBalance(targetUserId);
+      console.log(`Portfolio balance synced for user ${targetUserId}`);
+    } catch (syncError) {
+      console.error("Error syncing portfolio balance:", syncError);
+      // Don't fail the exchange creation if sync fails
+    }
 
     return NextResponse.json(exchange, { status: 201 });
   } catch (error) {

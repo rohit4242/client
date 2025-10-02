@@ -43,6 +43,11 @@ export async function GET(
 ) {
   try {
     const { symbol } = await params;
+
+    // Get userId from query params instead of body (GET requests don't have body)
+    const { searchParams } = new URL(request.url);
+    const requestUserId = searchParams.get("userId");
+    
     const session = await auth.api.getSession({
       headers: await headers(),
     });
@@ -51,9 +56,12 @@ export async function GET(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
+    // Use requestUserId if provided (admin), otherwise use session user
+    const targetUserId = requestUserId || session.user.id;
+
     // Get user's active exchange
     const portfolio = await db.portfolio.findFirst({
-      where: { userId: session.user.id },
+      where: { userId: targetUserId },
       include: {
         exchanges: {
           where: { isActive: true },

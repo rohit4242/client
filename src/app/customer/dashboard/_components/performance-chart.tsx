@@ -1,7 +1,7 @@
 "use client";
 
 import { PortfolioStats } from "@/db/actions/customer/get-portfolio-stats";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { TrendingUp, DollarSign, Percent, Award } from "lucide-react";
 
 interface PerformanceChartProps {
@@ -90,10 +90,10 @@ export function PerformanceChart({ stats }: PerformanceChartProps) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Performance Overview</CardTitle>
-        <p className="text-sm text-muted-foreground">
+        <CardTitle className="text-lg">Performance Overview</CardTitle>
+        <CardDescription>
           Your trading performance metrics
-        </p>
+        </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
         {/* Time-based P&L */}

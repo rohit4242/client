@@ -12,6 +12,7 @@ interface LivePriceProps {
   showUpdateIndicator?: boolean;
   fallbackPrice?: number;
   colorMode?: "default" | "trend" | "green";
+  userId?: string;
 }
 
 export function LivePrice({
@@ -23,8 +24,9 @@ export function LivePrice({
   showUpdateIndicator = false,
   fallbackPrice,
   colorMode = "default",
+  userId,
 }: LivePriceProps) {
-  const { price, isUpdating, error } = useLivePrice(symbol);
+  const { price, isUpdating, error } = useLivePrice(symbol, userId);
 
   // Determine which price to display
   const displayPrice = price ?? fallbackPrice ?? 0;
@@ -76,10 +78,12 @@ export function MarkPrice({
   symbol,
   className = "",
   fallbackPrice,
+  userId,
 }: {
   symbol: string;
   className?: string;
   fallbackPrice?: number;
+  userId?: string;
 }) {
   return (
     <div className="text-xs text-muted-foreground">
@@ -90,6 +94,7 @@ export function MarkPrice({
         decimals={2}
         fallbackPrice={fallbackPrice}
         colorMode="green"
+        userId={userId}
       />
     </div>
   );
@@ -101,13 +106,15 @@ export function TrendPrice({
   entryPrice,
   className = "",
   fallbackPrice,
+  userId,
 }: {
   symbol: string;
   entryPrice?: number;
   className?: string;
   fallbackPrice?: number;
+  userId?: string;
 }) {
-  const { price } = useLivePrice(symbol);
+  const { price } = useLivePrice(symbol, userId);
   const currentPrice = price ?? fallbackPrice ?? 0;
   
   let trendColor = "";
@@ -126,6 +133,7 @@ export function TrendPrice({
       decimals={4}
       fallbackPrice={fallbackPrice}
       showUpdateIndicator
+      userId={userId}
     />
   );
 }

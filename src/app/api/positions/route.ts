@@ -15,6 +15,7 @@ export async function GET(request: NextRequest) {
     }
 
     const { searchParams } = new URL(request.url);
+    const userId = searchParams.get("userId");
     const status = searchParams.get("status");
     const symbol = searchParams.get("symbol");
     const exchange = searchParams.get("exchange");
@@ -27,7 +28,8 @@ export async function GET(request: NextRequest) {
       ...(limit && { limit: parseInt(limit) }),
     };
 
-    const positions = await getPositions(filters);
+    console.log("userId", userId);
+    const positions = await getPositions({ ...filters, userId: userId || session.user.id });
 
     return NextResponse.json({
       success: true,

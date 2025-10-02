@@ -3,14 +3,22 @@ import axios from "axios";
 import z from "zod";
 
 
-export const createExchange = async (exchange: z.infer<typeof createExchangeSchema>) => {
+export const createExchange = async (
+  exchange: z.infer<typeof createExchangeSchema>,
+  userId?: string
+) => {
   try {
     const validatedExchange = createExchangeSchema.safeParse(exchange);
     if (!validatedExchange.success) {
       return { error: validatedExchange.error.message };
     }
     
-    const response = await axios.post("/api/exchanges", validatedExchange.data);
+    // Include userId in the request if provided (for admin creating for customer)
+    const payload = userId 
+      ? { ...validatedExchange.data, userId }
+      : validatedExchange.data;
+    
+    const response = await axios.post("/api/exchanges", payload);
     console.log(response.data);
     return response.data;
   } catch (error) {

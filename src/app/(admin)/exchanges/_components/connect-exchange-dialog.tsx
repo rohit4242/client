@@ -31,6 +31,7 @@ interface ConnectExchangeDialogProps {
   exchange?: Exchange | null;
   onSuccess: (exchange: Exchange) => void;
   onClose: () => void;
+  userId?: string;
 }
 
 const formSchema = z.object({
@@ -46,6 +47,7 @@ export function ConnectExchangeDialog({
   exchange,
   onSuccess,
   onClose,
+  userId,
 }: ConnectExchangeDialogProps) {
   const [loading, setLoading] = useState(false);
   const [showApiSecret, setShowApiSecret] = useState(false);
@@ -92,7 +94,7 @@ export function ConnectExchangeDialog({
           apiKey: data.apiKey,
           apiSecret: data.apiSecret,
           positionMode: data.positionMode,
-        });
+        }, userId);
       }
       
       console.log("Exchange operation response:", response);

@@ -56,12 +56,16 @@ interface TradingFormProps {
   selectedExchange: Exchange | null;
   onSelectAssetsChange: (assets: string[]) => void;
   selectedAsset: string;
+  userId: string;
+  portfolioId?: string;
 }
 
 export function TradingForm({
   selectedExchange,
   onSelectAssetsChange,
   selectedAsset,
+  userId,
+  portfolioId,
 }: TradingFormProps) {
   // State management
   const [orderType, setOrderType] = useState<OrderTypeType>("MARKET");
@@ -261,6 +265,8 @@ export function TradingForm({
       await createOrder({
         exchange: selectedExchange!,
         order: data,
+        userId,
+        portfolioId: portfolioId!,
       });
       
       // Clear form and validation state on successful submission

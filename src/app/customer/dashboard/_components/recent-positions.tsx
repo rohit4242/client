@@ -39,10 +39,6 @@ export function RecentPositions({ positions }: RecentPositionsProps) {
     }
   };
 
-  const getSideColor = (side: string) => {
-    return side === "LONG" ? "text-green-500" : "text-red-500";
-  };
-
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between">
@@ -54,7 +50,7 @@ export function RecentPositions({ positions }: RecentPositionsProps) {
           View all →
         </Link>
       </CardHeader>
-      <CardContent>
+      <CardContent className="overflow-x-auto">
         {positions.length === 0 ? (
           <div className="text-center py-8">
             <p className="text-muted-foreground">No trades yet</p>
@@ -63,7 +59,7 @@ export function RecentPositions({ positions }: RecentPositionsProps) {
             </p>
           </div>
         ) : (
-          <div className="space-y-4">
+          <div className="space-y-4 min-w-[700px]">
             {positions.map((position) => (
               <div
                 key={position.id}

@@ -7,8 +7,13 @@ import { TradingForm } from "./trading-form";
 import { POPULAR_SYMBOLS } from "@/db/schema/order";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { TradingChart } from "./trading-chart";
+import { Customer } from "@/db/actions/admin/get-customers";
 
-export default function ManualTradingView() {
+interface ManualTradingViewProps {
+  selectedUser: Customer;
+}
+
+export default function ManualTradingView({ selectedUser }: ManualTradingViewProps) {
   const [selectedExchange, setSelectedExchange] = useState<Exchange | null>(
     null
   );
@@ -38,6 +43,7 @@ export default function ManualTradingView() {
               <ExchangeSelector
                 onSelect={setSelectedExchange}
                 selectedExchange={selectedExchange}
+                userId={selectedUser.id}
               />
 
               {/* Trading Form */}
@@ -45,6 +51,8 @@ export default function ManualTradingView() {
                 selectedExchange={selectedExchange}
                 onSelectAssetsChange={onSelectAssetsChange}
                 selectedAsset={selectedAsset}
+                userId={selectedUser.id}
+                portfolioId={selectedUser.portfolioId}
               />
             </div>
           </ScrollArea>

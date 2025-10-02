@@ -15,6 +15,7 @@ export async function getPositions(filters?: {
   symbol?: string;
   exchange?: string;
   limit?: number;
+  userId?: string;
 }): Promise<PositionData[]> {
   const session = await auth.api.getSession({
     headers: await headers(),
@@ -29,7 +30,7 @@ export async function getPositions(filters?: {
     const positions = await db.position.findMany({
       where: {
         portfolio: {
-          userId: session.user.id,
+          userId: filters?.userId || session.user.id,
         },
         ...(filters?.status && {
           status: mapPositionStatusToDatabase(filters.status),
@@ -68,6 +69,7 @@ export async function getRawPositions(filters?: {
   symbol?: string;
   exchange?: string;
   limit?: number;
+  userId?: string;
 }) {
   const session = await auth.api.getSession({
     headers: await headers(),
@@ -81,7 +83,7 @@ export async function getRawPositions(filters?: {
     const positions = await db.position.findMany({
       where: {
         portfolio: {
-          userId: session.user.id,
+          userId: filters?.userId || session.user.id,
         },
         ...(filters?.status && {
           status: mapPositionStatusToDatabase(filters.status),
@@ -338,16 +340,16 @@ function transformDatabasePositionToPositionData(
   };
 }
 
-export async function getOpenPositions(): Promise<PositionData[]> {
-  return getPositions({ status: "OPEN" });
+export async function getOpenPositions(userId?: string): Promise<PositionData[]> {
+  return getPositions({ status: "OPEN", userId });
 }
 
-export async function getClosedPositions(): Promise<PositionData[]> {
-  return getPositions({ status: "CLOSED" });
+export async function getClosedPositions(userId?: string): Promise<PositionData[]> {
+  return getPositions({ status: "CLOSED", userId });
 }
 
 // Get positions for bot trades (filtered by source)
-export async function getBotPositions(): Promise<PositionData[]> {
+export async function getBotPositions(userId?: string): Promise<PositionData[]> {
   const session = await auth.api.getSession({
     headers: await headers(),
   });
@@ -360,7 +362,7 @@ export async function getBotPositions(): Promise<PositionData[]> {
     const positions = await db.position.findMany({
       where: {
         portfolio: {
-          userId: session.user.id,
+          userId: userId || session.user.id,
         },
         source: "BOT",
       },
@@ -389,7 +391,7 @@ export async function getBotPositions(): Promise<PositionData[]> {
 }
 
 // Get positions for manual trades (filtered by source)
-export async function getManualPositions(): Promise<PositionData[]> {
+export async function getManualPositions(userId?: string): Promise<PositionData[]> {
   const session = await auth.api.getSession({
     headers: await headers(),
   });
@@ -402,7 +404,7 @@ export async function getManualPositions(): Promise<PositionData[]> {
     const positions = await db.position.findMany({
       where: {
         portfolio: {
-          userId: session.user.id,
+          userId: userId || session.user.id,
         },
         source: "MANUAL",
       },

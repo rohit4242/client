@@ -1,5 +1,5 @@
 import { RecentSignal } from "@/db/actions/customer/get-recent-signals";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Bot, CheckCircle2, XCircle, Clock } from "lucide-react";
 
@@ -39,17 +39,18 @@ export function RecentSignals({ signals }: RecentSignalsProps) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-xl flex items-center gap-2">
+        <CardTitle className="flex items-center gap-2">
           <Bot className="h-5 w-5" />
           Recent Signals
         </CardTitle>
+        <CardDescription>Bot signals will appear here</CardDescription>
       </CardHeader>
       <CardContent>
         {signals.length === 0 ? (
-          <div className="text-center py-8">
-            <Bot className="h-12 w-12 mx-auto text-muted-foreground mb-2" />
-            <p className="text-muted-foreground">No signals yet</p>
-            <p className="text-sm text-muted-foreground mt-1">
+          <div className="text-center py-12">
+            <Bot className="h-12 w-12 mx-auto text-muted-foreground mb-4 opacity-20" />
+            <p className="text-sm font-medium text-muted-foreground">No signals yet</p>
+            <p className="text-xs text-muted-foreground mt-1">
               Bot signals will appear here
             </p>
           </div>

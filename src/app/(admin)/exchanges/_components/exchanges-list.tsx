@@ -17,15 +17,18 @@ import { Exchange } from "@/types/exchange";
 import { ExchangeCard } from "./exchange-card";
 import { ConnectExchangeDialog } from "./connect-exchange-dialog";
 import axios from "axios";
+import { Customer } from "@/db/actions/admin/get-customers";
 
 interface ExchangesListProps {
   exchanges: Exchange[];
   onExchangesChange: (exchanges: Exchange[]) => void;
+  selectedUser: Customer;
 }
 
 export function ExchangesList({
   exchanges,
   onExchangesChange,
+  selectedUser,
 }: ExchangesListProps) {
   const [syncing, setSyncing] = useState<string | null>(null);
   const [editingExchange, setEditingExchange] = useState<Exchange | null>(null);
@@ -184,6 +187,7 @@ export function ExchangesList({
             setShowEditDialog(false);
             setEditingExchange(null);
           }}
+          userId={selectedUser.id}
         />
       </Dialog>
     </>

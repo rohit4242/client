@@ -11,7 +11,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { 
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -20,30 +20,40 @@ import {
 } from "@/components/ui/select";
 import { TrendingDown, Loader2 } from "lucide-react";
 import { toast } from "sonner";
-import { PositionData, PositionAction, PositionFilters } from "@/types/position";
+import {
+  PositionData,
+  PositionAction,
+  PositionFilters,
+} from "@/types/position";
 import { PositionRow } from "./position-row";
 import { useLivePrices } from "@/hooks/use-live-price";
 import axios from "axios";
+import { useSelectedUser } from "@/contexts/selected-user-context";
 
 interface AdvancedPositionsTableProps {
   positions?: PositionData[];
 }
 
-
-export function AdvancedPositionsTable({ positions: propPositions }: AdvancedPositionsTableProps) {
+export function AdvancedPositionsTable({
+  positions: propPositions,
+}: AdvancedPositionsTableProps) {
   const [selectedTab, setSelectedTab] = useState("live");
   const [filters, setFilters] = useState<PositionFilters>({});
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
   const [isClosingAll, setIsClosingAll] = useState(false);
-  const [positions, setPositions] = useState<PositionData[]>(propPositions || []);
+  const [positions, setPositions] = useState<PositionData[]>(
+    propPositions || []
+  );
   const [loading, setLoading] = useState(false);
 
+  const { selectedUser } = useSelectedUser();
+
   // Get unique symbols for live price fetching (memoized to prevent infinite re-renders)
-  const symbols = useMemo(() => 
-    [...new Set(positions.map(p => p.symbol))], 
+  const symbols = useMemo(
+    () => [...new Set(positions.map((p) => p.symbol))],
     [positions]
   );
-  const { prices: livePrices } = useLivePrices(symbols);
+  const { prices: livePrices } = useLivePrices(symbols, selectedUser?.id);
 
   // Fetch positions from API (only if no props positions provided)
   const fetchPositions = useCallback(async () => {
@@ -51,17 +61,19 @@ export function AdvancedPositionsTable({ positions: propPositions }: AdvancedPos
     if (propPositions && propPositions.length > 0) {
       return;
     }
-    
+
     try {
       setLoading(true);
       const params = new URLSearchParams();
-      
-      if (filters.status) params.append('status', filters.status);
-      if (filters.symbol) params.append('symbol', filters.symbol);
-      if (filters.exchange) params.append('exchange', filters.exchange);
-      
-      const response = await axios.get(`/api/positions?${params.toString()}`);
-      
+
+      if (filters.status) params.append("status", filters.status);
+      if (filters.symbol) params.append("symbol", filters.symbol);
+      if (filters.exchange) params.append("exchange", filters.exchange);
+
+      const response = await axios.get(
+        `/api/positions?${params.toString()}&userId=${selectedUser?.id}`
+      );
+
       if (response.data.success) {
         setPositions(response.data.data || []);
       } else {
@@ -102,10 +114,15 @@ export function AdvancedPositionsTable({ positions: propPositions }: AdvancedPos
   const handlePositionAction = async (action: PositionAction) => {
     try {
       if (action.type === "CLOSE_POSITION") {
-        const response = await axios.post(`/api/positions/${action.payload.positionId}/close`, action.payload);
-        
+        const response = await axios.post(
+          `/api/positions/${action.payload.positionId}/close`,
+          { ...action.payload, userId: selectedUser?.id }
+        );
+
         if (response.data.success) {
-          toast.success(response.data.message || "Position closed successfully");
+          toast.success(
+            response.data.message || "Position closed successfully"
+          );
           // Refresh positions data
           await fetchPositions();
         } else {
@@ -123,16 +140,18 @@ export function AdvancedPositionsTable({ positions: propPositions }: AdvancedPos
   const handleCloseAllPositions = async () => {
     setIsClosingAll(true);
     try {
-      const openPositions = filteredPositions.filter(p => p.status === "ENTERED");
-      
-      const closePromises = openPositions.map(position => 
+      const openPositions = filteredPositions.filter(
+        (p) => p.status === "ENTERED"
+      );
+
+      const closePromises = openPositions.map((position) =>
         handlePositionAction({
           type: "CLOSE_POSITION",
           payload: {
             positionId: position.id,
             closeType: "FULL",
             slippage: 1.0,
-          }
+          },
         })
       );
 
@@ -147,23 +166,27 @@ export function AdvancedPositionsTable({ positions: propPositions }: AdvancedPos
     }
   };
 
-
-  const filteredPositions = positions.filter(position => {
-    if (filters.exchange && position.exchange !== filters.exchange) return false;
+  const filteredPositions = positions.filter((position) => {
+    if (filters.exchange && position.exchange !== filters.exchange)
+      return false;
     if (filters.symbol && position.symbol !== filters.symbol) return false;
     if (filters.status && position.status !== filters.status) return false;
     if (filters.side && position.side !== filters.side) return false;
     return true;
   });
 
-  const uniqueExchanges = [...new Set(positions.map(p => p.exchange))];
-  const uniquePairs = [...new Set(positions.map(p => p.symbol))];
-  const uniqueStatuses = [...new Set(positions.map(p => p.status))];
+  const uniqueExchanges = [...new Set(positions.map((p) => p.exchange))];
+  const uniquePairs = [...new Set(positions.map((p) => p.symbol))];
+  const uniqueStatuses = [...new Set(positions.map((p) => p.status))];
 
   return (
     <div className="space-y-4">
       {/* Header Tabs */}
-      <Tabs value={selectedTab} onValueChange={setSelectedTab} className="w-full">
+      <Tabs
+        value={selectedTab}
+        onValueChange={setSelectedTab}
+        className="w-full"
+      >
         <div className="flex flex-col lg:flex-row gap-4 items-start lg:items-center justify-between">
           <TabsList className="grid w-full lg:w-auto grid-cols-2 lg:grid-cols-2">
             <TabsTrigger value="live" className="text-sm">
@@ -176,64 +199,76 @@ export function AdvancedPositionsTable({ positions: propPositions }: AdvancedPos
 
           {/* Filters */}
           <div className="flex flex-wrap gap-2">
-            <Select 
-              value={filters.exchange || "all"} 
-              onValueChange={(value) => setFilters(prev => ({ 
-                ...prev, 
-                exchange: value === "all" ? undefined : value 
-              }))}
+            <Select
+              value={filters.exchange || "all"}
+              onValueChange={(value) =>
+                setFilters((prev) => ({
+                  ...prev,
+                  exchange: value === "all" ? undefined : value,
+                }))
+              }
             >
               <SelectTrigger className="w-[140px] h-9 text-sm">
                 <SelectValue placeholder="All exchanges" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All exchanges</SelectItem>
-                {uniqueExchanges.map(exchange => (
-                  <SelectItem key={exchange} value={exchange}>{exchange}</SelectItem>
+                {uniqueExchanges.map((exchange) => (
+                  <SelectItem key={exchange} value={exchange}>
+                    {exchange}
+                  </SelectItem>
                 ))}
               </SelectContent>
             </Select>
 
-            <Select 
-              value={filters.symbol || "all"} 
-              onValueChange={(value) => setFilters(prev => ({ 
-                ...prev, 
-                symbol: value === "all" ? undefined : value 
-              }))}
+            <Select
+              value={filters.symbol || "all"}
+              onValueChange={(value) =>
+                setFilters((prev) => ({
+                  ...prev,
+                  symbol: value === "all" ? undefined : value,
+                }))
+              }
             >
               <SelectTrigger className="w-[120px] h-9 text-sm">
                 <SelectValue placeholder="All pairs" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All pairs</SelectItem>
-                {uniquePairs.map(pair => (
-                  <SelectItem key={pair} value={pair}>{pair}</SelectItem>
+                {uniquePairs.map((pair) => (
+                  <SelectItem key={pair} value={pair}>
+                    {pair}
+                  </SelectItem>
                 ))}
               </SelectContent>
             </Select>
 
-            <Select 
-              value={filters.status || "all"} 
-              onValueChange={(value) => setFilters(prev => ({ 
-                ...prev, 
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                status: value === "all" ? undefined : value as any
-              }))}
+            <Select
+              value={filters.status || "all"}
+              onValueChange={(value) =>
+                setFilters((prev) => ({
+                  ...prev,
+                  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                  status: value === "all" ? undefined : (value as any),
+                }))
+              }
             >
               <SelectTrigger className="w-[130px] h-9 text-sm">
                 <SelectValue placeholder="All statuses" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All statuses</SelectItem>
-                {uniqueStatuses.map(status => (
-                  <SelectItem key={status} value={status}>{status}</SelectItem>
+                {uniqueStatuses.map((status) => (
+                  <SelectItem key={status} value={status}>
+                    {status}
+                  </SelectItem>
                 ))}
               </SelectContent>
             </Select>
 
-            <Button 
-              variant="outline" 
-              size="sm" 
+            <Button
+              variant="outline"
+              size="sm"
               className="h-9 text-sm text-red-600 hover:text-red-700"
               onClick={handleCloseAllPositions}
               disabled={isClosingAll}
@@ -277,26 +312,38 @@ export function AdvancedPositionsTable({ positions: propPositions }: AdvancedPos
                       <tr>
                         <td colSpan={13} className="text-center py-8">
                           <Loader2 className="h-6 w-6 animate-spin mx-auto" />
-                          <p className="mt-2 text-muted-foreground">Loading positions...</p>
+                          <p className="mt-2 text-muted-foreground">
+                            Loading positions...
+                          </p>
                         </td>
                       </tr>
-                    ) : filteredPositions.filter(p => p.status === "OPEN" || p.status === "ENTERED").length === 0 ? (
+                    ) : filteredPositions.filter(
+                        (p) => p.status === "OPEN" || p.status === "ENTERED"
+                      ).length === 0 ? (
                       <tr>
                         <td colSpan={13} className="text-center py-8">
-                          <p className="text-muted-foreground">No open positions found</p>
+                          <p className="text-muted-foreground">
+                            No open positions found
+                          </p>
                         </td>
                       </tr>
                     ) : (
-                      filteredPositions.filter(p => p.status === "OPEN" || p.status === "ENTERED").map((position) => (
-                        <PositionRow
-                          key={position.id}
-                          position={position}
-                          isExpanded={expandedRows.has(position.id)}
-                          onToggleExpand={() => toggleRowExpansion(position.id)}
-                          onPositionAction={handlePositionAction}
-                          currentPrice={livePrices[position.symbol]}
-                        />
-                      ))
+                      filteredPositions
+                        .filter(
+                          (p) => p.status === "OPEN" || p.status === "ENTERED"
+                        )
+                        .map((position) => (
+                          <PositionRow
+                            key={position.id}
+                            position={position}
+                            isExpanded={expandedRows.has(position.id)}
+                            onToggleExpand={() =>
+                              toggleRowExpansion(position.id)
+                            }
+                            onPositionAction={handlePositionAction}
+                            currentPrice={livePrices[position.symbol]}
+                          />
+                        ))
                     )}
                   </TableBody>
                 </Table>
@@ -308,15 +355,21 @@ export function AdvancedPositionsTable({ positions: propPositions }: AdvancedPos
         <TabsContent value="history" className="mt-6">
           <Card>
             <CardContent className="p-0">
-              {filteredPositions.filter(p => p.status === "CLOSED" || p.status === "MARKET_CLOSED").length > 0 ? (
+              {filteredPositions.filter(
+                (p) => p.status === "CLOSED" || p.status === "MARKET_CLOSED"
+              ).length > 0 ? (
                 <div className="rounded-md border overflow-x-auto">
                   <Table>
                     <TableHeader>
                       <TableRow className="bg-muted/50">
                         <TableHead className="w-8"></TableHead>
-                        <TableHead className="min-w-[120px]">Position</TableHead>
+                        <TableHead className="min-w-[120px]">
+                          Position
+                        </TableHead>
                         <TableHead className="text-right">Entry %</TableHead>
-                        <TableHead className="text-right">Max Drawdown</TableHead>
+                        <TableHead className="text-right">
+                          Max Drawdown
+                        </TableHead>
                         <TableHead className="text-right">TP</TableHead>
                         <TableHead className="text-right">SL</TableHead>
                         <TableHead className="text-right">BE</TableHead>
@@ -329,16 +382,24 @@ export function AdvancedPositionsTable({ positions: propPositions }: AdvancedPos
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {filteredPositions.filter(p => p.status === "CLOSED" || p.status === "MARKET_CLOSED").map((position) => (
-                        <PositionRow
-                          key={position.id}
-                          position={position}
-                          isExpanded={expandedRows.has(position.id)}
-                          onToggleExpand={() => toggleRowExpansion(position.id)}
-                          onPositionAction={handlePositionAction}
-                          currentPrice={livePrices[position.symbol]}
-                        />
-                      ))}
+                      {filteredPositions
+                        .filter(
+                          (p) =>
+                            p.status === "CLOSED" ||
+                            p.status === "MARKET_CLOSED"
+                        )
+                        .map((position) => (
+                          <PositionRow
+                            key={position.id}
+                            position={position}
+                            isExpanded={expandedRows.has(position.id)}
+                            onToggleExpand={() =>
+                              toggleRowExpansion(position.id)
+                            }
+                            onPositionAction={handlePositionAction}
+                            currentPrice={livePrices[position.symbol]}
+                          />
+                        ))}
                     </TableBody>
                   </Table>
                 </div>
@@ -346,7 +407,9 @@ export function AdvancedPositionsTable({ positions: propPositions }: AdvancedPos
                 <div className="p-12 text-center">
                   <div className="text-muted-foreground">
                     <TrendingDown className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                    <h3 className="text-lg font-medium mb-2">No historical positions</h3>
+                    <h3 className="text-lg font-medium mb-2">
+                      No historical positions
+                    </h3>
                     <p className="text-sm">Closed positions will appear here</p>
                   </div>
                 </div>

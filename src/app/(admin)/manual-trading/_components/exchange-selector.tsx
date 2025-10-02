@@ -14,7 +14,7 @@ import {
 import { RefreshCw } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { useQuery } from "@tanstack/react-query";
-import { getExchanges } from "@/db/actions/exchange/get-exchanges";
+import { getExchangesForUser } from "@/db/actions/admin/get-exchanges-for-user";
 import { Exchange } from "@/types/exchange";
 
 import { Spinner } from "@/components/spinner";
@@ -22,11 +22,13 @@ import { Spinner } from "@/components/spinner";
 interface ExchangeSelectorProps {
   onSelect: (exchange: Exchange | null) => void;
   selectedExchange: Exchange | null;
+  userId: string;
 }
 
 export function ExchangeSelector({
   onSelect,
   selectedExchange,
+  userId,
 }: ExchangeSelectorProps) {
   const {
     data: exchanges,
@@ -34,9 +36,9 @@ export function ExchangeSelector({
     error,
     refetch,
   } = useQuery<Exchange[]>({
-    queryKey: ["exchanges"],
+    queryKey: ["exchanges", userId],
     queryFn: async () => {
-      const exchanges = await getExchanges();
+      const exchanges = await getExchangesForUser(userId);
       return exchanges as Exchange[];
     },
   });

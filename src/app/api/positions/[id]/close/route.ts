@@ -33,10 +33,15 @@ export async function POST(
 
     console.log("body", body);
     console.log("positionId", id);
+    console.log("selectedUser", body.userId);
+
+    const { userId } = body;
+
+    const targetUserId = userId || session.user.id;
 
     // Find the position with user account
     const position = await db.position.findUnique({
-      where: { id: id },
+      where: { id: id, portfolio: { userId: targetUserId } },
       include: {
         portfolio: {
           include: {
@@ -61,7 +66,7 @@ export async function POST(
     }
 
     // Verify position belongs to the authenticated user
-    if (position.portfolio.userId !== session.user.id) {
+    if (position.portfolio.userId !== targetUserId) {
       return NextResponse.json(
         { error: "Unauthorized to close this position" },
         { status: 403 }

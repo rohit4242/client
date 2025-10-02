@@ -12,6 +12,7 @@ import { OrderHistory } from "./order-history";
 import { cn, formatDate } from "@/lib/utils";
 import { useLivePrice } from "@/hooks/use-live-price";
 import { MarkPrice } from "@/components/ui/live-price";
+import { useSelectedUser } from "@/contexts/selected-user-context";
 
 interface PositionRowProps {
   position: PositionData;
@@ -29,9 +30,10 @@ export function PositionRow({
   currentPrice,
 }: PositionRowProps) {
   const [actionLoading, setActionLoading] = useState(false);
+  const { selectedUser } = useSelectedUser();
 
   // Use live price hook to get real-time market price
-  const { price: livePrice } = useLivePrice(position.symbol);
+  const { price: livePrice } = useLivePrice(position.symbol, selectedUser?.id);
   
   // Priority: passed currentPrice > live price > position.currentPrice > entryPrice as fallback
   const price = currentPrice || livePrice || position.currentPrice || position.entryPrice;
@@ -255,6 +257,7 @@ export function PositionRow({
             symbol={position.symbol} 
             fallbackPrice={position.currentPrice || position.entryPrice}
             className="mt-1"
+            userId={selectedUser?.id}
           />
         </TableCell>
         <TableCell className="text-center">

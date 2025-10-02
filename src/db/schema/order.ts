@@ -98,11 +98,15 @@ export type TradingFormData = z.infer<typeof TradingFormSchema>;
 export type CreateOrderData = {
   exchange: Exchange;
   order: TradingFormData;
+  userId?: string;
+  portfolioId?: string;
 }
 // same as Exchange type so use this Exchange type here
 export const createOrderDataSchema = z.object({
   exchange: ExchangeSchema,
   order: TradingFormSchema,
+  userId: z.string().optional(),
+  portfolioId: z.string().optional(),
 });
 
 // Default form values

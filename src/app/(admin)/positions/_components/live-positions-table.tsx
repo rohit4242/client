@@ -30,6 +30,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import { useSelectedUser } from "@/contexts/selected-user-context";
 interface LivePositionsTableProps {
   positions: Array<{
     id: string;
@@ -50,6 +51,7 @@ type SortField = "createdAt" | "symbol" | "entryPrice" | "quantity" | "currentVa
 type SortDirection = "asc" | "desc";
 
 export function LivePositionsTable({ positions }: LivePositionsTableProps) {
+  const { selectedUser } = useSelectedUser();
   const [searchTerm, setSearchTerm] = useState("");
   const [sortField, setSortField] = useState<SortField>("createdAt");
   const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
@@ -62,7 +64,7 @@ export function LivePositionsTable({ positions }: LivePositionsTableProps) {
   );
   
   // Use the new live prices hook
-  const { prices: currentPrices } = useLivePrices(symbols);
+  const { prices: currentPrices } = useLivePrices(symbols, selectedUser?.id);
 
   // Filter function
   const filterPositions = () => {
@@ -316,6 +318,7 @@ export function LivePositionsTable({ positions }: LivePositionsTableProps) {
                         symbol={position.symbol}
                         entryPrice={Number(position.entryPrice)}
                         fallbackPrice={Number(position.entryPrice)}
+                        userId={selectedUser?.id}
                       />
                     </TableCell>
                     <TableCell className="text-right font-mono">

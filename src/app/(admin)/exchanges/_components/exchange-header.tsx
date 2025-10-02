@@ -6,12 +6,14 @@ import { Dialog, DialogTrigger } from '@/components/ui/dialog';
 import { Plus } from 'lucide-react';
 import { ConnectExchangeDialog } from './connect-exchange-dialog';
 import { Exchange } from '@/types/exchange';
+import { Customer } from '@/db/actions/admin/get-customers';
 
 interface ExchangeHeaderProps {
   onExchangeAdded: (exchange: Exchange) => void;
+  selectedUser: Customer;
 }
 
-export function ExchangeHeader({ onExchangeAdded }: ExchangeHeaderProps) {
+export function ExchangeHeader({ onExchangeAdded, selectedUser }: ExchangeHeaderProps) {
   const [showConnectDialog, setShowConnectDialog] = useState(false);
 
   const handleExchangeAdded = (exchange: Exchange) => {
@@ -22,9 +24,9 @@ export function ExchangeHeader({ onExchangeAdded }: ExchangeHeaderProps) {
   return (
     <div className="flex items-center justify-between">
       <div>
-        <h1 className="text-3xl font-bold">My Exchanges</h1>
+        <h1 className="text-3xl font-bold">Exchange Accounts</h1>
         <p className="text-muted-foreground mt-1">
-          Manage your exchange connections and trading accounts
+          Managing exchanges for {selectedUser.name} ({selectedUser.email})
         </p>
       </div>
       <Dialog open={showConnectDialog} onOpenChange={setShowConnectDialog}>
@@ -37,6 +39,7 @@ export function ExchangeHeader({ onExchangeAdded }: ExchangeHeaderProps) {
         <ConnectExchangeDialog 
           onSuccess={handleExchangeAdded}
           onClose={() => setShowConnectDialog(false)}
+          userId={selectedUser.id}
         />
       </Dialog>
     </div>
