@@ -4,9 +4,10 @@ import { createSignalBotSchema } from "@/db/schema/signal-bot";
 import { nanoid } from "nanoid";
 import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
+import { getSelectedUser } from "@/lib/selected-user-server";
 
-// GET /api/signal-bots - Get all signal bots for current user
-export async function GET(request: NextRequest) {
+// GET /api/signal-bots - Get all signal bots for current user or selected user (admin)
+export async function GET() {
   try {
     const session = await auth.api.getSession({
         headers: await headers(),
@@ -16,8 +17,12 @@ export async function GET(request: NextRequest) {
         return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
       }
 
+    // Check if admin is using selected user
+    const selectedUser = await getSelectedUser();
+    const targetUserId = selectedUser?.id || session.user.id;
+
     const portfolio = await db.portfolio.findFirst({
-      where: { userId: session.user.id },
+      where: { userId: targetUserId },
     });
 
     if (!portfolio) {
@@ -94,8 +99,12 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
+    // Check if admin is using selected user
+    const selectedUser = await getSelectedUser();
+    const targetUserId = selectedUser?.id || session.user.id;
+
     const portfolio = await db.portfolio.findFirst({
-      where: { userId: session.user.id },
+      where: { userId: targetUserId },
     });
 
     if (!portfolio) {

@@ -11,8 +11,13 @@ import { EmptyState } from "./empty-state";
 import { useQuery } from "@tanstack/react-query";
 import axios from "axios";
 import { SignalBot } from "@/types/signal-bot";
+import { Customer } from "@/db/actions/admin/get-customers";
 
-export function SignalBotClient() {
+interface SignalBotClientProps {
+  selectedUser: Customer;
+}
+
+export function SignalBotClient({ selectedUser }: SignalBotClientProps) {
   const [showCreateDialog, setShowCreateDialog] = useState(false);
 
   const {
@@ -20,7 +25,7 @@ export function SignalBotClient() {
     isLoading,
     refetch,
   } = useQuery<SignalBot[]>({
-    queryKey: ["signal-bots"],
+    queryKey: ["signal-bots", selectedUser.id],
     queryFn: async () => {
       const response = await axios.get("/api/signal-bots");
       return response.data;

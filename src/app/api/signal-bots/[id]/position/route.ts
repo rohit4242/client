@@ -5,6 +5,7 @@ import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
 import { placeOrder } from "@/db/actions/order/create-order";
 import { updatePosition } from "@/db/actions/position/update-position";
+import { getSelectedUser } from "@/lib/selected-user-server";
 import {
   calculatePositionQuantity,
   adjustQuantityToConstraints,
@@ -307,8 +308,12 @@ export async function POST(
 
     const { side, symbol, customQuantity } = validatedData.data;
 
+    // Check if admin is using selected user
+    const selectedUser = await getSelectedUser();
+    const targetUserId = selectedUser?.id || session.user.id;
+
     // Get user portfolio
-    const portfolio = await getUserPortfolio(session.user.id);
+    const portfolio = await getUserPortfolio(targetUserId);
 
     // Get and validate signal bot
     const signalBot = await getSignalBot(botId, portfolio.id);
@@ -398,8 +403,8 @@ export async function POST(
     // Recalculate portfolio stats after position creation
     try {
       const { recalculatePortfolioStats } = await import("@/db/actions/admin/update-portfolio-stats");
-      await recalculatePortfolioStats(session.user.id);
-      console.log(`Portfolio stats recalculated for user ${session.user.id}`);
+      await recalculatePortfolioStats(targetUserId);
+      console.log(`Portfolio stats recalculated for user ${targetUserId}`);
     } catch (statsError) {
       console.error("Error recalculating portfolio stats:", statsError);
       // Don't fail the request if stats calculation fails

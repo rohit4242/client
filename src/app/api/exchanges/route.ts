@@ -5,6 +5,8 @@ import { auth } from "@/lib/auth";
 import { createExchangeSchema } from "@/db/schema/exchange";
 import { Spot } from "@binance/spot";
 import { calculateTotalUSDValue } from "@/lib/trading-utils";
+import { getSelectedUser } from "@/lib/selected-user-server";
+
 export async function GET() {
   try {
     const session = await auth.api.getSession({
@@ -15,10 +17,13 @@ export async function GET() {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
+    // Check if admin is using selected user
+    const selectedUser = await getSelectedUser();
+    const targetUserId = selectedUser?.id || session.user.id;
     
     const portfolio = await db.portfolio.findFirst({
       where: {
-        userId: session.user.id,
+        userId: targetUserId,
       },
     });
 

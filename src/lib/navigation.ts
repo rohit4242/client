@@ -4,6 +4,7 @@ import {
   TrendingUp,
   Bot,
   Wallet,
+  LineChart,
   LucideIcon,
 } from "lucide-react";
 
@@ -70,6 +71,16 @@ export const navigationConfig: NavigationGroup[] = [
         icon: Bot,
         isActive: true,
         badgeVariant: "secondary",
+      },
+      {
+        id: "live-prices",
+        title: "Live Prices",
+        description: "Real-time cryptocurrency prices via WebSocket",
+        url: "/live-prices",
+        icon: LineChart,
+        isActive: true,
+        badge: "New",
+        badgeVariant: "default",
       },
     ],
   },

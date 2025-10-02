@@ -1,7 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
-import axios from "axios";
+import { useCryptoPrice } from "./use-crypto-price";
 
 interface LivePriceHookResult {
   price: number | null;
@@ -11,206 +10,61 @@ interface LivePriceHookResult {
   userId?: string;
 }
 
+/**
+ * Hook for getting live price of a single symbol using WebSocket
+ * @param symbol - Trading pair symbol (e.g., 'BTCUSDT')
+ * @param userId - Optional user ID (kept for backward compatibility, not used)
+ */
 export function useLivePrice(symbol: string, userId?: string): LivePriceHookResult {
-  const [price, setPrice] = useState<number | null>(null);
-  const [isUpdating, setIsUpdating] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const intervalRef = useRef<NodeJS.Timeout | null>(null);
-  const isInitialLoad = useRef(true);
+  const { prices, isConnected, error } = useCryptoPrice(symbol ? [symbol] : []);
+  
+  const priceData = prices[symbol];
+  const price = priceData ? parseFloat(priceData.price) : null;
 
-  const fetchPrice = useCallback(async () => {
-    if (!symbol) {
-      return;
-    }
-
-    try {
-      // Only show updating state after initial load
-      if (!isInitialLoad.current) {
-        setIsUpdating(true);
-      }
-      setError(null);
-      
-      // Build URL with query params instead of body
-      const url = userId 
-        ? `/api/trading/price/${symbol}?userId=${userId}`
-        : `/api/trading/price/${symbol}`;
-      
-      const response = await axios.get(url);
-      
-      let priceValue: number | null = null;
-      
-      // Handle different response formats
-      if (response.data?.price) {
-        priceValue = parseFloat(response.data.price);
-      } else if (response.data?.data?.price) {
-        priceValue = parseFloat(response.data.data.price);
-      } else if (typeof response.data === 'number') {
-        priceValue = response.data;
-      }
-      
-      if (priceValue && !isNaN(priceValue)) {
-        setPrice(priceValue);
-      } else {
-        console.warn(`Invalid price data for ${symbol}:`, response.data);
-        // Keep the previous price if new data is invalid
-      }
-      
-      isInitialLoad.current = false;
-    } catch (err) {
-      console.error(`Error fetching price for ${symbol}:`, err);
-      setError("Failed to fetch price");
-      // Don't clear price on error, keep showing last known price
-    } finally {
-      setIsUpdating(false);
-    }
-  }, [symbol, userId]);
-
-  const refreshPrice = useCallback(() => {
-    fetchPrice();
-  }, [fetchPrice]);
-
-  useEffect(() => {
-    if (!symbol) return;
-    
-    // Clear previous data when symbol changes
-    setPrice(null);
-    setError(null);
-    isInitialLoad.current = true;
-    
-    // Clear existing interval
-    if (intervalRef.current) {
-      clearInterval(intervalRef.current);
-    }
-    
-    // Fetch initial price
-    fetchPrice();
-    
-    // Set up interval to refresh price every 3 seconds
-    intervalRef.current = setInterval(fetchPrice, 1000);
-    
-    return () => {
-      if (intervalRef.current) {
-        clearInterval(intervalRef.current);
-      }
-    };
-  }, [fetchPrice]);
+  // Dummy refresh function for backward compatibility
+  const refreshPrice = () => {
+    // WebSocket automatically refreshes, no manual refresh needed
+  };
 
   return {
     price,
-    isUpdating,
-    error,
+    isUpdating: !isConnected && !price, // Consider updating if not connected and no price yet
+    error: error,
     refreshPrice,
+    userId,
   };
 }
 
-// Hook for multiple symbols
+/**
+ * Hook for getting live prices of multiple symbols using WebSocket
+ * @param symbols - Array of trading pair symbols (e.g., ['BTCUSDT', 'ETHUSDT'])
+ * @param userId - Optional user ID (kept for backward compatibility, not used)
+ */
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 export function useLivePrices(symbols: string[], userId?: string) {
-  const [prices, setPrices] = useState<Record<string, number>>({});
-  const [isUpdating, setIsUpdating] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const intervalRef = useRef<NodeJS.Timeout | null>(null);
-  const isInitialLoad = useRef(true);
-
-  const fetchPrices = useCallback(async () => {
-    if (!symbols.length) {
-      return;
-    }
-
-    try {
-      // Only show updating state after initial load
-      if (!isInitialLoad.current) {
-        setIsUpdating(true);
+  const { prices: wsData, isConnected, error } = useCryptoPrice(symbols);
+  
+  // Convert WebSocket price data to the expected format
+  const prices: Record<string, number> = {};
+  Object.keys(wsData).forEach((symbol) => {
+    const priceStr = wsData[symbol]?.price;
+    if (priceStr) {
+      const priceNum = parseFloat(priceStr);
+      if (!isNaN(priceNum)) {
+        prices[symbol] = priceNum;
       }
-      setError(null);
-      
-      // Fetch prices for all symbols in parallel
-      const pricePromises = symbols.map(async (symbol) => {
-        try {
-          // Build URL with query params instead of body
-          const url = userId 
-            ? `/api/trading/price/${symbol}?userId=${userId}`
-            : `/api/trading/price/${symbol}`;
-          
-          const response = await axios.get(url);
-          
-          let priceValue: number | null = null;
-          
-          // Handle different response formats
-          if (response.data?.price) {
-            priceValue = parseFloat(response.data.price);
-          } else if (response.data?.data?.price) {
-            priceValue = parseFloat(response.data.data.price);
-          } else if (typeof response.data === 'number') {
-            priceValue = response.data;
-          }
-          
-          return {
-            symbol,
-            price: priceValue && !isNaN(priceValue) ? priceValue : null,
-          };
-        } catch (err) {
-          console.error(`Error fetching price for ${symbol}:`, err);
-          return { symbol, price: null };
-        }
-      });
-
-      const results = await Promise.all(pricePromises);
-      
-      // Update prices, keeping existing ones if new fetch fails
-      setPrices(prevPrices => {
-        const newPrices = { ...prevPrices };
-        results.forEach(({ symbol, price }) => {
-          if (price !== null) {
-            newPrices[symbol] = price;
-          }
-          // Keep existing price if new price is null/invalid
-        });
-        return newPrices;
-      });
-      
-      isInitialLoad.current = false;
-    } catch (err) {
-      console.error("Error fetching prices:", err);
-      setError("Failed to fetch prices");
-    } finally {
-      setIsUpdating(false);
     }
-  }, [symbols.join(','), userId]); // Use symbols.join(',') to create a stable dependency
+  });
 
-  const refreshPrices = useCallback(() => {
-    fetchPrices();
-  }, [fetchPrices]);
-
-  useEffect(() => {
-    if (!symbols.length) return;
-    
-    // Clear previous data when symbols change
-    setPrices({});
-    setError(null);
-    isInitialLoad.current = true;
-    
-    // Clear existing interval
-    if (intervalRef.current) {
-      clearInterval(intervalRef.current);
-    }
-    
-    // Fetch initial prices
-    fetchPrices();
-    
-    // Set up interval to refresh prices every 3 seconds
-    intervalRef.current = setInterval(fetchPrices, 1000);
-    
-    return () => {
-      if (intervalRef.current) {
-        clearInterval(intervalRef.current);
-      }
-    };
-  }, [fetchPrices]);
+  // Dummy refresh function for backward compatibility
+  const refreshPrices = () => {
+    // WebSocket automatically refreshes, no manual refresh needed
+  };
 
   return {
     prices,
-    isUpdating,
-    error,
+    isUpdating: !isConnected && Object.keys(prices).length === 0,
+    error: error,
     refreshPrices,
   };
 }

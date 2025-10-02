@@ -43,69 +43,14 @@ export async function GET(
 ) {
   try {
     const { symbol } = await params;
-
-    // Get userId from query params instead of body (GET requests don't have body)
-    const { searchParams } = new URL(request.url);
-    const requestUserId = searchParams.get("userId");
-    
-    const session = await auth.api.getSession({
-      headers: await headers(),
-    });
-
-    if (!session) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    // Use requestUserId if provided (admin), otherwise use session user
-    const targetUserId = requestUserId || session.user.id;
-
-    // Get user's active exchange
-    const portfolio = await db.portfolio.findFirst({
-      where: { userId: targetUserId },
-      include: {
-        exchanges: {
-          where: { isActive: true },
-        },
-      },
-    });
-
-    if (!portfolio || portfolio.exchanges.length === 0) {
-      return NextResponse.json(
-        { error: "No active exchange found" },
-        { status: 400 }
-      );
-    }
-
-    const activeExchange = portfolio.exchanges[0];
-    const configurationRestAPI = {
-      apiKey: activeExchange.apiKey,
-      apiSecret: activeExchange.apiSecret,
-    };
-
-    const priceData = await getPriceBySymbol(configurationRestAPI, symbol);
-    
-    // Normalize the response format
-    let price: number;
-    if (typeof priceData === 'object' && priceData?.price) {
-      price = parseFloat(priceData.price);
-    } else if (typeof priceData === 'string') {
-      price = parseFloat(priceData);
-    } else if (typeof priceData === 'number') {
-      price = priceData;
-    } else {
-      throw new Error('Invalid price data format');
-    }
-
-    // Ensure price is valid
-    if (isNaN(price) || price <= 0) {
-      throw new Error('Invalid price value');
-    }
-
-    return NextResponse.json({ 
-      price: price,
-      symbol: symbol,
-      timestamp: Date.now()
-    }, { status: 200 });
+    // Use public Binance price for minimal coupling and caching benefits
+    const url = `https://api.binance.com/api/v3/ticker/price?symbol=${encodeURIComponent(symbol.toUpperCase())}`;
+    const res = await fetch(url, { cache: "no-store" });
+    if (!res.ok) return NextResponse.json({ error: "Upstream error" }, { status: 502 });
+    const data = await res.json();
+    const price = parseFloat(data?.price);
+    if (!price || isNaN(price)) throw new Error("Invalid upstream price");
+    return NextResponse.json({ price, symbol: symbol.toUpperCase(), timestamp: Date.now() }, { status: 200 });
   } catch (error) {
     console.error("Error fetching price:", error);
     return NextResponse.json(

@@ -1,5 +1,20 @@
 This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
 
+## Features
+
+### 🚀 Real-time Price Updates (WebSocket)
+- **WebSocket-based live prices** - ~100ms latency for real-time crypto prices
+- **Auto-reconnection** - Seamless reconnection on connection drops
+- **Price animations** - Visual feedback with green/red flashes on price changes
+- See `WEBSOCKET_LIVE_PRICES.md` and `WEBSOCKET_INTEGRATION_COMPLETE.md` for details
+
+### 📊 Trading Features
+- Manual trading with real-time market data
+- Signal bot for automated trading
+- Position management with live P&L tracking
+- Exchange integration (Binance)
+- Portfolio tracking and analytics
+
 ## Getting Started
 
 First, run the development server:

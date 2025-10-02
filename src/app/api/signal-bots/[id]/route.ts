@@ -3,6 +3,7 @@ import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
 import db from "@/db";
 import { updateSignalBotSchema } from "@/db/schema/signal-bot";
+import { getSelectedUser } from "@/lib/selected-user-server";
 
 // GET /api/signal-bots/[id] - Get specific signal bot
 export async function GET(
@@ -19,8 +20,12 @@ export async function GET(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
+    // Check if admin is using selected user
+    const selectedUser = await getSelectedUser();
+    const targetUserId = selectedUser?.id || session.user.id;
+
     const portfolio = await db.portfolio.findFirst({
-      where: { userId: session.user.id },
+      where: { userId: targetUserId },
     });
 
     if (!portfolio) {
@@ -110,8 +115,12 @@ export async function PUT(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
+    // Check if admin is using selected user
+    const selectedUser = await getSelectedUser();
+    const targetUserId = selectedUser?.id || session.user.id;
+
     const portfolio = await db.portfolio.findFirst({
-      where: { userId: session.user.id },
+      where: { userId: targetUserId },
     });
 
     if (!portfolio) {
@@ -251,8 +260,12 @@ export async function DELETE(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
+    // Check if admin is using selected user
+    const selectedUser = await getSelectedUser();
+    const targetUserId = selectedUser?.id || session.user.id;
+
     const portfolio = await db.portfolio.findFirst({
-      where: { userId: session.user.id },
+      where: { userId: targetUserId },
     });
 
     if (!portfolio) {
