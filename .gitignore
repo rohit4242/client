@@ -41,3 +41,10 @@ yarn-error.log*
 next-env.d.ts
 
 /src/generated/prisma
+
+# PM2 logs
+/logs
+*.log
+
+# Deployment
+.pm2

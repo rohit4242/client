@@ -6,6 +6,7 @@ WORKDIR /app
 
 # Install dependencies only when needed
 COPY package.json package-lock.json ./
+COPY prisma ./prisma
 RUN npm ci --only=production
 
 # Stage 2: Builder
