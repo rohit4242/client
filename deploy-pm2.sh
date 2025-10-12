@@ -16,7 +16,7 @@ NC='\033[0m' # No Color
 APP_NAME="bytix-ai"
 APP_DIR="$HOME/$APP_NAME"
 NODE_VERSION="20"
-DOMAIN="yourdomain.com"  # Change this to your actual domain
+DOMAIN="bytix.ai" # Change this to your actual domain
 
 echo -e "${GREEN}========================================${NC}"
 echo -e "${GREEN}  Bytix AI - EC2 Deployment${NC}"
