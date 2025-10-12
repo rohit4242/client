@@ -44,8 +44,37 @@ To learn more about Next.js, take a look at the following resources:
 
 You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
 
-## Deploy on Vercel
+## Deployment
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+### Docker Deployment (AWS EC2)
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+This project includes Docker support for production deployment on AWS EC2:
+
+- **Quick Start**: See [DOCKER_QUICKSTART.md](./DOCKER_QUICKSTART.md) for quick deployment instructions
+- **Full Guide**: See [DEPLOYMENT.md](./DEPLOYMENT.md) for comprehensive AWS EC2 deployment guide
+
+**Key Features:**
+- Multi-stage Docker build for optimized image size
+- Nginx reverse proxy with WebSocket support
+- Health checks and auto-restart policies
+- Production-ready security configurations
+- SSL/HTTPS support
+
+**Quick Deploy:**
+```bash
+# Configure environment
+cp env.example .env
+nano .env
+
+# Build and run
+docker-compose up -d
+
+# Run migrations
+docker-compose exec app npx prisma migrate deploy
+```
+
+### Deploy on Vercel
+
+Alternatively, you can deploy on the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+
+Check out the [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
