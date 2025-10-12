@@ -128,7 +128,7 @@ npx prisma generate
 
 # Run database migrations
 print_message "Running database migrations..."
-npx prisma migrate deploy
+npx prisma db push
 
 # Build Next.js application
 print_message "Building Next.js application (this may take a few minutes)..."
