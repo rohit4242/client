@@ -63,10 +63,7 @@ export function ConnectExchangeDialog({
   });
 
   const ipAddresses = [
-    "3.122.50.188",
-    "18.192.238.182", 
-    "3.72.244.137",
-    "18.185.137.24",
+    "13.50.243.93",
   ];
 
   const copyIpAddresses = () => {
