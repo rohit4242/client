@@ -15,6 +15,11 @@ model User {
   image         String?
   role          UserRole @default(CUSTOMER)
 
+  // Agent-Customer relationship
+  agentId   String? // Nullable - only set when customer is assigned to agent
+  agent     User?   @relation("AgentCustomers", fields: [agentId], references: [id], onDelete: SetNull)
+  customers User[]  @relation("AgentCustomers") // Agent's assigned customers
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -273,9 +278,11 @@ model Signal {
   price   Float?
   message String?
 
-  processed Boolean  @default(false)
-  error     String?
-  createdAt DateTime @default(now())
+  processed       Boolean  @default(false)
+  error           String?
+  visibleToCustomer Boolean @default(true) // Controls if customer can see this signal
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 
   bot Bot @relation(fields: [botId], references: [id], onDelete: Cascade)
 
@@ -341,5 +348,6 @@ enum OrderStatus {
 
 enum UserRole {
   ADMIN
+  AGENT
   CUSTOMER
 }

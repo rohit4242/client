@@ -4,7 +4,7 @@ import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
 import db from "@/db";
 
-export type UserRole = "ADMIN" | "CUSTOMER";
+export type UserRole = "ADMIN" | "AGENT" | "CUSTOMER";
 
 export interface UserWithRole {
   id: string;
@@ -71,5 +71,13 @@ export async function isAdmin(): Promise<boolean> {
 export async function isCustomer(): Promise<boolean> {
   const user = await getUserWithRole();
   return user?.role === "CUSTOMER";
+}
+
+/**
+ * Check if the current user has agent role
+ */
+export async function isAgent(): Promise<boolean> {
+  const user = await getUserWithRole();
+  return user?.role === "AGENT";
 }
 

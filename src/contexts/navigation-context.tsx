@@ -3,24 +3,45 @@
 import React, { createContext, useContext, useMemo, useCallback } from "react";
 import { usePathname } from "next/navigation";
 import { 
-  navigationConfig, 
+  navigationConfig as adminNavigationConfig, 
   NavigationItem,
-  getAllNavigationItems,
-  findNavigationItem 
+  NavigationGroup
 } from "@/lib/navigation";
+import { agentNavigationConfig } from "@/lib/agent-navigation";
 
 interface NavigationContextType {
   currentRoute: NavigationItem | undefined;
   breadcrumbs: NavigationItem[];
   isActiveRoute: (url: string) => boolean;
   pathname: string;
-  navigationConfig: typeof navigationConfig;
+  navigationConfig: NavigationGroup[];
 }
 
 const NavigationContext = createContext<NavigationContextType | undefined>(undefined);
 
-export function NavigationProvider({ children }: { children: React.ReactNode }) {
+interface NavigationProviderProps {
+  children: React.ReactNode;
+}
+
+export function NavigationProvider({ children }: NavigationProviderProps) {
   const pathname = usePathname();
+
+  // Automatically select navigation config based on current path
+  const navigationConfig = useMemo(() => {
+    if (pathname.startsWith('/agent')) {
+      return agentNavigationConfig;
+    }
+    return adminNavigationConfig;
+  }, [pathname]);
+
+  // Helper functions that work with any navigation config
+  const getAllNavigationItems = useCallback((): NavigationItem[] => {
+    return navigationConfig.flatMap(group => group.items);
+  }, [navigationConfig]);
+
+  const findNavigationItem = useCallback((id: string): NavigationItem | undefined => {
+    return getAllNavigationItems().find(item => item.id === id);
+  }, [getAllNavigationItems]);
 
   const currentRoute = useMemo(() => {
     return findNavigationItem(
@@ -28,7 +49,7 @@ export function NavigationProvider({ children }: { children: React.ReactNode }) 
         pathname.startsWith(item.url)
       )?.id || ""
     );
-  }, [pathname]);
+  }, [pathname, getAllNavigationItems, findNavigationItem]);
 
   const breadcrumbs = useMemo(() => {
     const items: NavigationItem[] = [];
@@ -43,7 +64,7 @@ export function NavigationProvider({ children }: { children: React.ReactNode }) 
     }
 
     return items;
-  }, [pathname]);
+  }, [pathname, getAllNavigationItems]);
 
   const isActiveRoute = useCallback((url: string) => {
     if (url === "/") return pathname === "/";
@@ -56,7 +77,7 @@ export function NavigationProvider({ children }: { children: React.ReactNode }) 
     isActiveRoute,
     pathname,
     navigationConfig,
-  }), [currentRoute, breadcrumbs, isActiveRoute, pathname]);
+  }), [currentRoute, breadcrumbs, isActiveRoute, pathname, navigationConfig]);
 
   return (
     <NavigationContext.Provider value={value}>

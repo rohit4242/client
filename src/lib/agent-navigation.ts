@@ -5,8 +5,6 @@ import {
   Bot,
   Wallet,
   LineChart,
-  Users,
-  Radio,
   LucideIcon,
 } from "lucide-react";
 
@@ -30,7 +28,8 @@ export interface NavigationGroup {
   items: NavigationItem[];
 }
 
-export const navigationConfig: NavigationGroup[] = [
+// Agent navigation - similar to admin but without user management
+export const agentNavigationConfig: NavigationGroup[] = [
   {
     id: "overview",
     title: "Overview",
@@ -38,16 +37,16 @@ export const navigationConfig: NavigationGroup[] = [
       {
         id: "dashboard",
         title: "Dashboard",
-        description: "View your trading overview and statistics",
-        url: "/dashboard",
+        description: "View customer trading overview and statistics",
+        url: "/agent/dashboard",
         icon: Home,
         isActive: true,
       },
       {
         id: "positions",
         title: "Positions",
-        description: "Manage your open and closed positions",
-        url: "/positions",
+        description: "Manage customer positions",
+        url: "/agent/positions",
         icon: Activity,
         isActive: true,
       },
@@ -60,16 +59,16 @@ export const navigationConfig: NavigationGroup[] = [
       {
         id: "manual-trading",
         title: "Manual Trading",
-        description: "Execute trades manually with advanced tools",
-        url: "/manual-trading",
+        description: "Execute trades for customers",
+        url: "/agent/manual-trading",
         icon: TrendingUp,
         isActive: true,
       },
       {
         id: "signal-bot",
         title: "Signal Bot",
-        description: "Automated trading with signal-based strategies",
-        url: "/signal-bot",
+        description: "View and manage customer bots",
+        url: "/agent/signal-bot",
         icon: Bot,
         isActive: true,
         badgeVariant: "secondary",
@@ -78,7 +77,7 @@ export const navigationConfig: NavigationGroup[] = [
         id: "live-prices",
         title: "Live Prices",
         description: "Real-time cryptocurrency prices via WebSocket",
-        url: "/live-prices",
+        url: "/agent/live-prices",
         icon: LineChart,
         isActive: true,
         badge: "New",
@@ -93,25 +92,9 @@ export const navigationConfig: NavigationGroup[] = [
       {
         id: "exchanges",
         title: "Exchanges",
-        description: "Connect and manage your exchange accounts",
-        url: "/exchanges",
+        description: "View customer exchange accounts",
+        url: "/agent/exchanges",
         icon: Wallet,
-        isActive: true,
-      },
-      {
-        id: "users",
-        title: "Users",
-        description: "Manage user roles and agent assignments",
-        url: "/users",
-        icon: Users,
-        isActive: true,
-      },
-      {
-        id: "signals",
-        title: "Signals",
-        description: "View and manage all trading signals",
-        url: "/signals",
-        icon: Radio,
         isActive: true,
       },
     ],
@@ -120,7 +103,7 @@ export const navigationConfig: NavigationGroup[] = [
 
 // Helper function to get all navigation items flattened
 export const getAllNavigationItems = (): NavigationItem[] => {
-  return navigationConfig.flatMap(group => group.items);
+  return agentNavigationConfig.flatMap(group => group.items);
 };
 
 // Helper function to find navigation item by ID
@@ -131,4 +114,5 @@ export const findNavigationItem = (id: string): NavigationItem | undefined => {
 // Helper function to get active navigation items
 export const getActiveNavigationItems = (): NavigationItem[] => {
   return getAllNavigationItems().filter(item => item.isActive);
-}; 
+};
+
