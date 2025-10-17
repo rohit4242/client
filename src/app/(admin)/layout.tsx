@@ -40,7 +40,7 @@ export default async function AdminLayout({
         <SidebarProvider>
           <AppSidebar customers={customers} />
           <SidebarInset>
-            <header className="flex h-16 shrink-0 items-center gap-2 transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-12">
+            <header className="sticky top-0 z-40 flex h-16 shrink-0 items-center gap-2 border-b bg-background/70 backdrop-blur supports-[backdrop-filter]:bg-background/50 transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-12">
               <div className="flex items-center w-full gap-2 px-4">
                 <div className="flex items-center gap-2 flex-1">
                   <MobileNav />
@@ -57,8 +57,8 @@ export default async function AdminLayout({
                 <div className="flex-1"></div>
               </div>
             </header>
-            <div className="flex flex-1 flex-col gap-4 p-4 pt-0">
-              <div className="bg-muted/50 rounded-xl min-h-[calc(100vh-8rem)] p-6">
+            <div className="flex flex-1 flex-col gap-4 p-4 pt-4">
+              <div className="rounded-xl min-h-[calc(100vh-8rem)] p-6 border bg-card/70 backdrop-blur supports-[backdrop-filter]:bg-card/60">
                 {children}
               </div>
             </div>

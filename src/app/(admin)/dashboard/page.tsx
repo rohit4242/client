@@ -1,11 +1,9 @@
 
 import { DashboardHeader } from "./_components/dashboard-header";
 import { StatsCards } from "./_components/stats-cards";
-import { QuickActions } from "./_components/quick-actions";
 import { PortfolioChart } from "./_components/portfolio-chart";
 import { RecentOrders } from "./_components/recent-orders";
 import { SignalBotWidget } from "./_components/signal-bot-widget";
-import { QuickNav } from "../_components/quick-nav";
 import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
@@ -30,8 +28,6 @@ export default async function DashboardPage() {
         userName={session.user.name}
       />
 
-      <QuickNav />
-
       <StatsCards stats={stats} />
 
       <div className="grid gap-6 lg:grid-cols-3">
@@ -44,7 +40,6 @@ export default async function DashboardPage() {
         </div>
       </div>
 
-      <QuickActions />
     </div>
   );
 }

@@ -24,6 +24,7 @@ import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 import { SignalWithBot } from "@/db/actions/admin/get-all-signals";
+import { SignalAction } from "@/types/signal-bot";
 
 interface EditSignalDialogProps {
   open: boolean;
@@ -94,7 +95,7 @@ export function EditSignalDialog({
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="action">Action</Label>
-              <Select value={action} onValueChange={(value: any) => setAction(value)}>
+              <Select value={action} onValueChange={(value: SignalAction) => setAction(value)}>
                 <SelectTrigger id="action">
                   <SelectValue />
                 </SelectTrigger>

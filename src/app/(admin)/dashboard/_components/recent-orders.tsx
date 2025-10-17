@@ -72,15 +72,15 @@ export function RecentOrders() {
   const orders = useMemo(() => generateMockOrders(), []);
 
   return (
-    <Card className="flex flex-col h-full">
-      <CardHeader className="flex-shrink-0">
+    <Card>
+      <CardHeader>
         <CardTitle>Recent Orders</CardTitle>
         <CardDescription>
           Your latest 10 trading orders across all exchanges
         </CardDescription>
       </CardHeader>
-      <CardContent className="flex-1 overflow-hidden">
-        <div className="h-full overflow-y-auto space-y-3 pr-2" style={{ maxHeight: '400px' }}>
+      <CardContent className="overflow-auto pr-2" style={{ maxHeight: '420px' }}>
+        <div className="space-y-3">
           {orders.map((order) => (
             <div
               key={order.id}

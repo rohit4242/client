@@ -244,7 +244,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Generate webhook information
-    const webhookEndpoint = `${process.env.NEXTAUTH_URL || process.env.NEXT_PUBLIC_APP_URL}/api/webhook/signal-bot`;
+    const webhookEndpoint = `${process.env.NEXT_PUBLIC_APP_URL}/api/webhook/signal-bot`;
     
     // Get recent signals for status
     const recentSignals = await db.signal.findMany({
