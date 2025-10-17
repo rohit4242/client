@@ -38,9 +38,6 @@ export async function assignCustomerToAgent(
         return { success: false, error: "Agent not found" };
       }
 
-      if (agent.role !== "AGENT") {
-        return { success: false, error: "User is not an agent" };
-      }
     }
 
     // Update customer's agentId
