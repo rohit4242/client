@@ -26,7 +26,7 @@ export async function GET(req: NextRequest) {
     });
 
     if (!user) {
-      return NextResponse.json({ success: true, positions: [] }, { headers: CORS_HEADERS });
+      return NextResponse.json({ success: true, signals: [] }, { headers: CORS_HEADERS });
     }
 
     const portfolio = await db.portfolio.findFirst({
@@ -35,20 +35,33 @@ export async function GET(req: NextRequest) {
     });
 
     if (!portfolio) {
-      return NextResponse.json({ success: true, positions: [] }, { headers: CORS_HEADERS });
+      return NextResponse.json({ success: true, signals: [] }, { headers: CORS_HEADERS });
     }
 
-    const positions = await db.position.findMany({
+    const bots = await db.bot.findMany({
       where: { portfolioId: portfolio.id },
+      select: { id: true },
+    });
+
+    if (bots.length === 0) {
+      return NextResponse.json({ success: true, signals: [] }, { headers: CORS_HEADERS });
+    }
+
+    const botIds = bots.map(b => b.id);
+
+    const signals = await db.signal.findMany({
+      where: { botId: { in: botIds }, visibleToCustomer: true },
       orderBy: { createdAt: "desc" },
     });
 
-    return NextResponse.json({ success: true, positions }, { headers: CORS_HEADERS });
+    return NextResponse.json({ success: true, signals }, { headers: CORS_HEADERS });
   } catch (error) {
-    console.error("Error fetching positions:", error);
+    console.error("Error fetching signals:", error);
     return NextResponse.json(
       { success: false, error: "Internal Server Error" },
       { status: 500, headers: CORS_HEADERS }
     );
   }
 }
+
+
