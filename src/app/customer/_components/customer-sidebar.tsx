@@ -7,6 +7,7 @@ import {
   TrendingUp,
   Activity,
 } from "lucide-react";
+import Image from "next/image";
 
 import { NavMain } from "@/app/(admin)/_components/nav-main";
 import { NavUser } from "@/app/(admin)/_components/nav-user";
@@ -72,8 +73,14 @@ export function CustomerSidebar({ user }: { user: UserWithRole }) {
     <Sidebar collapsible="icon">
       <SidebarHeader>
         <div className="flex items-center gap-2 px-4 py-2">
-          <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground">
-            <LayoutDashboard className="size-4" />
+          <div className="flex aspect-square size-8 items-center justify-center">
+            <Image
+              src="/animated_bytix_logo.png"
+              alt="Bytix Logo"
+              width={32}
+              height={32}
+              className="size-8 rounded-lg object-contain"
+            />
           </div>
           <div className="grid flex-1 text-left text-sm leading-tight">
             <span className="truncate font-semibold">Customer Portal</span>

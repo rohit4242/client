@@ -291,9 +291,14 @@ export function SignUpForm({
               </div>
             </form>
           </Form>
-          <div className="bg-gradient-to-br from-blue-500 via-blue-600 to-cyan-600 relative hidden md:flex justify-center items-center flex-col gap-y-4">
-            <Image src="/logo.svg" alt="Bytik Logo" width={120} height={120} />
-            <p className="text-white font-semibold text-2xl">Bytik</p>
+          <div className="relative hidden md:flex items-center justify-center overflow-hidden min-h-[600px] bg-[#029587]">
+            <div className="w-full h-full flex items-center justify-center p-8">
+              <img 
+                src="/animated_bytix_gif.gif" 
+                alt="Bytix Background" 
+                className="w-full h-auto max-h-full object-contain"
+              />
+            </div>
           </div>
         </CardContent>
       </Card>

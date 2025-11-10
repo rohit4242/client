@@ -19,8 +19,8 @@ import { AssignedCustomer } from "@/db/actions/agent/get-assigned-customers";
 export const data = {
   teams: [
     {
-      name: "Bytik",
-      logo: "/logo.svg",
+      name: "Bytix",
+      logo: "/animated_bytix_logo.png",
       plan: "Agent",
     },
   ],

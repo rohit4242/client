@@ -25,13 +25,13 @@ export function TeamSwitcher({
           size="lg"
           className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
         >
-          <div className="text-sidebar-primary-foreground flex aspect-square size-8 items-center justify-center rounded-lg">
+          <div className="text-sidebar-primary-foreground flex aspect-square size-8 items-center justify-center">
             <Image
               src={activeTeam[0].logo}
               alt={activeTeam[0].name}
               width={32}
               height={32}
-              className="size-8"
+              className="size-8 rounded-lg object-contain"
             />
           </div>
           <div className="grid flex-1 text-left text-sm leading-tight">

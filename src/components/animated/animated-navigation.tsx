@@ -26,20 +26,23 @@ export const AnimatedNavigation = ({
       transition={{ duration: 0.6 }}
       className="sticky top-0 z-50 bg-background/80 backdrop-blur-md border-b"
     >
-      <div className="container mx-auto px-4 py-4 flex items-center justify-between">
+      <div className="container mx-auto px-4 py-3 flex items-center justify-between">
         <motion.div
-          className="flex items-center space-x-2"
+          className="flex items-center space-x-3"
           whileHover={{ scale: 1.05 }}
         >
-          <Link href="/" className="flex items-center gap-2">
+          <Link href="/" className="flex items-center gap-3">
             <motion.div
-              className="w-8 h-8 bg-gradient-to-br from-primary to-chart-1 rounded-lg flex items-center justify-center"
-              whileHover={{ rotate: 360 }}
-              transition={{ duration: 0.5 }}
+              whileHover={{ scale: 1.1 }}
+              transition={{ duration: 0.3 }}
             >
-              <Bot className="w-5 h-5 text-primary-foreground" />
+              <img 
+                src="/animated_bytix_logo.png" 
+                alt="Bytix Logo" 
+                className="w-12 h-12 object-contain rounded-xl"
+              />
             </motion.div>
-            <span className="text-xl font-bold">BYTIX.ai</span>
+            <span className="text-2xl font-bold">BYTIX.ai</span>
           </Link>
         </motion.div>
 

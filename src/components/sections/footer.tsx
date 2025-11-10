@@ -41,13 +41,16 @@ export const Footer = () => {
             viewport={{ once: true }}
             transition={{ duration: 0.6 }}
           >
-            <div className="flex items-center space-x-2 mb-4">
+            <div className="flex items-center space-x-3 mb-4">
               <motion.div 
-                className="w-10 h-10 bg-gradient-to-br from-primary to-chart-1 rounded-lg flex items-center justify-center"
-                whileHover={{ rotate: 360, scale: 1.1 }}
+                whileHover={{ scale: 1.1 }}
                 transition={{ duration: 0.5 }}
               >
-                <Bot className="w-6 h-6 text-primary-foreground" />
+                <img 
+                  src="/animated_bytix_logo.png" 
+                  alt="Bytix Logo" 
+                  className="w-12 h-12 object-contain rounded-xl"
+                />
               </motion.div>
               <span className="text-2xl font-bold">BYTIX.ai</span>
             </div>

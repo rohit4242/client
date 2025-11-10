@@ -19,8 +19,8 @@ import { Customer } from "@/db/actions/admin/get-customers";
 export const data = {
   teams: [
     {
-      name: "Bytik",
-      logo: "/logo.svg",
+      name: "Bytix",
+      logo: "/animated_bytix_logo.png",
       plan: "Premium",
     },
   ],
