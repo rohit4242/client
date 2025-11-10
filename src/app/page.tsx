@@ -1,30 +1,72 @@
-import { redirect } from "next/navigation";
-import { auth } from "@/lib/auth";
-import { headers } from "next/headers";
-import { getUserWithRole } from "@/lib/auth-utils";
+"use client";
 
-export default async function Home() {
-  const session = await auth.api.getSession({
-    headers: await headers(),
-  });
+import { AnimatedNavigation, BackToTopButton } from "@/components/animated";
+import {
+  HeroSection,
+  FeaturesSection,
+  HowItWorksSection,
+  TargetAudienceSection,
+  CapabilitiesSection,
+  SecuritySection,
+  Footer,
+} from "@/components/sections";
+import { useCallback, useEffect } from "react";
+import { authClient } from "@/lib/auth-client";
+import { getDashboardUrlByRole } from "@/lib/utils";
 
-  if (!session) {
-    redirect("/sign-in");
-  }
+export default function Home() {
+  const { data: session } = authClient.useSession();
+  
+  const scrollToSection = useCallback((sectionId: string) => {
+    const section = document.getElementById(sectionId);
+    if (section) {
+      section.scrollIntoView({ behavior: "smooth" });
+    }
+  }, []);
 
-  // Get user role and redirect accordingly
-  const user = await getUserWithRole();
+  useEffect(() => {
+    // Check if user is authenticated and redirect accordingly
+    // Only redirect if we have a valid session with user data
+    if (session?.user) {
+      // Add a small delay to ensure session is fully loaded
+      const timeoutId = setTimeout(() => {
+        fetch("/api/auth/user-role")
+          .then((response) => {
+            if (response.ok) {
+              return response.json();
+            }
+            return null;
+          })
+          .then((data) => {
+            if (data?.role) {
+              const redirectUrl = getDashboardUrlByRole(data.role);
+              // Only redirect if we're not already on a different page
+              if (window.location.pathname === '/') {
+                window.location.href = redirectUrl;
+              }
+            }
+          })
+          .catch((error) => {
+            // If there's an error, just show the landing page
+            console.error("Auth check failed:", error);
+          });
+      }, 300); // Wait 300ms to ensure session is fully loaded
 
-  if (!user) {
-    redirect("/sign-in");
-  }
+      return () => clearTimeout(timeoutId);
+    }
+  }, [session]);
 
-  // Role-based routing
-  if (user.role === "ADMIN") {
-    redirect("/dashboard");
-  } else if (user.role === "AGENT") {
-    redirect("/agent/dashboard");
-  } else {
-    redirect("/customer/dashboard");
-  }
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-background via-accent/5 to-secondary/10">
+      <AnimatedNavigation onSectionClick={scrollToSection} />
+      <HeroSection />
+      <FeaturesSection />
+      <HowItWorksSection />
+      <TargetAudienceSection />
+      <CapabilitiesSection />
+      <SecuritySection />
+      <Footer />
+      <BackToTopButton />
+    </div>
+  );
 }

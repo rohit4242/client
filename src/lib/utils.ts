@@ -230,5 +230,11 @@ export function calculateExitPrices(
  * Get the appropriate dashboard URL based on user role
  */
 export function getDashboardUrlByRole(role: UserRole): string {
-  return role === "ADMIN" ? "/dashboard" : "/customer/dashboard";
+  if (role === "ADMIN") {
+    return "/dashboard";
+  } else if (role === "AGENT") {
+    return "/agent/dashboard";
+  } else {
+    return "/customer/dashboard";
+  }
 }

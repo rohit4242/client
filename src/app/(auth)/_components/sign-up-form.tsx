@@ -25,6 +25,7 @@ import { AlertCircle } from "lucide-react";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Spinner } from "@/components/spinner";
+import { getDashboardUrlByRole } from "@/lib/utils";
 
 const formSchema = z
   .object({
@@ -85,21 +86,25 @@ export function SignUpForm({
           });
         },
         onSuccess: async () => {
+          // Wait a bit for session to be set
+          await new Promise(resolve => setTimeout(resolve, 100));
+          
           // Fetch user role and redirect accordingly
           const response = await fetch("/api/auth/user-role");
           if (response.ok) {
             const { role } = await response.json();
-            const redirectUrl = role === "ADMIN" ? "/dashboard" : "/customer/dashboard";
-            router.push(redirectUrl);
+            const redirectUrl = getDashboardUrlByRole(role);
             toast.success("Sign up successful", {
               id: "signup-toast",
             });
+            // Use window.location for more reliable redirect
+            window.location.href = redirectUrl;
           } else {
             // Fallback to customer dashboard (default for new users)
-            router.push("/customer/dashboard");
             toast.success("Sign up successful", {
               id: "signup-toast",
             });
+            window.location.href = "/customer/dashboard";
           }
         },
         onError: ({ error }) => {
@@ -114,29 +119,14 @@ export function SignUpForm({
 
   const onSubmitSocial = async (provider: "google" | "github") => {
     setError(null);
+    // Social login will redirect to OAuth provider, then back to callback URL
+    // The redirect is handled by better-auth automatically
     await authClient.signIn.social(
       {
         provider,
+        callbackURL: "/auth/callback",
       },
       {
-        onSuccess: async () => {
-          // Fetch user role and redirect accordingly
-          const response = await fetch("/api/auth/user-role");
-          if (response.ok) {
-            const { role } = await response.json();
-            const redirectUrl = role === "ADMIN" ? "/dashboard" : "/customer/dashboard";
-            router.push(redirectUrl);
-            toast.success("Sign up successful", {
-              id: "signup-toast",
-            });
-          } else {
-            // Fallback to customer dashboard (default for new users)
-            router.push("/customer/dashboard");
-            toast.success("Sign up successful", {
-              id: "signup-toast",
-            });
-          }
-        },
         onError: ({ error }) => {
           setError(error.message);
           toast.error(error.message, {
