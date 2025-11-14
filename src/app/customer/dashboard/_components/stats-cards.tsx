@@ -1,6 +1,6 @@
 import { PortfolioStats } from "@/db/actions/customer/get-portfolio-stats";
-import { TrendingUp, TrendingDown, Activity, Target, DollarSign } from "lucide-react";
-import { Card, CardContent } from "@/components/ui/card";
+import { TrendingUp, TrendingDown, Activity, Target, Wallet } from "lucide-react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 interface StatsCardsProps {
   stats: PortfolioStats | null;
@@ -9,12 +9,18 @@ interface StatsCardsProps {
 export function StatsCards({ stats }: StatsCardsProps) {
   if (!stats) {
     return (
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-4">
         {[1, 2, 3, 4].map((i) => (
-          <Card key={i}>
-            <CardContent className="p-6">
-              <p className="text-sm font-medium text-muted-foreground">Loading...</p>
-              <p className="text-2xl font-bold">--</p>
+          <Card key={i} className="overflow-hidden border-slate-200 shadow-md hover:shadow-lg transition-all duration-200 rounded-xl">
+            <div className="h-1.5 w-full bg-gradient-to-r from-slate-300 to-slate-400" />
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 pt-5">
+              <CardTitle className="text-sm font-bold text-slate-900">Loading...</CardTitle>
+              <div className="p-2 bg-slate-50 rounded-lg">
+                <Wallet className="h-5 w-5 text-slate-400" />
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="text-3xl font-bold text-slate-900">--</div>
             </CardContent>
           </Card>
         ))}
@@ -34,66 +40,85 @@ export function StatsCards({ stats }: StatsCardsProps) {
     return `${value >= 0 ? "+" : ""}${value.toFixed(2)}%`;
   };
 
-  const cards = [
-    {
-      title: "Portfolio Value",
-      value: formatCurrency(stats.currentBalance),
-      icon: DollarSign,
-      color: "text-blue-500",
-      bgColor: "bg-blue-500/10",
-    },
-    {
-      title: "Total P&L",
-      value: formatCurrency(stats.totalPnl),
-      subtitle: formatPercent(stats.totalPnlPercent),
-      icon: stats.totalPnl >= 0 ? TrendingUp : TrendingDown,
-      color: stats.totalPnl >= 0 ? "text-green-500" : "text-red-500",
-      bgColor: stats.totalPnl >= 0 ? "bg-green-500/10" : "bg-red-500/10",
-    },
-    {
-      title: "Win Rate",
-      value: `${stats.winRate.toFixed(1)}%`,
-      subtitle: `${stats.totalWins}W / ${stats.totalLosses}L`,
-      icon: Target,
-      color: stats.winRate >= 50 ? "text-green-500" : "text-orange-500",
-      bgColor: stats.winRate >= 50 ? "bg-green-500/10" : "bg-orange-500/10",
-    },
-    {
-      title: "Active Positions",
-      value: stats.activeTrades.toString(),
-      subtitle: `${stats.totalTrades} total trades`,
-      icon: Activity,
-      color: "text-purple-500",
-      bgColor: "bg-purple-500/10",
-    },
-  ];
-
   return (
-    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-      {cards.map((card, index) => (
-        <Card key={index}>
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between space-x-4">
-              <div className="space-y-1 flex-1">
-                <p className="text-sm font-medium text-muted-foreground">
-                  {card.title}
-                </p>
-                <p className={`text-2xl font-bold ${card.color}`}>
-                  {card.value}
-                </p>
-                {card.subtitle && (
-                  <p className="text-xs text-muted-foreground">
-                    {card.subtitle}
-                  </p>
-                )}
-              </div>
-              <div className={`p-3 rounded-lg ${card.bgColor}`}>
-                <card.icon className={`h-6 w-6 ${card.color}`} />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      ))}
+    <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-4">
+      {/* Portfolio Value */}
+      <Card className="overflow-hidden border-slate-200 shadow-md hover:shadow-lg transition-all duration-200 rounded-xl">
+        <div className="h-1.5 w-full bg-gradient-to-r from-teal-400 via-teal-500 to-teal-600" />
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 pt-5">
+          <CardTitle className="text-sm font-bold text-slate-900">Portfolio Value</CardTitle>
+          <div className="p-2 bg-teal-50 rounded-lg">
+            <Wallet className="h-5 w-5 text-teal-600" />
+          </div>
+        </CardHeader>
+        <CardContent>
+          <div className="text-3xl font-bold text-slate-900">
+            {formatCurrency(stats.currentBalance)}
+          </div>
+          <p className="text-sm text-slate-600 mt-1 font-medium">
+            Current balance
+          </p>
+        </CardContent>
+      </Card>
+
+      {/* Total P&L */}
+      <Card className="overflow-hidden border-slate-200 shadow-md hover:shadow-lg transition-all duration-200 rounded-xl">
+        <div className={`h-1.5 w-full ${stats.totalPnl >= 0 ? 'bg-gradient-to-r from-green-400 to-emerald-500' : 'bg-gradient-to-r from-red-400 to-rose-500'}`} />
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 pt-5">
+          <CardTitle className="text-sm font-bold text-slate-900">Total P&L</CardTitle>
+          <div className={`p-2 rounded-lg ${stats.totalPnl >= 0 ? 'bg-green-50' : 'bg-red-50'}`}>
+            {stats.totalPnl >= 0 ? (
+              <TrendingUp className="h-5 w-5 text-green-600" />
+            ) : (
+              <TrendingDown className="h-5 w-5 text-red-600" />
+            )}
+          </div>
+        </CardHeader>
+        <CardContent>
+          <div className={`text-3xl font-bold ${stats.totalPnl >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+            {formatCurrency(stats.totalPnl)}
+          </div>
+          <p className="text-sm text-slate-600 mt-1 font-medium">
+            {formatPercent(stats.totalPnlPercent)}
+          </p>
+        </CardContent>
+      </Card>
+
+      {/* Win Rate */}
+      <Card className="overflow-hidden border-slate-200 shadow-md hover:shadow-lg transition-all duration-200 rounded-xl">
+        <div className={`h-1.5 w-full ${stats.winRate >= 50 ? 'bg-gradient-to-r from-green-400 to-emerald-500' : 'bg-gradient-to-r from-orange-400 to-amber-500'}`} />
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 pt-5">
+          <CardTitle className="text-sm font-bold text-slate-900">Win Rate</CardTitle>
+          <div className={`p-2 rounded-lg ${stats.winRate >= 50 ? 'bg-green-50' : 'bg-orange-50'}`}>
+            <Target className={`h-5 w-5 ${stats.winRate >= 50 ? 'text-green-600' : 'text-orange-600'}`} />
+          </div>
+        </CardHeader>
+        <CardContent>
+          <div className={`text-3xl font-bold ${stats.winRate >= 50 ? 'text-green-600' : 'text-orange-600'}`}>
+            {stats.winRate.toFixed(1)}%
+          </div>
+          <p className="text-sm text-slate-600 mt-1 font-medium">
+            {stats.totalWins}W / {stats.totalLosses}L
+          </p>
+        </CardContent>
+      </Card>
+
+      {/* Active Positions */}
+      <Card className="overflow-hidden border-slate-200 shadow-md hover:shadow-lg transition-all duration-200 rounded-xl">
+        <div className="h-1.5 w-full bg-gradient-to-r from-cyan-400 via-teal-500 to-emerald-500" />
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 pt-5">
+          <CardTitle className="text-sm font-bold text-slate-900">Active Positions</CardTitle>
+          <div className="p-2 bg-cyan-50 rounded-lg">
+            <Activity className="h-5 w-5 text-cyan-600" />
+          </div>
+        </CardHeader>
+        <CardContent>
+          <div className="text-3xl font-bold text-slate-900">{stats.activeTrades}</div>
+          <p className="text-sm text-slate-600 mt-1 font-medium">
+            {stats.totalTrades} total trades
+          </p>
+        </CardContent>
+      </Card>
     </div>
   );
 }

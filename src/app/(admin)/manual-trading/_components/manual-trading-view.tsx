@@ -7,10 +7,10 @@ import { TradingForm } from "./trading-form";
 import { POPULAR_SYMBOLS } from "@/db/schema/order";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { TradingChart } from "./trading-chart";
-import { Customer } from "@/db/actions/admin/get-customers";
+import { UserWithAgent } from "@/db/actions/admin/get-all-users";
 
 interface ManualTradingViewProps {
-  selectedUser: Customer;
+  selectedUser: UserWithAgent;
 }
 
 export default function ManualTradingView({ selectedUser }: ManualTradingViewProps) {

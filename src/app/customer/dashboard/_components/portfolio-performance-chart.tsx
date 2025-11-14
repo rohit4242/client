@@ -72,18 +72,18 @@ export function PortfolioPerformanceChart({
   const padding = (maxValue - minValue) * 0.1; // 10% padding
   
   return (
-    <Card>
+    <Card className="border-slate-200 shadow-md rounded-xl">
       <CardHeader>
         <div className="flex items-start justify-between">
           <div>
-            <CardTitle className="flex items-center gap-2">
+            <CardTitle className="flex items-center gap-2 text-xl font-bold text-slate-900">
               Portfolio Performance
-              <span className={`flex items-center text-sm font-normal ${isPositive ? 'text-green-500' : 'text-red-500'}`}>
+              <span className={`flex items-center text-sm font-normal ${isPositive ? 'text-green-600' : 'text-red-600'}`}>
                 {isPositive ? <TrendingUp className="h-4 w-4" /> : <TrendingDown className="h-4 w-4" />}
                 {isPositive ? '+' : ''}{returnPercentage}%
               </span>
             </CardTitle>
-            <CardDescription>
+            <CardDescription className="mt-1 text-slate-600">
               Portfolio value over the last 30 days • {isPositive ? '+' : ''}{formatCurrency(totalReturn)} total return
             </CardDescription>
           </div>

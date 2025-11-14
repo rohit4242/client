@@ -5,13 +5,13 @@ import { Exchange } from '@/types/exchange';
 import { ExchangeHeader } from './exchange-header';
 import { ExchangesList } from './exchanges-list';
 import { EmptyState } from './empty-state';
-import { Customer } from '@/db/actions/admin/get-customers';
+import { UserWithAgent } from '@/db/actions/admin/get-all-users';
 import { getExchangesForUser } from '@/db/actions/admin/get-exchanges-for-user';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Card } from '@/components/ui/card';
 
 interface ExchangesClientProps {
-  selectedUser: Customer;
+  selectedUser: UserWithAgent;
 }
 
 export function ExchangesClient({ selectedUser }: ExchangesClientProps) {

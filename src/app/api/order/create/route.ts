@@ -8,6 +8,7 @@ import { createPosition } from "@/db/actions/position";
 import { getPriceBySymbol } from "@/lib/trading-utils";
 import { updatePosition } from "@/db/actions/position/update-position";
 import { recalculatePortfolioStats } from "@/db/actions/admin/update-portfolio-stats";
+import { revalidatePath } from "next/cache";
 
 export async function POST(request: NextRequest) {
   try {
@@ -52,6 +53,8 @@ export async function POST(request: NextRequest) {
       portfolio = await db.portfolio.create({
         data: { userId: targetUserId },
       });
+      // Revalidate admin layout to refresh user list with updated portfolio status
+      revalidatePath('/admin');
     }
 
     if (!portfolio) {

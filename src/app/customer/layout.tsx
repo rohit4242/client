@@ -29,20 +29,20 @@ export default async function CustomerLayout({
       <SidebarProvider>
         <CustomerSidebar user={user} />
         <SidebarInset>
-          <header className="flex h-16 shrink-0 items-center gap-2 transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-12">
-            <div className="flex items-center w-full gap-2 px-4">
-              <div className="flex items-center gap-2 flex-1">
-                <SidebarTrigger className="-ml-1" />
+          <header className="sticky top-0 z-40 flex h-16 shrink-0 items-center gap-2 border-b border-slate-200 bg-white/80 backdrop-blur-lg supports-[backdrop-filter]:bg-white/60 transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-12 shadow-sm">
+            <div className="flex items-center w-full gap-2 px-6">
+              <div className="flex items-center gap-3 flex-1">
+                <SidebarTrigger className="-ml-1 hidden md:flex hover:bg-teal-50 hover:text-teal-700 rounded-lg transition-colors" />
                 <Separator
                   orientation="vertical"
-                  className="mr-2 data-[orientation=vertical]:h-4"
+                  className="mr-2 h-5 bg-slate-200"
                 />
-                <h2 className="text-lg font-semibold">Customer Portal</h2>
+                <h2 className="text-lg font-semibold text-slate-900">Customer Portal</h2>
               </div>
             </div>
           </header>
-          <div className="flex flex-1 flex-col gap-4 p-4 pt-0">
-            <div className="bg-muted/50 rounded-xl min-h-[calc(100vh-8rem)] p-6">
+          <div className="flex flex-1 flex-col gap-4 p-6 pt-6 bg-slate-50">
+            <div className="rounded-2xl min-h-[calc(100vh-8rem)] p-8 border border-slate-200 bg-white shadow-sm">
               {children}
             </div>
           </div>

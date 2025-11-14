@@ -6,6 +6,7 @@ import { createExchangeSchema } from "@/db/schema/exchange";
 import { Spot } from "@binance/spot";
 import { calculateTotalUSDValue } from "@/lib/trading-utils";
 import { getSelectedUser } from "@/lib/selected-user-server";
+import { revalidatePath } from "next/cache";
 
 export async function GET() {
   try {
@@ -111,6 +112,8 @@ export async function POST(request: NextRequest) {
           name: name.toUpperCase(),
         },
       });
+      // Revalidate admin layout to refresh user list with updated portfolio status
+      revalidatePath('/admin');
     }
 
     console.log(portfolio);

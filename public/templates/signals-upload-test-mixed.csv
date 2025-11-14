@@ -1,0 +1,10 @@
+botName,action,symbol,price,message
+My Trading Bot,ENTER_LONG,BTCUSDT,45000,Valid signal with all fields
+Test Bot,EXIT_LONG,ETHUSDT,2500,Valid exit signal
+,ENTER_SHORT,BNBUSDT,350,Missing bot name - should fail
+Unknown Bot,ENTER_LONG,ADAUSDT,1.5,Bot doesn't exist - should fail
+My Trading Bot,INVALID_ACTION,DOGEUSDT,0.08,Invalid action - should fail
+My Trading Bot,ENTER_LONG,,100,Missing symbol - should fail
+My Trading Bot,EXIT_SHORT,SOLUSDT,-50,Negative price - should fail
+My Trading Bot,ENTER_LONG,MATICUSDT,,Valid signal without price
+

@@ -9,14 +9,16 @@ import { EmptyState } from "./empty-state";
 import { useQuery } from "@tanstack/react-query";
 import axios from "axios";
 import { SignalBot } from "@/types/signal-bot";
-import { Customer } from "@/db/actions/admin/get-customers";
+import { UserWithAgent } from "@/db/actions/admin/get-all-users";
+import { useSelectedUser } from "@/contexts/selected-user-context";
 
 interface SignalBotClientProps {
-  selectedUser: Customer;
+  selectedUser: UserWithAgent;
 }
 
 export function SignalBotClient({ selectedUser }: SignalBotClientProps) {
   const [showCreateDialog, setShowCreateDialog] = useState(false);
+  const { refreshSelectedUser } = useSelectedUser();
 
   const {
     data: signalBots = [],
@@ -34,9 +36,11 @@ export function SignalBotClient({ selectedUser }: SignalBotClientProps) {
   const totalTrades = signalBots.reduce((sum, bot) => sum + bot.totalTrades, 0);
   const totalPnl = signalBots.reduce((sum, bot) => sum + bot.totalPnl, 0);
 
-  const handleBotCreated = () => {
+  const handleBotCreated = async () => {
     setShowCreateDialog(false);
     refetch();
+    // Refresh selected user data to update portfolio status
+    await refreshSelectedUser();
   };
 
   const handleBotUpdated = () => {

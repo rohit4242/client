@@ -6,19 +6,23 @@ import { Dialog, DialogTrigger } from '@/components/ui/dialog';
 import { Plus } from 'lucide-react';
 import { ConnectExchangeDialog } from './connect-exchange-dialog';
 import { Exchange } from '@/types/exchange';
-import { Customer } from '@/db/actions/admin/get-customers';
+import { UserWithAgent } from '@/db/actions/admin/get-all-users';
+import { useSelectedUser } from '@/contexts/selected-user-context';
 
 interface ExchangeHeaderProps {
   onExchangeAdded: (exchange: Exchange) => void;
-  selectedUser: Customer;
+  selectedUser: UserWithAgent;
 }
 
 export function ExchangeHeader({ onExchangeAdded, selectedUser }: ExchangeHeaderProps) {
   const [showConnectDialog, setShowConnectDialog] = useState(false);
+  const { refreshSelectedUser } = useSelectedUser();
 
-  const handleExchangeAdded = (exchange: Exchange) => {
+  const handleExchangeAdded = async (exchange: Exchange) => {
     onExchangeAdded(exchange);
     setShowConnectDialog(false);
+    // Refresh selected user data to update portfolio status
+    await refreshSelectedUser();
   };
 
   return (

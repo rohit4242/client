@@ -1,0 +1,6 @@
+botName,action,symbol,price,message
+My Trading Bot,ENTER_LONG,BTCUSDT,45000,Bitcoin long entry signal
+Scalping Bot,EXIT_LONG,ETHUSDT,2500,Taking profits on ETH
+Swing Trader,ENTER_SHORT,BNBUSDT,350,BNB short position
+Day Trader,EXIT_SHORT,ADAUSDT,,Exit ADA short position
+

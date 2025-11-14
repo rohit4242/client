@@ -68,17 +68,17 @@ export async function getSelectedUser() {
       };
     }
 
-    // Admin can select any customer
+    // Admin can select any user (no role restriction)
     const user = await db.user.findUnique({
       where: {
         id: selectedUserId,
-        role: "CUSTOMER",
       },
       select: {
         id: true,
         name: true,
         email: true,
         image: true,
+        role: true,
         portfolios: {
           select: {
             id: true,
@@ -97,6 +97,7 @@ export async function getSelectedUser() {
       name: user.name,
       email: user.email,
       image: user.image,
+      role: user.role as "ADMIN" | "AGENT" | "CUSTOMER",
       portfolioId: user.portfolios[0]?.id || null,
       hasPortfolio: user.portfolios.length > 0,
     };

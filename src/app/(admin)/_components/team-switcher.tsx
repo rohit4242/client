@@ -23,19 +23,20 @@ export function TeamSwitcher({
       <SidebarMenuItem>
         <SidebarMenuButton
           size="lg"
-          className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
+          className="data-[state=open]:bg-teal-50 data-[state=open]:text-teal-900 hover:bg-teal-50 transition-all duration-200"
         >
-          <div className="text-sidebar-primary-foreground flex aspect-square size-8 items-center justify-center">
+          <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-gradient-to-br from-teal-500 to-teal-600 p-1 shadow-sm">
             <Image
               src={activeTeam[0].logo}
               alt={activeTeam[0].name}
               width={32}
               height={32}
-              className="size-8 rounded-lg object-contain"
+              className="size-7 rounded-md object-contain"
             />
           </div>
           <div className="grid flex-1 text-left text-sm leading-tight">
-            <span className="truncate font-medium">{activeTeam[0].name}</span>
+            <span className="truncate font-bold text-slate-900">{activeTeam[0].name}</span>
+            <span className="truncate text-xs font-medium text-teal-600">{activeTeam[0].plan}</span>
           </div>
         </SidebarMenuButton>
       </SidebarMenuItem>

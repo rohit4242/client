@@ -11,12 +11,13 @@ interface PerformanceChartProps {
 export function PerformanceChart({ stats }: PerformanceChartProps) {
   if (!stats) {
     return (
-      <Card>
+      <Card className="border-slate-200 shadow-md rounded-xl">
         <CardHeader>
-          <CardTitle>Performance Overview</CardTitle>
+          <CardTitle className="text-xl font-bold text-slate-900">Performance Overview</CardTitle>
+          <CardDescription className="text-slate-600">Your trading performance metrics</CardDescription>
         </CardHeader>
         <CardContent>
-          <p className="text-muted-foreground">Loading performance data...</p>
+          <p className="text-slate-600">Loading performance data...</p>
         </CardContent>
       </Card>
     );
@@ -88,26 +89,26 @@ export function PerformanceChart({ stats }: PerformanceChartProps) {
   ];
 
   return (
-    <Card>
+    <Card className="border-slate-200 shadow-md rounded-xl">
       <CardHeader>
-        <CardTitle className="text-lg">Performance Overview</CardTitle>
-        <CardDescription>
+        <CardTitle className="text-xl font-bold text-slate-900">Performance Overview</CardTitle>
+        <CardDescription className="text-slate-600">
           Your trading performance metrics
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
         {/* Time-based P&L */}
         <div>
-          <h3 className="text-sm font-semibold mb-3">Time-based P&L</h3>
+          <h3 className="text-sm font-semibold mb-3 text-slate-900">Time-based P&L</h3>
           <div className="grid grid-cols-3 gap-4">
             {performanceMetrics.map((metric, index) => (
               <div
                 key={index}
-                className={`p-4 rounded-lg ${metric.bgColor}`}
+                className={`p-4 rounded-lg border border-slate-200 ${metric.bgColor}`}
               >
                 <div className="flex items-center gap-2 mb-2">
                   <metric.icon className={`h-4 w-4 ${metric.color}`} />
-                  <p className="text-sm font-medium text-muted-foreground">
+                  <p className="text-sm font-medium text-slate-600">
                     {metric.label}
                   </p>
                 </div>
@@ -121,15 +122,15 @@ export function PerformanceChart({ stats }: PerformanceChartProps) {
 
         {/* Trading Metrics */}
         <div>
-          <h3 className="text-sm font-semibold mb-3">Trading Metrics</h3>
+          <h3 className="text-sm font-semibold mb-3 text-slate-900">Trading Metrics</h3>
           <div className="grid grid-cols-2 gap-4">
             {tradingMetrics.map((metric, index) => (
               <div
                 key={index}
-                className="p-3 rounded-lg border bg-card"
+                className="p-4 rounded-lg border border-slate-200 bg-white"
               >
                 <div className="flex items-center justify-between">
-                  <p className="text-sm text-muted-foreground">
+                  <p className="text-sm text-slate-600 font-medium">
                     {metric.label}
                   </p>
                   <metric.icon className={`h-4 w-4 ${metric.color}`} />
@@ -143,17 +144,17 @@ export function PerformanceChart({ stats }: PerformanceChartProps) {
         </div>
 
         {/* Portfolio Info */}
-        <div className="p-4 rounded-lg bg-muted/50">
+        <div className="p-4 rounded-lg border border-slate-200 bg-slate-50">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-muted-foreground">Initial Balance</p>
-              <p className="text-lg font-semibold">
+              <p className="text-sm text-slate-600 font-medium">Initial Balance</p>
+              <p className="text-lg font-semibold text-slate-900">
                 {formatCurrency(stats.initialBalance)}
               </p>
             </div>
             <div className="text-right">
-              <p className="text-sm text-muted-foreground">Current Balance</p>
-              <p className="text-lg font-semibold">
+              <p className="text-sm text-slate-600 font-medium">Current Balance</p>
+              <p className="text-lg font-semibold text-slate-900">
                 {formatCurrency(stats.currentBalance)}
               </p>
             </div>

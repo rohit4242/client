@@ -14,7 +14,7 @@ import {
   SidebarRail,
   SidebarSeparator,
 } from "@/components/ui/sidebar";
-import { Customer } from "@/db/actions/admin/get-customers";
+import { UserWithAgent } from "@/db/actions/admin/get-all-users";
 
 export const data = {
   teams: [
@@ -27,24 +27,28 @@ export const data = {
 };
 
 interface AppSidebarProps extends React.ComponentProps<typeof Sidebar> {
-  customers: Customer[];
+  users: UserWithAgent[];
 }
 
-export function AppSidebar({ customers, ...props }: AppSidebarProps) {
+export function AppSidebar({ users, ...props }: AppSidebarProps) {
   return (
-    <Sidebar collapsible="icon" {...props}>
-      <SidebarHeader>
+    <Sidebar 
+      collapsible="icon" 
+      {...props}
+      className="border-r border-slate-200 bg-white"
+    >
+      <SidebarHeader className="border-b border-slate-100 bg-gradient-to-b from-slate-50 to-white">
         <TeamSwitcher activeTeam={data.teams} />
-        <SidebarSeparator className="mx-0" />
-        <UserSelector customers={customers} />
+        <SidebarSeparator className="mx-0 bg-slate-200" />
+        <UserSelector users={users} />
       </SidebarHeader>
-      <SidebarContent>
+      <SidebarContent className="bg-white py-4">
         <NavMain />
       </SidebarContent>
-      <SidebarFooter>
+      <SidebarFooter className="border-t border-slate-100 bg-gradient-to-t from-slate-50 to-white">
         <NavUser />
       </SidebarFooter>
-      <SidebarRail />
+      {/* <SidebarRail className="bg-slate-200" /> */}
     </Sidebar>
   );
 }

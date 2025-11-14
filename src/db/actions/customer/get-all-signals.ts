@@ -3,7 +3,7 @@
 import { getUserWithRole } from "@/lib/auth-utils";
 import db from "@/db";
 
-export interface RecentSignal {
+export interface CustomerSignal {
   id: string;
   action: string;
   symbol: string;
@@ -12,10 +12,12 @@ export interface RecentSignal {
   processed: boolean;
   error: string | null;
   createdAt: string;
+  updatedAt: string;
   botName: string;
+  botId: string;
 }
 
-export async function getRecentSignals(limit: number = 10): Promise<RecentSignal[]> {
+export async function getAllSignals(): Promise<CustomerSignal[]> {
   try {
     const user = await getUserWithRole();
 
@@ -45,6 +47,7 @@ export async function getRecentSignals(limit: number = 10): Promise<RecentSignal
       include: {
         bot: {
           select: {
+            id: true,
             name: true,
           },
         },
@@ -52,7 +55,6 @@ export async function getRecentSignals(limit: number = 10): Promise<RecentSignal
       orderBy: {
         createdAt: "desc",
       },
-      take: limit,
     });
 
     return signals.map((signal) => ({
@@ -64,10 +66,12 @@ export async function getRecentSignals(limit: number = 10): Promise<RecentSignal
       processed: signal.processed,
       error: signal.error,
       createdAt: signal.createdAt.toISOString(),
+      updatedAt: signal.updatedAt.toISOString(),
       botName: signal.bot.name,
+      botId: signal.bot.id,
     }));
   } catch (error) {
-    console.error("Error fetching recent signals:", error);
+    console.error("Error fetching all signals:", error);
     return [];
   }
 }

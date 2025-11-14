@@ -21,7 +21,7 @@ import {
 } from "@/components/ui/sidebar";
 import { useRouter } from "next/navigation";
 import { authClient } from "@/lib/auth-client";
-import { Avatar, AvatarImage } from "@/components/ui/avatar";
+import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { GeneratedAvatar } from "@/components/generated-avatar";
 
 export  function  NavUser({}) {
@@ -44,6 +44,13 @@ export  function  NavUser({}) {
                     src={session.user.image}
                     alt={session.user.name}
                   />
+                  <AvatarFallback>
+                    <GeneratedAvatar
+                      seed={session?.user?.name || ""}
+                      variant="initials"
+                      className="h-8 w-8 rounded-lg"
+                    />
+                  </AvatarFallback>
                 </Avatar>
               ) : (
                 <GeneratedAvatar
@@ -74,6 +81,13 @@ export  function  NavUser({}) {
                       src={session.user.image}
                       alt={session.user.name}
                     />
+                    <AvatarFallback>
+                      <GeneratedAvatar
+                        seed={session?.user?.name || ""}
+                        variant="initials"
+                        className="h-8 w-8 rounded-lg"
+                      />
+                    </AvatarFallback>
                   </Avatar>
                 ) : (
                   <GeneratedAvatar

@@ -13,10 +13,10 @@ export function NavigationBreadcrumb() {
   }
 
   return (
-    <nav className="flex items-center space-x-1 text-sm text-muted-foreground">
+    <nav className="flex items-center space-x-1 text-sm">
       <Link
         href="/dashboard"
-        className="flex items-center hover:text-foreground transition-colors"
+        className="flex items-center px-2 py-1.5 rounded-lg text-slate-600 hover:text-teal-700 hover:bg-teal-50 transition-all duration-200"
       >
         <Home className="w-4 h-4" />
         <span className="sr-only">Home</span>
@@ -24,12 +24,14 @@ export function NavigationBreadcrumb() {
       
       {breadcrumbs.map((item, index) => (
         <div key={item.id} className="flex items-center">
-          <ChevronRight className="w-4 h-4 mx-1" />
+          <ChevronRight className="w-4 h-4 mx-0.5 text-slate-400" />
           <Link
             href={item.url}
             className={cn(
-              "hover:text-foreground transition-colors",
-              index === breadcrumbs.length - 1 && "text-foreground font-medium"
+              "px-2 py-1.5 rounded-lg transition-all duration-200",
+              index === breadcrumbs.length - 1 
+                ? "text-teal-700 font-semibold bg-teal-50" 
+                : "text-slate-600 hover:text-teal-700 hover:bg-teal-50"
             )}
           >
             {item.title}
@@ -38,4 +40,4 @@ export function NavigationBreadcrumb() {
       ))}
     </nav>
   );
-} 
+}

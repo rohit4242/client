@@ -17,12 +17,12 @@ import { Exchange } from "@/types/exchange";
 import { ExchangeCard } from "./exchange-card";
 import { ConnectExchangeDialog } from "./connect-exchange-dialog";
 import axios from "axios";
-import { Customer } from "@/db/actions/admin/get-customers";
+import { UserWithAgent } from "@/db/actions/admin/get-all-users";
 
 interface ExchangesListProps {
   exchanges: Exchange[];
   onExchangesChange: (exchanges: Exchange[]) => void;
-  selectedUser: Customer;
+  selectedUser: UserWithAgent;
 }
 
 export function ExchangesList({

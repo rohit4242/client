@@ -1,12 +1,14 @@
 "use client";
 
 import { createContext, useContext, useState, useEffect, ReactNode } from "react";
-import { Customer } from "@/db/actions/admin/get-customers";
+import { UserWithAgent } from "@/db/actions/admin/get-all-users";
+import { refreshSelectedUser as refreshUserData } from "@/lib/refresh-selected-user";
 
 interface SelectedUserContextType {
-  selectedUser: Customer | null;
-  setSelectedUser: (user: Customer | null) => void;
+  selectedUser: UserWithAgent | null;
+  setSelectedUser: (user: UserWithAgent | null) => void;
   clearSelectedUser: () => void;
+  refreshSelectedUser: () => Promise<void>;
 }
 
 const SelectedUserContext = createContext<SelectedUserContextType | undefined>(
@@ -14,7 +16,7 @@ const SelectedUserContext = createContext<SelectedUserContextType | undefined>(
 );
 
 export function SelectedUserProvider({ children }: { children: ReactNode }) {
-  const [selectedUser, setSelectedUserState] = useState<Customer | null>(null);
+  const [selectedUser, setSelectedUserState] = useState<UserWithAgent | null>(null);
 
   // Load from localStorage on mount
   useEffect(() => {
@@ -30,7 +32,7 @@ export function SelectedUserProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  const setSelectedUser = (user: Customer | null) => {
+  const setSelectedUser = (user: UserWithAgent | null) => {
     setSelectedUserState(user);
     if (user) {
       localStorage.setItem("selectedUser", JSON.stringify(user));
@@ -50,9 +52,18 @@ export function SelectedUserProvider({ children }: { children: ReactNode }) {
     document.cookie = "selected_user_id=;path=/;max-age=0";
   };
 
+  const refreshSelectedUser = async () => {
+    if (selectedUser?.id) {
+      const freshUserData = await refreshUserData(selectedUser.id);
+      if (freshUserData) {
+        setSelectedUser(freshUserData);
+      }
+    }
+  };
+
   return (
     <SelectedUserContext.Provider
-      value={{ selectedUser, setSelectedUser, clearSelectedUser }}
+      value={{ selectedUser, setSelectedUser, clearSelectedUser, refreshSelectedUser }}
     >
       {children}
     </SelectedUserContext.Provider>

@@ -9,7 +9,7 @@ import { RecentPositions } from "./_components/recent-positions";
 import { RecentSignals } from "./_components/recent-signals";
 import { PerformanceChart } from "./_components/performance-chart";
 import { PortfolioPerformanceChart } from "./_components/portfolio-performance-chart";
-import { SyncBalanceButton } from "./_components/sync-balance-button";
+import { DashboardHeader } from "./_components/dashboard-header";
 
 export default async function CustomerDashboardPage() {
   const user = await getUserWithRole();
@@ -27,21 +27,8 @@ export default async function CustomerDashboardPage() {
   ]);
 
   return (
-    <div className="space-y-6 pb-10">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">
-            Welcome back, {user.name}!
-          </h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            Here&apos;s your portfolio overview and recent activity
-          </p>
-        </div>
-        {stats && stats.initialBalance === 0 && (
-          <SyncBalanceButton />
-        )}
-      </div>
+    <div className="space-y-6">
+      <DashboardHeader userName={user.name} stats={stats} />
 
       {/* Stats Cards */}
       <StatsCards stats={stats} />
