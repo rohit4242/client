@@ -109,7 +109,16 @@ export function AgentUserSelector({ customers }: AgentUserSelectorProps) {
                 customers.map((customer, index) => (
                   <DropdownMenuItem
                     key={customer.id}
-                    onClick={() => setSelectedUser(customer)}
+                    onClick={() => setSelectedUser({
+                      id: customer.id,
+                      name: customer.name,
+                      email: customer.email,
+                      image: customer.image,
+                      role: "CUSTOMER",
+                      hasPortfolio: customer.hasPortfolio,
+                      createdAt: customer.createdAt,
+                      portfolioId: customer.portfolioId,
+                    })}
                     className="gap-2 p-2"
                   >
                     <div className="flex size-8 items-center justify-center rounded-sm border">

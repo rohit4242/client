@@ -28,7 +28,7 @@ export async function createSignalForUser(
     if (!validatedData.success) {
       return {
         success: false,
-        error: `Invalid input: ${validatedData.error.errors.map((e) => e.message).join(", ")}`,
+        error: `Invalid input: ${validatedData.error.issues.map((e) => e.message).join(", ")}`,
       };
     }
 

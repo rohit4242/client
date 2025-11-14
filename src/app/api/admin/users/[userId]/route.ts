@@ -10,7 +10,7 @@ import { UserWithAgent } from "@/db/actions/admin/get-all-users";
  */
 export async function GET(
   request: NextRequest,
-  { params }: { params: { userId: string } }
+  { params }: { params: Promise<{ userId: string }> }
 ) {
   try {
     const admin = await isAdmin();
@@ -19,7 +19,7 @@ export async function GET(
       return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
     }
 
-    const { userId } = params;
+    const { userId } = await params;
 
     // Fetch user with fresh portfolio information
     const user = await db.user.findUnique({

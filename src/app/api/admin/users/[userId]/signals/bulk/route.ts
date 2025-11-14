@@ -42,7 +42,7 @@ export async function POST(
     if (!validatedData.success) {
       return NextResponse.json(
         {
-          error: `Invalid input: ${validatedData.error.errors.map((e) => e.message).join(", ")}`,
+          error: `Invalid input: ${validatedData.error.issues.map((e) => e.message).join(", ")}`,
         },
         { status: 400 }
       );
