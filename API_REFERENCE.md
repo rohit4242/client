@@ -600,5 +600,98 @@ const customers = user.role === "ADMIN"
 
 ---
 
+## Mobile API Endpoints
+
+### `/api/mobile/login` - Mobile User Login
+
+**Method**: POST
+
+**Description**: Authenticates a user by email for mobile applications and returns user details with portfolio information.
+
+**Request Body**:
+```json
+{
+  "email": "user@example.com"
+}
+```
+
+**Success Response (200)**:
+```json
+{
+  "user": {
+    "id": "clx1234567890",
+    "name": "John Doe",
+    "email": "john@example.com",
+    "role": "CUSTOMER",
+    "image": "https://example.com/profile.jpg",
+    "portfolios": [
+      {
+        "id": "portfolio-uuid",
+        "name": "Main Portfolio",
+        "currentBalance": 10000.50
+      }
+    ]
+  }
+}
+```
+
+**Error Responses**:
+
+- **400 Bad Request** - Invalid or missing email
+```json
+{
+  "error": "Email is required"
+}
+```
+or
+```json
+{
+  "error": "Invalid email format"
+}
+```
+
+- **404 Not Found** - User does not exist
+```json
+{
+  "error": "User not found"
+}
+```
+
+- **500 Internal Server Error** - Server error
+```json
+{
+  "error": "Internal Server Error"
+}
+```
+
+**Notes**:
+- This is a public endpoint (no authentication required)
+- If user exists but has no portfolio, returns empty portfolios array
+- Returns all portfolios associated with the user
+- Suitable for mobile app login flows
+
+**Example Usage** (React Native):
+```typescript
+async function loginUser(email: string) {
+  const response = await fetch('https://your-domain.com/api/mobile/login', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ email }),
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.error);
+  }
+
+  const data = await response.json();
+  return data.user;
+}
+```
+
+---
+
 This API reference covers all the main functions and endpoints for the user role management system. For implementation details, see `IMPLEMENTATION_SUMMARY.md`.
 
