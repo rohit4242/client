@@ -248,6 +248,21 @@ export async function executeExitLong(
       },
     });
 
+    // Recalculate portfolio stats after closing position
+    try {
+      const { recalculatePortfolioStatsInternal } = await import("@/db/actions/portfolio/recalculate-stats");
+      const portfolio = await db.portfolio.findUnique({
+        where: { id: bot.portfolioId },
+        select: { userId: true },
+      });
+      
+      if (portfolio) {
+        await recalculatePortfolioStatsInternal(portfolio.userId);
+      }
+    } catch (statsError) {
+      console.error("Failed to update portfolio stats:", statsError);
+    }
+
     return {
       success: true,
       positionId: updatedPosition.id,
@@ -476,6 +491,21 @@ export async function executeExitShort(
         winTrades: pnl > 0 ? { increment: 1 } : undefined,
       },
     });
+
+    // Recalculate portfolio stats after closing position
+    try {
+      const { recalculatePortfolioStatsInternal } = await import("@/db/actions/portfolio/recalculate-stats");
+      const portfolio = await db.portfolio.findUnique({
+        where: { id: bot.portfolioId },
+        select: { userId: true },
+      });
+      
+      if (portfolio) {
+        await recalculatePortfolioStatsInternal(portfolio.userId);
+      }
+    } catch (statsError) {
+      console.error("Failed to update portfolio stats:", statsError);
+    }
 
     return {
       success: true,

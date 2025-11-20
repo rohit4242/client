@@ -18,12 +18,10 @@ export async function GET(req: NextRequest) {
     const { searchParams } = new URL(req.url);
     const email = searchParams.get("email");
     const period = (searchParams.get("period") as
+      | "1D"
+      | "1W"
       | "1M"
-      | "3M"
-      | "6M"
-      | "1Y"
-      | "ALL"
-      | null) ?? "ALL";
+      | null) ?? "1W";
 
     if (!email) {
       return NextResponse.json({ error: "Email is required" }, { status: 400, headers: CORS_HEADERS });
@@ -43,7 +41,7 @@ export async function GET(req: NextRequest) {
 
     const [stats, chartData] = await Promise.all([
       getPortfolioStatsCustomerV1(user.id),
-      getPortfolioChartDataCustomerV1(user.id, period ?? "ALL"),
+      getPortfolioChartDataCustomerV1(user.id, period ?? "1W"),
     ]);
 
     if (!stats) {

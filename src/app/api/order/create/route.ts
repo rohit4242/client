@@ -7,7 +7,7 @@ import { placeOrder } from "@/db/actions/order/create-order";
 import { createPosition } from "@/db/actions/position";
 import { getPriceBySymbol } from "@/lib/trading-utils";
 import { updatePosition } from "@/db/actions/position/update-position";
-import { recalculatePortfolioStats } from "@/db/actions/admin/update-portfolio-stats";
+import { recalculatePortfolioStatsInternal } from "@/db/actions/portfolio/recalculate-stats";
 import { revalidatePath } from "next/cache";
 
 export async function POST(request: NextRequest) {
@@ -139,7 +139,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Recalculate portfolio stats after successful order
-    await recalculatePortfolioStats(targetUserId);
+    await recalculatePortfolioStatsInternal(targetUserId);
 
     return NextResponse.json({
       success: true,

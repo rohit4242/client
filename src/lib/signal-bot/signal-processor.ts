@@ -7,7 +7,7 @@ import {
   executeExitShort,
   type TradeExecutionResult
 } from "./trade-executor";
-import { recalculatePortfolioStats } from "@/db/actions/admin/update-portfolio-stats";
+import { recalculatePortfolioStatsInternal } from "@/db/actions/portfolio/recalculate-stats";
 
 /**
  * Signal processing result interface
@@ -159,7 +159,7 @@ export async function processSignal(signalId: string): Promise<SignalProcessingR
       // Recalculate portfolio stats after signal processing
       try {
         const userId = bot.portfolio.userId;
-        await recalculatePortfolioStats(userId);
+        await recalculatePortfolioStatsInternal(userId);
         console.log(`Portfolio stats recalculated for user ${userId}`);
       } catch (statsError) {
         console.error("Error recalculating portfolio stats:", statsError);

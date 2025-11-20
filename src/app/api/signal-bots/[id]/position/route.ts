@@ -402,8 +402,8 @@ export async function POST(
 
     // Recalculate portfolio stats after position creation
     try {
-      const { recalculatePortfolioStats } = await import("@/db/actions/admin/update-portfolio-stats");
-      await recalculatePortfolioStats(targetUserId);
+      const { recalculatePortfolioStatsInternal } = await import("@/db/actions/portfolio/recalculate-stats");
+      await recalculatePortfolioStatsInternal(targetUserId);
       console.log(`Portfolio stats recalculated for user ${targetUserId}`);
     } catch (statsError) {
       console.error("Error recalculating portfolio stats:", statsError);

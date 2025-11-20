@@ -107,6 +107,25 @@ export async function closePosition(request: ClosePositionRequest) {
 
     console.log("Position closed successfully");
 
+    // Recalculate portfolio stats after closing position
+    if (positionStatus === "CLOSED") {
+      try {
+        const { recalculatePortfolioStatsInternal } = await import("@/db/actions/portfolio/recalculate-stats");
+        const portfolio = await db.portfolio.findUnique({
+          where: { id: existingPosition.portfolioId },
+          select: { userId: true },
+        });
+        
+        if (portfolio) {
+          await recalculatePortfolioStatsInternal(portfolio.userId);
+          console.log("Portfolio stats updated after position close");
+        }
+      } catch (statsError) {
+        console.error("Failed to update portfolio stats:", statsError);
+        // Don't fail the close operation if stats update fails
+      }
+    }
+
     return {
       success: true,
       positionId: updatedPosition.id,

@@ -122,6 +122,18 @@ export async function POST(
 
     console.log("Position close result:", closePositionResult);
 
+    // Recalculate portfolio stats after successful close
+    if (closePositionResult.success && closePositionResult.status === "CLOSED") {
+      try {
+        const { recalculatePortfolioStatsInternal } = await import("@/db/actions/portfolio/recalculate-stats");
+        await recalculatePortfolioStatsInternal(targetUserId);
+        console.log("Portfolio stats updated after API position close");
+      } catch (statsError) {
+        console.error("Failed to update portfolio stats:", statsError);
+        // Don't fail the close operation if stats update fails
+      }
+    }
+
     return NextResponse.json({
       success: true,
       message: "Position closed successfully",
