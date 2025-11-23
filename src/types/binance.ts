@@ -1,4 +1,3 @@
-
 export interface configurationRestAPI {
     apiKey: string;
     apiSecret: string;

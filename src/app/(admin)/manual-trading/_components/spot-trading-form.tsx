@@ -52,29 +52,26 @@ const extractQuoteAsset = (symbol: string): string => {
   return symbol.replace(baseAsset, "");
 };
 
-interface TradingFormProps {
+interface SpotTradingFormProps {
   selectedExchange: Exchange | null;
   onSelectAssetsChange: (assets: string[]) => void;
   selectedAsset: string;
   userId: string;
   portfolioId?: string;
-  accountType?: 'spot' | 'margin';
 }
 
-export function TradingForm({
+export function SpotTradingForm({
   selectedExchange,
   onSelectAssetsChange,
   selectedAsset,
   userId,
   portfolioId,
-  accountType = 'spot',
-}: TradingFormProps) {
+}: SpotTradingFormProps) {
   // State management
   const [orderType, setOrderType] = useState<OrderTypeType>("MARKET");
   const [validationErrors, setValidationErrors] = useState<ValidationError[]>([]);
   const [validationWarnings, setValidationWarnings] = useState<string[]>([]);
   const [costBreakdown, setCostBreakdown] = useState<CostBreakdown | null>(null);
-  const [sideEffectType, setSideEffectType] = useState<string>("NO_SIDE_EFFECT");
   const { createOrder, isPending } = useCreateOrder();
 
   // Optimized asset data hook with live updates
@@ -263,28 +260,16 @@ export function TradingForm({
       console.log("Order warnings:", validationResult.warnings);
     }
     
-    // Prepare order data with margin fields if in margin mode
-    const orderData = {
-      ...data,
-      ...(accountType === 'margin' && {
-        isMargin: true,
-        sideEffectType: sideEffectType,
-      }),
-    };
-
     // All validation passed, create order via API
     try {
-      // Use different endpoint for margin orders
-      const endpoint = accountType === 'margin' ? '/api/margin/order/create' : '/api/order/create';
-      
-      const response = await fetch(endpoint, {
+      const response = await fetch('/api/order/create', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
           exchange: selectedExchange!,
-          order: orderData,
+          order: data,
           userId,
           portfolioId: portfolioId!,
         }),
@@ -299,7 +284,6 @@ export function TradingForm({
       form.reset(getDefaultValues(orderType));
       setValidationErrors([]);
       setValidationWarnings([]);
-      setSideEffectType("NO_SIDE_EFFECT");
     } catch (error) {
       console.error("Order creation failed:", error);
       setValidationErrors([{
@@ -402,51 +386,6 @@ export function TradingForm({
               )}
             />
 
-            {/* Margin Mode: Side Effect Selector */}
-            {accountType === 'margin' && (
-              <div className="space-y-2">
-                <FormLabel>Side Effect</FormLabel>
-                <Select value={sideEffectType} onValueChange={setSideEffectType}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select side effect" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="NO_SIDE_EFFECT">
-                      <div className="flex flex-col items-start">
-                        <span className="font-medium">No Auto Borrow/Repay</span>
-                        <span className="text-xs text-muted-foreground">Manual borrow required</span>
-                      </div>
-                    </SelectItem>
-                    <SelectItem value="MARGIN_BUY">
-                      <div className="flex flex-col items-start">
-                        <span className="font-medium">Auto Borrow</span>
-                        <span className="text-xs text-muted-foreground">Borrow if insufficient balance</span>
-                      </div>
-                    </SelectItem>
-                    <SelectItem value="AUTO_REPAY">
-                      <div className="flex flex-col items-start">
-                        <span className="font-medium">Auto Repay</span>
-                        <span className="text-xs text-muted-foreground">Repay debt when selling</span>
-                      </div>
-                    </SelectItem>
-                  </SelectContent>
-                </Select>
-                <p className="text-xs text-muted-foreground">
-                  Choose how to handle borrowing and repayment
-                </p>
-              </div>
-            )}
-
-            {/* Margin Warning */}
-            {accountType === 'margin' && (
-              <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-md">
-                <p className="text-xs text-yellow-800">
-                  <strong>Margin Trading Risk:</strong> You can lose more than your initial investment. 
-                  Monitor your margin level to avoid liquidation.
-                </p>
-              </div>
-            )}
-
             {orderType === "LIMIT" && (
               <LimitOrderFields
                 form={form}
@@ -502,52 +441,6 @@ export function TradingForm({
                 />
               </div>
             )}
-
-            {/* Risk Management Section */}
-            {/* <ExpandableSection title="Risk Management">
-              <div className="space-y-4 mt-4">
-                <div className="text-sm text-muted-foreground">
-                  Set stop-loss and take-profit levels to manage your risk.
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="text-xs font-medium text-muted-foreground">
-                      Stop Loss
-                    </label>
-                    <Input placeholder="0.00" className="mt-1" />
-                  </div>
-                  <div>
-                    <label className="text-xs font-medium text-muted-foreground">
-                      Take Profit
-                    </label>
-                    <Input placeholder="0.00" className="mt-1" />
-                  </div>
-                </div>
-              </div>
-            </ExpandableSection> */}
-
-            {/* Advanced Options Section */}
-            {/* <ExpandableSection title="Advanced Options">
-              <div className="space-y-4 mt-4">
-                <div className="text-sm text-muted-foreground">
-                  Configure advanced trading parameters.
-                </div>
-                <div className="space-y-3">
-                  <div>
-                    <label className="text-xs font-medium text-muted-foreground">
-                      Slippage Tolerance
-                    </label>
-                    <Input placeholder="0.5%" className="mt-1" />
-                  </div>
-                  <div>
-                    <label className="text-xs font-medium text-muted-foreground">
-                      Order Timeout
-                    </label>
-                    <Input placeholder="5 minutes" className="mt-1" />
-                  </div>
-                </div>
-              </div>
-            </ExpandableSection> */}
 
             {/* Validation Errors */}
             {validationErrors.length > 0 && (
@@ -699,3 +592,4 @@ export function TradingForm({
     </Card>
   );
 }
+

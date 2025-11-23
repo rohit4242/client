@@ -6,6 +6,13 @@ export const OrderSide = z.enum(["BUY", "SELL"]);
 export const OrderType = z.enum(["LIMIT", "MARKET"]);
 export const TimeInForce = z.enum(["GTC", "IOC", "FOK"]);
 
+// Margin trading side effect types
+export const SideEffectTypeSchema = z.enum([
+  "NO_SIDE_EFFECT",
+  "MARGIN_BUY",
+  "AUTO_REPAY",
+]);
+
 // Base fields common to all orders
 const baseFields = {
   symbol: z.string()
@@ -16,6 +23,9 @@ const baseFields = {
   side: OrderSide,
   type: OrderType,
   
+  // Margin trading fields (optional)
+  isMargin: z.boolean().optional(),
+  sideEffectType: SideEffectTypeSchema.optional(),
 };
 
 // LIMIT order schema
@@ -90,6 +100,7 @@ export const TradingFormSchema = z.discriminatedUnion("type", [
 export type OrderSideType = z.infer<typeof OrderSide>;
 export type OrderTypeType = z.infer<typeof OrderType>;
 export type TimeInForceType = z.infer<typeof TimeInForce>;
+export type SideEffectTypeType = z.infer<typeof SideEffectTypeSchema>;
 
 export type LimitOrder = z.infer<typeof LimitOrderSchema>;
 export type MarketOrder = z.infer<typeof MarketOrderSchema>;

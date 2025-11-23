@@ -47,7 +47,7 @@ import {
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import axios from "axios";
 import { UserWithAgent } from "@/db/actions/admin/get-all-users";
 import { SignalBot } from "@/types/signal-bot";

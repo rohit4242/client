@@ -22,6 +22,9 @@ export interface ValidationContext {
   baseBalance: AssetBalance | null;
   quoteBalance: AssetBalance | null;
   currentPrice: AssetPrice | null;
+  sideEffectType?: string;
+  maxBorrowableQuote?: number | null;
+  maxBorrowableBase?: number | null;
 }
 
 export function validateOrder(
@@ -71,7 +74,7 @@ function validateBuyOrder(
   errors: ValidationError[],
   warnings: string[]
 ) {
-  const { baseAsset, quoteAsset, constraints, quoteBalance } = context;
+  const { baseAsset, quoteAsset, constraints, quoteBalance, sideEffectType, maxBorrowableQuote } = context;
 
   const quantity = orderData.quantity ? parseFloat(orderData.quantity) : 0;
   const quoteOrderQty = orderData.quoteOrderQty ? parseFloat(orderData.quoteOrderQty) : 0;
@@ -107,13 +110,28 @@ function validateBuyOrder(
       });
     }
 
-    // Check sufficient balance
-    if (quoteOrderQty > availableQuoteBalance) {
-      errors.push({
-        field: "quoteOrderQty",
-        message: `Insufficient ${quoteAsset} balance. Available: ${availableQuoteBalance.toFixed(8)} ${quoteAsset}`,
-        code: "INSUFFICIENT_BALANCE"
-      });
+    // Check balance or max borrowable based on sideEffectType
+    if (sideEffectType === 'MARGIN_BUY') {
+      // Skip balance check, validate against max borrowable
+      const requiredBorrow = Math.max(0, quoteOrderQty - availableQuoteBalance);
+      if (maxBorrowableQuote !== null && maxBorrowableQuote !== undefined) {
+        if (requiredBorrow > maxBorrowableQuote) {
+          errors.push({
+            field: "quoteOrderQty",
+            message: `Order exceeds maximum borrowable amount. Max borrowable: ${maxBorrowableQuote.toFixed(2)} ${quoteAsset}`,
+            code: "EXCEEDS_MAX_BORROWABLE"
+          });
+        }
+      }
+    } else {
+      // Standard balance validation (NO_SIDE_EFFECT or AUTO_REPAY)
+      if (quoteOrderQty > availableQuoteBalance) {
+        errors.push({
+          field: "quoteOrderQty",
+          message: `Insufficient ${quoteAsset} balance. Available: ${availableQuoteBalance.toFixed(8)} ${quoteAsset}`,
+          code: "INSUFFICIENT_BALANCE"
+        });
+      }
     }
 
     // Calculate estimated quantity for warnings
@@ -152,14 +170,29 @@ function validateBuyOrder(
       });
     }
 
-    // Check sufficient balance (estimated cost)
+    // Check balance or max borrowable based on sideEffectType
     const estimatedCost = quantity * currentPrice;
-    if (estimatedCost > availableQuoteBalance) {
-      errors.push({
-        field: "quantity",
-        message: `Insufficient ${quoteAsset} balance. Need: ${estimatedCost.toFixed(2)} ${quoteAsset}, Available: ${availableQuoteBalance.toFixed(2)} ${quoteAsset}`,
-        code: "INSUFFICIENT_BALANCE"
-      });
+    if (sideEffectType === 'MARGIN_BUY') {
+      // Skip balance check, validate against max borrowable
+      const requiredBorrow = Math.max(0, estimatedCost - availableQuoteBalance);
+      if (maxBorrowableQuote !== null && maxBorrowableQuote !== undefined) {
+        if (requiredBorrow > maxBorrowableQuote) {
+          errors.push({
+            field: "quantity",
+            message: `Order exceeds maximum borrowable amount. Max borrowable: ${maxBorrowableQuote.toFixed(2)} ${quoteAsset}`,
+            code: "EXCEEDS_MAX_BORROWABLE"
+          });
+        }
+      }
+    } else {
+      // Standard balance validation (NO_SIDE_EFFECT or AUTO_REPAY)
+      if (estimatedCost > availableQuoteBalance) {
+        errors.push({
+          field: "quantity",
+          message: `Insufficient ${quoteAsset} balance. Need: ${estimatedCost.toFixed(2)} ${quoteAsset}, Available: ${availableQuoteBalance.toFixed(2)} ${quoteAsset}`,
+          code: "INSUFFICIENT_BALANCE"
+        });
+      }
     }
 
     // Check minimum notional
@@ -178,7 +211,7 @@ function validateSellOrder(
   context: ValidationContext,
   errors: ValidationError[]
 ) {
-  const { baseAsset, constraints, baseBalance } = context;
+  const { baseAsset, constraints, baseBalance, sideEffectType, maxBorrowableBase } = context;
 
   const quantity = orderData.quantity ? parseFloat(orderData.quantity) : 0;
   const availableBaseBalance = baseBalance ? parseFloat(baseBalance.free) : 0;
@@ -220,13 +253,31 @@ function validateSellOrder(
     });
   }
 
-  // Check sufficient balance
-  if (quantity > availableBaseBalance) {
-    errors.push({
-      field: "quantity",
-      message: `Insufficient ${baseAsset} balance. Available: ${availableBaseBalance.toFixed(8)} ${baseAsset}`,
-      code: "INSUFFICIENT_BALANCE"
-    });
+  // Check balance based on sideEffectType
+  if (sideEffectType === 'MARGIN_BUY') {
+    // Allow borrowing base asset to sell (short selling)
+    const requiredBorrow = Math.max(0, quantity - availableBaseBalance);
+    if (maxBorrowableBase !== null && maxBorrowableBase !== undefined) {
+      if (requiredBorrow > maxBorrowableBase) {
+        errors.push({
+          field: "quantity",
+          message: `Order exceeds maximum borrowable amount. Max borrowable: ${maxBorrowableBase.toFixed(8)} ${baseAsset}`,
+          code: "EXCEEDS_MAX_BORROWABLE"
+        });
+      }
+    }
+  } else if (sideEffectType === 'AUTO_REPAY') {
+    // Allow selling more than available balance (will auto-repay debt)
+    // Still validate against max quantity constraints above
+  } else {
+    // Standard balance validation (NO_SIDE_EFFECT)
+    if (quantity > availableBaseBalance) {
+      errors.push({
+        field: "quantity",
+        message: `Insufficient ${baseAsset} balance. Available: ${availableBaseBalance.toFixed(8)} ${baseAsset}`,
+        code: "INSUFFICIENT_BALANCE"
+      });
+    }
   }
 }
 
@@ -317,27 +368,50 @@ function validateLimitOrder(
     });
   }
 
-  // Check sufficient balance
+  // Check sufficient balance based on side and sideEffectType
   if (orderData.side === "BUY") {
     const totalCost = quantity * price;
     const availableQuoteBalance = quoteBalance ? parseFloat(quoteBalance.free) : 0;
+    const { sideEffectType, maxBorrowableQuote } = context;
     
-    if (totalCost > availableQuoteBalance) {
-      errors.push({
-        field: "quantity",
-        message: `Insufficient ${quoteAsset} balance. Need: ${totalCost.toFixed(2)} ${quoteAsset}, Available: ${availableQuoteBalance.toFixed(2)} ${quoteAsset}`,
-        code: "INSUFFICIENT_BALANCE"
-      });
+    if (sideEffectType === 'MARGIN_BUY') {
+      // Skip balance check, validate against max borrowable
+      const requiredBorrow = Math.max(0, totalCost - availableQuoteBalance);
+      if (maxBorrowableQuote !== null && maxBorrowableQuote !== undefined) {
+        if (requiredBorrow > maxBorrowableQuote) {
+          errors.push({
+            field: "quantity",
+            message: `Order exceeds maximum borrowable amount. Max borrowable: ${maxBorrowableQuote.toFixed(2)} ${quoteAsset}`,
+            code: "EXCEEDS_MAX_BORROWABLE"
+          });
+        }
+      }
+    } else {
+      // Standard balance validation (NO_SIDE_EFFECT or AUTO_REPAY)
+      if (totalCost > availableQuoteBalance) {
+        errors.push({
+          field: "quantity",
+          message: `Insufficient ${quoteAsset} balance. Need: ${totalCost.toFixed(2)} ${quoteAsset}, Available: ${availableQuoteBalance.toFixed(2)} ${quoteAsset}`,
+          code: "INSUFFICIENT_BALANCE"
+        });
+      }
     }
   } else {
     const availableBaseBalance = baseBalance ? parseFloat(baseBalance.free) : 0;
+    const { sideEffectType } = context;
     
-    if (quantity > availableBaseBalance) {
-      errors.push({
-        field: "quantity",
-        message: `Insufficient ${baseAsset} balance. Available: ${availableBaseBalance.toFixed(8)} ${baseAsset}`,
-        code: "INSUFFICIENT_BALANCE"
-      });
+    if (sideEffectType === 'AUTO_REPAY') {
+      // Allow selling more than available balance (will auto-repay debt)
+      // Still validate against max quantity constraints above
+    } else {
+      // Standard balance validation (NO_SIDE_EFFECT or MARGIN_BUY)
+      if (quantity > availableBaseBalance) {
+        errors.push({
+          field: "quantity",
+          message: `Insufficient ${baseAsset} balance. Available: ${availableBaseBalance.toFixed(8)} ${baseAsset}`,
+          code: "INSUFFICIENT_BALANCE"
+        });
+      }
     }
   }
 }

@@ -10,7 +10,9 @@
     "postinstall": "prisma generate"
   },
   "dependencies": {
+    "@binance/margin-trading": "^10.0.1",
     "@binance/spot": "^16.0.0",
+    "@binance/wallet": "^12.0.2",
     "@dicebear/collection": "^9.2.4",
     "@dicebear/core": "^9.2.4",
     "@hookform/resolvers": "^5.2.1",

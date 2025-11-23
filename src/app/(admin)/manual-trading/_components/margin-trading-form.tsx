@@ -3,6 +3,7 @@
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useState, useMemo, useCallback, useEffect } from "react";
+import { toast } from "sonner";
 import {
   getDefaultValues,
   OrderTypeType,
@@ -31,13 +32,13 @@ import {
 
 // Optimized imports
 import { useAssetData } from "@/hooks/use-asset-data";
+import { useMarginBalance } from "@/hooks/use-margin-balance";
 import { useSymbolInfo } from "@/hooks/use-symbol-info";
-import { AssetInfoCard } from "./asset-info-card";
+import { MarginAssetInfoCard } from "./margin-asset-info-card";
 import { ToggleButtonGroup } from "./toggle-button-group";
 import { TradingInputMode } from "./trading-input-mode";
 import { LimitOrderFields } from "./limit-order-fields";
 import { extractBaseAsset } from "@/lib/utils";
-import { useCreateOrder } from "@/db/actions/order/use-create-order";
 import { 
   extractTradingConstraints, 
   calculateMaxBuy, 
@@ -45,6 +46,7 @@ import {
 } from "@/lib/trading-constraints";
 import { validateOrder, ValidationError } from "@/lib/order-validation";
 import { calculateOrderCost, CostBreakdown, getFeePercentageDisplay, getExpectedFeeType } from "@/lib/cost-calculator";
+import { useMarginValidation } from "@/hooks/use-margin-validation";
 
 // Helper function to extract quote asset (e.g., USDT from BTCUSDT)
 const extractQuoteAsset = (symbol: string): string => {
@@ -52,60 +54,71 @@ const extractQuoteAsset = (symbol: string): string => {
   return symbol.replace(baseAsset, "");
 };
 
-interface TradingFormProps {
+interface MarginTradingFormProps {
   selectedExchange: Exchange | null;
   onSelectAssetsChange: (assets: string[]) => void;
   selectedAsset: string;
   userId: string;
   portfolioId?: string;
-  accountType?: 'spot' | 'margin';
 }
 
-export function TradingForm({
+export function MarginTradingForm({
   selectedExchange,
   onSelectAssetsChange,
   selectedAsset,
   userId,
   portfolioId,
-  accountType = 'spot',
-}: TradingFormProps) {
+}: MarginTradingFormProps) {
   // State management
   const [orderType, setOrderType] = useState<OrderTypeType>("MARKET");
   const [validationErrors, setValidationErrors] = useState<ValidationError[]>([]);
   const [validationWarnings, setValidationWarnings] = useState<string[]>([]);
   const [costBreakdown, setCostBreakdown] = useState<CostBreakdown | null>(null);
   const [sideEffectType, setSideEffectType] = useState<string>("NO_SIDE_EFFECT");
-  const { createOrder, isPending } = useCreateOrder();
+  const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
 
-  // Optimized asset data hook with live updates
+  // Get separate balances for base and quote assets
+  const baseAsset = extractBaseAsset(selectedAsset);
+  const quoteAsset = extractQuoteAsset(selectedAsset);
+
+  // Fetch price data (still use spot price)
   const {
-    balance,
     price,
-    lastUpdate,
-    isLoadingBalance,
+    lastUpdate: priceLastUpdate,
     isLoadingPrice,
     refreshPrice,
   } = useAssetData(selectedAsset, selectedExchange, {
     livePriceConfig: { intervalMs: 1000 },
   });
-
-  // Get separate balances for base and quote assets for better UX
-  const baseAsset = extractBaseAsset(selectedAsset);
-  const quoteAsset = extractQuoteAsset(selectedAsset);
   
-  // Fetch base asset balance (e.g., BTC from BTCUSDT)
+  // Fetch MARGIN account balances for base asset
   const {
-    balance: baseBalance,
-  } = useAssetData(baseAsset + "USDT", selectedExchange, {
-    livePriceConfig: { enabled: false }, // Disable live updates for balance-only
-  });
+    balance: marginBaseBalance,
+    isLoading: isLoadingBaseBalance,
+    lastUpdate: baseLastUpdate,
+  } = useMarginBalance(baseAsset, selectedExchange);
 
-  // Fetch quote asset balance (e.g., USDT from BTCUSDT)
+  // Fetch MARGIN account balances for quote asset
   const {
-    balance: quoteBalance,
-  } = useAssetData(quoteAsset === "USDT" ? "USDTUSDT" : quoteAsset + "USDT", selectedExchange, {
-    livePriceConfig: { enabled: false }, // Disable live updates for balance-only
-  });
+    balance: marginQuoteBalance,
+    isLoading: isLoadingQuoteBalance,
+  } = useMarginBalance(quoteAsset, selectedExchange);
+
+  // Convert margin balances to format expected by validation
+  const baseBalance = marginBaseBalance ? {
+    asset: marginBaseBalance.asset,
+    free: marginBaseBalance.free,
+    locked: marginBaseBalance.locked,
+  } : null;
+
+  const quoteBalance = marginQuoteBalance ? {
+    asset: marginQuoteBalance.asset,
+    free: marginQuoteBalance.free,
+    locked: marginQuoteBalance.locked,
+  } : null;
+
+  const isLoadingBalance = isLoadingBaseBalance || isLoadingQuoteBalance;
+  const lastUpdate = baseLastUpdate || priceLastUpdate;
 
   // Symbol info for exchange filters
   const { symbolInfo, isLoading: isLoadingSymbolInfo } = useSymbolInfo({
@@ -119,6 +132,7 @@ export function TradingForm({
     [symbolInfo, selectedAsset]
   );
 
+ 
   // Calculate max buy amounts
   const maxBuyInfo = useMemo(() => {
     if (!price?.price || !baseBalance || !quoteBalance) return null;
@@ -144,6 +158,23 @@ export function TradingForm({
     resolver: zodResolver(TradingFormSchema),
     defaultValues: getDefaultValues(orderType),
   });
+
+   // Fetch max borrowable amounts for margin validation
+   const currentOrderSide = form.watch("side") || "BUY";
+   const {
+     maxBorrowableQuote,
+     maxBorrowableBase,
+     isLoadingQuote,
+     isLoadingBase,
+   } = useMarginValidation({
+     quoteAsset,
+     baseAsset,
+     exchange: selectedExchange,
+     sideEffectType,
+     orderSide: currentOrderSide,
+     enabled: !!selectedExchange,
+   });
+ 
 
   // Memoized toggle options
   const sideOptions = useMemo(
@@ -226,7 +257,7 @@ export function TradingForm({
     setValidationErrors([]);
     setValidationWarnings([]);
     
-    // Validate order before submission
+    // Validate order before submission with margin-specific context
     const validationResult = validateOrder(data, {
       baseAsset,
       quoteAsset,
@@ -234,6 +265,9 @@ export function TradingForm({
       baseBalance,
       quoteBalance,
       currentPrice: price,
+      sideEffectType,
+      maxBorrowableQuote: maxBorrowableQuote ?? undefined,
+      maxBorrowableBase: maxBorrowableBase ?? undefined,
     });
     
     console.log("Validation result: ", validationResult);
@@ -263,21 +297,17 @@ export function TradingForm({
       console.log("Order warnings:", validationResult.warnings);
     }
     
-    // Prepare order data with margin fields if in margin mode
+    // Prepare order data with margin fields
     const orderData = {
       ...data,
-      ...(accountType === 'margin' && {
-        isMargin: true,
-        sideEffectType: sideEffectType,
-      }),
+      isMargin: true,
+      sideEffectType: sideEffectType,
     };
 
     // All validation passed, create order via API
+    setIsSubmitting(true);
     try {
-      // Use different endpoint for margin orders
-      const endpoint = accountType === 'margin' ? '/api/margin/order/create' : '/api/order/create';
-      
-      const response = await fetch(endpoint, {
+      const response = await fetch('/api/margin/order/create', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -290,10 +320,17 @@ export function TradingForm({
         }),
       });
 
+      const result = await response.json();
+
       if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || 'Failed to create order');
+        throw new Error(result.error || 'Failed to create order');
       }
+
+      // Show success toast
+      toast.success('Order placed successfully!', {
+        description: `${data.side} ${data.symbol} order has been executed on Binance.`,
+        duration: 5000,
+      });
 
       // Clear form and validation state on successful submission
       form.reset(getDefaultValues(orderType));
@@ -302,11 +339,21 @@ export function TradingForm({
       setSideEffectType("NO_SIDE_EFFECT");
     } catch (error) {
       console.error("Order creation failed:", error);
+      const errorMessage = error instanceof Error ? error.message : 'Failed to create order';
+      
+      // Show error toast
+      toast.error('Order failed', {
+        description: errorMessage,
+        duration: 5000,
+      });
+      
       setValidationErrors([{
         code: 'UNKNOWN_ERROR',
         field: 'unknown',
-        message: error instanceof Error ? error.message : 'Failed to create order',
+        message: errorMessage,
       }]);
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -347,11 +394,11 @@ export function TradingForm({
               )}
             />
 
-            {/* Asset Info Card - Balance & Price Display */}
+            {/* Margin Asset Info Card - Balance & Price Display */}
             {selectedAsset && (
-              <AssetInfoCard
+              <MarginAssetInfoCard
                 symbol={selectedAsset}
-                balance={balance}
+                balance={marginBaseBalance}
                 price={price}
                 lastUpdate={lastUpdate}
                 isLoadingBalance={isLoadingBalance}
@@ -403,47 +450,95 @@ export function TradingForm({
             />
 
             {/* Margin Mode: Side Effect Selector */}
-            {accountType === 'margin' && (
-              <div className="space-y-2">
-                <FormLabel>Side Effect</FormLabel>
-                <Select value={sideEffectType} onValueChange={setSideEffectType}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select side effect" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="NO_SIDE_EFFECT">
-                      <div className="flex flex-col items-start">
-                        <span className="font-medium">No Auto Borrow/Repay</span>
-                        <span className="text-xs text-muted-foreground">Manual borrow required</span>
-                      </div>
-                    </SelectItem>
-                    <SelectItem value="MARGIN_BUY">
-                      <div className="flex flex-col items-start">
-                        <span className="font-medium">Auto Borrow</span>
-                        <span className="text-xs text-muted-foreground">Borrow if insufficient balance</span>
-                      </div>
-                    </SelectItem>
-                    <SelectItem value="AUTO_REPAY">
-                      <div className="flex flex-col items-start">
-                        <span className="font-medium">Auto Repay</span>
-                        <span className="text-xs text-muted-foreground">Repay debt when selling</span>
-                      </div>
-                    </SelectItem>
-                  </SelectContent>
-                </Select>
-                <p className="text-xs text-muted-foreground">
-                  Choose how to handle borrowing and repayment
+            <div className="space-y-2">
+              <FormLabel>Side Effect</FormLabel>
+              <Select value={sideEffectType} onValueChange={setSideEffectType}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select side effect" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="NO_SIDE_EFFECT">
+                    <div className="flex flex-col items-start">
+                      <span className="font-medium">No Auto Borrow/Repay</span>
+                      <span className="text-xs text-muted-foreground">Manual borrow required</span>
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="MARGIN_BUY">
+                    <div className="flex flex-col items-start">
+                      <span className="font-medium">Auto Borrow</span>
+                      <span className="text-xs text-muted-foreground">
+                        {currentOrderSide === 'BUY' 
+                          ? `Borrow ${quoteAsset} if insufficient balance`
+                          : `Borrow ${baseAsset} to sell (short)`
+                        }
+                      </span>
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="AUTO_REPAY">
+                    <div className="flex flex-col items-start">
+                      <span className="font-medium">Auto Repay</span>
+                      <span className="text-xs text-muted-foreground">
+                        {currentOrderSide === 'SELL' 
+                          ? 'Auto repay debt when selling'
+                          : 'Applies to sell orders'
+                        }
+                      </span>
+                    </div>
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                {currentOrderSide === 'BUY' 
+                  ? 'Choose how to handle borrowing for buying'
+                  : 'Choose how to handle borrowing/repayment for selling'
+                }
+              </p>
+            </div>
+
+            {/* Margin Warning */}
+            <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-md">
+              <p className="text-xs text-yellow-800">
+                <strong>Margin Trading Risk:</strong> You can lose more than your initial investment. 
+                Monitor your margin level to avoid liquidation.
+              </p>
+            </div>
+
+            {/* Short Selling Explanation */}
+            {currentOrderSide === 'SELL' && sideEffectType === 'MARGIN_BUY' && (
+              <div className="p-3 bg-blue-50 border border-blue-200 rounded-md space-y-2">
+                <p className="text-xs text-blue-800">
+                  <strong>📉 Short Selling:</strong>
                 </p>
+                <ul className="text-xs text-blue-700 space-y-1 ml-4 list-disc">
+                  <li>You&apos;ll borrow <strong>{baseAsset}</strong> to sell it at current price</li>
+                  <li>You&apos;ll receive <strong>{quoteAsset}</strong> from the sale</li>
+                  <li>This creates a <strong>SHORT position</strong> (debt of {baseAsset})</li>
+                  <li>You must repay the borrowed {baseAsset} later (ideally at a lower price)</li>
+                  <li>Position will appear in your Binance margin trades</li>
+                </ul>
               </div>
             )}
 
-            {/* Margin Warning */}
-            {accountType === 'margin' && (
-              <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-md">
-                <p className="text-xs text-yellow-800">
-                  <strong>Margin Trading Risk:</strong> You can lose more than your initial investment. 
-                  Monitor your margin level to avoid liquidation.
+            {/* Long Position with Borrowing Explanation */}
+            {currentOrderSide === 'BUY' && sideEffectType === 'MARGIN_BUY' && (
+              <div className="p-3 bg-blue-50 border border-blue-200 rounded-md space-y-2">
+                <p className="text-xs text-blue-800">
+                  <strong>📈 Buying with Borrowed Funds:</strong>
                 </p>
+                <ul className="text-xs text-blue-700 space-y-1 ml-4 list-disc">
+                  <li>If you don&apos;t have enough {quoteAsset}, it will be automatically borrowed from Binance</li>
+                  <li>You&apos;ll receive <strong>{baseAsset}</strong> from the purchase</li>
+                  <li>This creates a <strong>debt in {quoteAsset}</strong> that must be repaid</li>
+                  <li>Interest accrues on borrowed funds</li>
+                </ul>
+              </div>
+            )}
+
+            {/* Loading max borrowable info */}
+            {(isLoadingQuote || isLoadingBase) && sideEffectType === 'MARGIN_BUY' && (
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-current"></div>
+                Loading borrow limits...
               </div>
             )}
 
@@ -502,52 +597,6 @@ export function TradingForm({
                 />
               </div>
             )}
-
-            {/* Risk Management Section */}
-            {/* <ExpandableSection title="Risk Management">
-              <div className="space-y-4 mt-4">
-                <div className="text-sm text-muted-foreground">
-                  Set stop-loss and take-profit levels to manage your risk.
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="text-xs font-medium text-muted-foreground">
-                      Stop Loss
-                    </label>
-                    <Input placeholder="0.00" className="mt-1" />
-                  </div>
-                  <div>
-                    <label className="text-xs font-medium text-muted-foreground">
-                      Take Profit
-                    </label>
-                    <Input placeholder="0.00" className="mt-1" />
-                  </div>
-                </div>
-              </div>
-            </ExpandableSection> */}
-
-            {/* Advanced Options Section */}
-            {/* <ExpandableSection title="Advanced Options">
-              <div className="space-y-4 mt-4">
-                <div className="text-sm text-muted-foreground">
-                  Configure advanced trading parameters.
-                </div>
-                <div className="space-y-3">
-                  <div>
-                    <label className="text-xs font-medium text-muted-foreground">
-                      Slippage Tolerance
-                    </label>
-                    <Input placeholder="0.5%" className="mt-1" />
-                  </div>
-                  <div>
-                    <label className="text-xs font-medium text-muted-foreground">
-                      Order Timeout
-                    </label>
-                    <Input placeholder="5 minutes" className="mt-1" />
-                  </div>
-                </div>
-              </div>
-            </ExpandableSection> */}
 
             {/* Validation Errors */}
             {validationErrors.length > 0 && (
@@ -680,12 +729,12 @@ export function TradingForm({
                   ? "bg-teal-600 hover:bg-teal-700"
                   : "bg-rose-600 hover:bg-rose-700"
               }`}
-              disabled={!selectedExchange || isPending || isLoadingSymbolInfo}
+              disabled={!selectedExchange || isSubmitting || isLoadingSymbolInfo || (sideEffectType === 'MARGIN_BUY' && isLoadingQuote)}
             >
-              {isPending ? (
+              {isSubmitting ? (
                 <>
                   <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                  Processing...
+                  Placing order...
                 </>
               ) : (
                 <div className="flex flex-col items-center">
@@ -699,3 +748,4 @@ export function TradingForm({
     </Card>
   );
 }
+
