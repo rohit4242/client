@@ -26,7 +26,7 @@ import {
   PositionFilters,
 } from "@/types/position";
 import { PositionRow } from "./position-row";
-import { useLivePrices } from "@/hooks/use-live-price";
+import { useLivePrices } from "@/hooks/trading/use-live-price";
 import axios from "axios";
 import { useSelectedUser } from "@/contexts/selected-user-context";
 
@@ -356,7 +356,7 @@ export function AdvancedPositionsTable({
           <Card>
             <CardContent className="p-0">
               {filteredPositions.filter(
-                (p) => p.status === "CLOSED" || p.status === "MARKET_CLOSED"
+                (p) => p.status === "CLOSED"
               ).length > 0 ? (
                 <div className="rounded-md border overflow-x-auto">
                   <Table>
@@ -385,8 +385,7 @@ export function AdvancedPositionsTable({
                       {filteredPositions
                         .filter(
                           (p) =>
-                            p.status === "CLOSED" ||
-                            p.status === "MARKET_CLOSED"
+                            p.status === "CLOSED"
                         )
                         .map((position) => (
                           <PositionRow

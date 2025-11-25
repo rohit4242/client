@@ -2,7 +2,7 @@
 
 import { useState, } from "react";
 import { SignalBotList } from "./signal-bot-list";
-import { CreateSignalBotDialog } from "./dialogs/create-signal-bot-dialog";
+import { CreateSignalBotDialog } from "@/components/signal-bot/dialogs/create-bot-dialog";
 import { SignalBotHeader } from "./signal-bot-header";
 import { SignalBotStats } from "./signal-bot-stats";
 import { EmptyState } from "./empty-state";

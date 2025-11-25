@@ -26,7 +26,7 @@ import {
 } from "lucide-react";
 
 import { SignalBot } from "@/types/signal-bot";
-import { useLivePrice } from "@/hooks/use-live-price";
+import { useLivePrice } from "@/hooks/trading/use-live-price";
 
 interface PositionConfirmationDialogProps {
   bot: SignalBot;

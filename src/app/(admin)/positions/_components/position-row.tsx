@@ -10,7 +10,7 @@ import { PositionData, PositionAction } from "@/types/position";
 import { PositionActions } from "./position-actions";
 import { OrderHistory } from "./order-history";
 import { cn, formatDate } from "@/lib/utils";
-import { useLivePrice } from "@/hooks/use-live-price";
+import { useLivePrice } from "@/hooks/trading/use-live-price";
 import { MarkPrice } from "@/components/ui/live-price";
 import { useSelectedUser } from "@/contexts/selected-user-context";
 
@@ -39,7 +39,7 @@ export function PositionRow({
   const price = currentPrice || livePrice || position.currentPrice || position.entryPrice;
   
   // Use realized PnL for closed positions, unrealized for open positions
-  const isClosedPosition = position.status === "CLOSED" || position.status === "MARKET_CLOSED";
+  const isClosedPosition = position.status === "CLOSED";
   const pnlValue = isClosedPosition ? position.pnlPercent : ((price - position.entryPrice) / position.entryPrice) * 100;
   const pnlAmount = isClosedPosition ? position.realizedPnl : (price - position.entryPrice) * position.quantity;
 

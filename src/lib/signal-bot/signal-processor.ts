@@ -1,5 +1,5 @@
 import db from "@/db";
-import { Action } from "@prisma/client";
+import { Action, Bot } from "@prisma/client";
 import {
   executeEnterLong,
   executeExitLong,
@@ -110,7 +110,18 @@ export async function processSignal(signalId: string): Promise<SignalProcessingR
     switch (action) {
       case Action.ENTER_LONG:
         result = await executeEnterLong({
-          bot,
+          bot: bot as Bot & {
+            exchange: {
+              id: string;
+              apiKey: string;
+              apiSecret: string;
+              totalValue: number;
+              isActive: boolean;
+            };
+            portfolio: {
+              id: string;
+            };
+          },
           signal,
           currentPrice,
         });
@@ -118,7 +129,18 @@ export async function processSignal(signalId: string): Promise<SignalProcessingR
 
       case Action.EXIT_LONG:
         result = await executeExitLong({
-          bot,
+          bot: bot as Bot & {
+            exchange: {
+              id: string;
+              apiKey: string;
+              apiSecret: string;
+              totalValue: number;
+              isActive: boolean;
+            };
+            portfolio: {
+              id: string;
+            };
+          },
           signal,
           currentPrice,
         });
@@ -126,7 +148,18 @@ export async function processSignal(signalId: string): Promise<SignalProcessingR
 
       case Action.ENTER_SHORT:
         result = await executeEnterShort({
-          bot,
+          bot: bot as Bot & {
+            exchange: {
+              id: string;
+              apiKey: string;
+              apiSecret: string;
+              totalValue: number;
+              isActive: boolean;
+            };
+            portfolio: {
+              id: string;
+            };
+          },
           signal,
           currentPrice,
         });

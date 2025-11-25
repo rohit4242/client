@@ -1,19 +1,17 @@
+/**
+ * Legacy Margin Order API Route
+ * DEPRECATED: Use /api/trading/order instead
+ * This route is kept for backward compatibility
+ */
+
 import { createOrderDataSchema } from '@/db/schema/order';
 import { auth } from '@/lib/auth';
 import { headers } from 'next/headers';
 import { NextRequest, NextResponse } from 'next/server';
 import db from '@/db';
-import { getPriceBySymbol } from '@/lib/trading-utils';
-import { createPosition } from '@/db/actions/position';
-import { updatePosition } from '@/db/actions/position/update-position';
-import { recalculatePortfolioStatsInternal } from '@/db/actions/portfolio/recalculate-stats';
+import { executeOrder, validateOrderRequest } from '@/lib/services/order-service';
 import { revalidatePath } from 'next/cache';
-import { placeMarginOrder } from '@/lib/binance-margin';
 
-/**
- * POST /api/margin/order/create
- * Create a new margin order on Binance
- */
 export async function POST(request: NextRequest) {
   try {
     const session = await auth.api.getSession({
@@ -29,7 +27,7 @@ export async function POST(request: NextRequest) {
     // Validate the full body first
     const validatedOrder = createOrderDataSchema.safeParse(body);
     if (!validatedOrder.success) {
-      console.error('Validation error:', validatedOrder.error);
+      console.error('[Margin API] Validation error:', validatedOrder.error);
       return NextResponse.json(
         {
           error: 'Invalid order data',
@@ -41,8 +39,7 @@ export async function POST(request: NextRequest) {
 
     const { exchange, order, userId: requestUserId } = validatedOrder.data;
 
-    console.log('Margin Order - exchange: ', exchange);
-    console.log('Margin Order - order: ', order);
+    console.log('[Margin API] Order request:', { exchange: exchange.name, order });
 
     // Use userId from request if provided (admin action), otherwise use session user
     const targetUserId = requestUserId || session.user.id;
@@ -57,7 +54,6 @@ export async function POST(request: NextRequest) {
       portfolio = await db.portfolio.create({
         data: { userId: targetUserId },
       });
-      // Revalidate admin layout to refresh user list with updated portfolio status
       revalidatePath('/admin');
     }
 
@@ -68,120 +64,70 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const configurationRestAPI = {
-      apiKey: exchange.apiKey,
-      apiSecret: exchange.apiSecret,
-    };
-
-    const currentPrice = await getPriceBySymbol(
-      configurationRestAPI,
-      order.symbol
-    );
-
-    console.log('Current price: ', currentPrice);
-
-    // Calculate quantity from quoteOrderQty if quantity is not provided (for MARKET orders only)
-    let positionQuantity = parseFloat(order.quantity || '0');
-    if (positionQuantity === 0 && order.type === 'MARKET' && 'quoteOrderQty' in order && order.quoteOrderQty) {
-      // For market orders with quoteOrderQty, estimate quantity from current price
-      positionQuantity = parseFloat(order.quoteOrderQty) / parseFloat(currentPrice.price);
-    }
-
-    // Create position in database first (also creates Order record)
-    const positionResult = await createPosition({
-      symbol: order.symbol,
-      side: order.side === 'BUY' ? 'Long' : 'Short',
-      type: order.type === 'MARKET' ? 'Market' : 'Limit',
-      entryPrice: parseFloat(currentPrice.price),
-      quantity: positionQuantity,
+    // Build order request for the service
+    const orderRequest = {
+      userId: targetUserId,
       portfolioId: portfolio.id,
-    });
-
-    if (!positionResult.success) {
-      return NextResponse.json(
-        { error: 'Failed to create position' },
-        { status: 500 }
-      );
-    }
-
-    // Extract both positionId and orderId (database IDs, not Binance IDs)
-    const dbPositionId = positionResult.positionId;
-    const dbOrderId = positionResult.orderId;
-
-    if (!dbPositionId || !dbOrderId) {
-      return NextResponse.json(
-        { error: 'Position or Order ID not found' },
-        { status: 404 }
-      );
-    }
-
-    // Prepare margin order parameters
-    // Convert empty strings to undefined to avoid sending empty values
-    const quantity = order.quantity && order.quantity.trim() !== '' ? order.quantity : undefined;
-    // quoteOrderQty only exists on MARKET orders
-    const quoteOrderQty = order.type === 'MARKET' && 'quoteOrderQty' in order && order.quoteOrderQty && order.quoteOrderQty.trim() !== '' 
-      ? order.quoteOrderQty 
-      : undefined;
-    
-    const marginOrderParams = {
-      symbol: order.symbol,
-      side: order.side as 'BUY' | 'SELL',
-      type: order.type as 'MARKET' | 'LIMIT',
-      quantity,
-      quoteOrderQty,
-      price: 'price' in order && order.price ? order.price : undefined,
-      sideEffectType: order.sideEffectType as
-        | 'NO_SIDE_EFFECT'
-        | 'MARGIN_BUY'
-        | 'AUTO_REPAY'
-        | undefined,
-      timeInForce: 'timeInForce' in order ? order.timeInForce : undefined,
+      exchange,
+      accountType: "margin" as const,
+      order: {
+        symbol: order.symbol,
+        side: order.side as 'BUY' | 'SELL',
+        type: order.type as 'MARKET' | 'LIMIT',
+        quantity: order.quantity,
+        quoteOrderQty: 'quoteOrderQty' in order ? order.quoteOrderQty : undefined,
+        price: 'price' in order ? order.price : undefined,
+        timeInForce: 'timeInForce' in order ? order.timeInForce : undefined,
+        sideEffectType: order.sideEffectType as 'NO_SIDE_EFFECT' | 'MARGIN_BUY' | 'AUTO_REPAY' | undefined,
+      },
+      source: 'MANUAL' as const,
     };
 
-    console.log('Placing margin order:', marginOrderParams);
+    // Validate order request
+    const validation = validateOrderRequest(orderRequest);
+    if (!validation.isValid) {
+      return NextResponse.json(
+        { error: validation.error },
+        { status: 400 }
+      );
+    }
 
-    // Place margin order on Binance
-    const binanceOrderResult = await placeMarginOrder(
-      configurationRestAPI,
-      marginOrderParams
-    );
+    // Execute order using the service
+    console.log('[Margin API] Executing order via service');
+    const result = await executeOrder(orderRequest);
 
-    console.log('Binance margin order result:', binanceOrderResult);
+    if (!result.success) {
+      return NextResponse.json(
+        {
+          error: result.error || 'Order placement failed',
+          code: result.code,
+        },
+        { status: 400 }
+      );
+    }
 
-    // Extract order information
-    const executedQty = parseFloat(binanceOrderResult.executedQty || '0');
-    const cummulativeQuoteQty = parseFloat(
-      binanceOrderResult.cummulativeQuoteQty || '0'
-    );
-    const avgPrice =
-      executedQty > 0 ? cummulativeQuoteQty / executedQty : parseFloat(currentPrice.price);
-
-    // Update position with actual execution data
-    // Use database orderId (not Binance orderId)
-    await updatePosition({
-      positionId: dbPositionId,
-      orderId: dbOrderId,
-      binanceResponse: binanceOrderResult,
-    });
-
-    // Recalculate portfolio stats
-    await recalculatePortfolioStatsInternal(portfolio.id);
-
-    // Revalidate relevant pages
+    // Revalidate paths
     revalidatePath('/admin');
     revalidatePath('/agent');
+
+    console.log('[Margin API] Order executed successfully');
 
     return NextResponse.json({
       success: true,
       message: 'Margin order successfully created',
       data: {
-        order: binanceOrderResult,
-        positionId: dbPositionId,
-        orderId: dbOrderId,
+        order: {
+          positionId: result.positionId,
+          orderId: result.orderId,
+          executedQty: result.executedQty,
+          executedPrice: result.executedPrice,
+        },
+        positionId: result.positionId,
+        orderId: result.orderId,
       },
     });
   } catch (error: unknown) {
-    console.error('Error creating margin order:', error);
+    console.error('[Margin API] Error:', error);
 
     const errorMessage =
       error instanceof Error ? error.message : 'Failed to create margin order';

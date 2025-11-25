@@ -58,7 +58,7 @@ export function OrderHistory({ orders, loading = false }: OrderHistoryProps) {
       STOP_LIMIT: { color: "text-red-600 bg-red-50 border-red-200" }
     };
     
-    const config = typeConfig[type] || typeConfig.MARKET;
+    const config = typeConfig[type as keyof typeof typeConfig] || typeConfig.MARKET;
     
     return (
       <div className="flex flex-col gap-1">

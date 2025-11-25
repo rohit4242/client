@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { headers } from 'next/headers';
 import { auth } from '@/lib/auth';
 import db from '@/db';
-import { repayMargin } from '@/lib/binance-margin';
+import { repayMargin } from '@/lib/margin/binance-margin';
 import { z } from 'zod';
 
 // Request validation schema

@@ -26,7 +26,7 @@ import {
 } from "lucide-react";
 
 import { SignalBot } from "@/types/signal-bot";
-import { useLivePrice } from "@/hooks/use-live-price";
+import { useLivePrice } from "@/hooks/trading/use-live-price";
 
 interface PositionConfirmationDialogProps {
   bot: SignalBot;
@@ -162,6 +162,18 @@ export function PositionConfirmationDialog({
                   <span className="text-muted-foreground">Portfolio %:</span>
                   <span className="ml-2 font-medium">{bot.portfolioPercent}%</span>
                 </div>
+                <div>
+                  <span className="text-muted-foreground">Account Type:</span>
+                  <Badge variant={bot.accountType === "MARGIN" ? "destructive" : "secondary"} className="ml-2">
+                    {bot.accountType}
+                  </Badge>
+                </div>
+                {bot.accountType === "MARGIN" && (
+                  <div>
+                    <span className="text-muted-foreground">Margin Type:</span>
+                    <Badge variant="outline" className="ml-2">CROSS</Badge>
+                  </div>
+                )}
                 {bot.stopLoss && (
                   <div>
                     <span className="text-muted-foreground">Stop Loss:</span>
@@ -173,6 +185,24 @@ export function PositionConfirmationDialog({
                     <span className="text-muted-foreground">Take Profit:</span>
                     <span className="ml-2 font-medium text-green-600">{bot.takeProfit}%</span>
                   </div>
+                )}
+                {bot.accountType === "MARGIN" && (
+                  <>
+                    <div>
+                      <span className="text-muted-foreground">Side Effect:</span>
+                      <span className="ml-2 font-medium text-xs">{bot.sideEffectType?.replace(/_/g, ' ')}</span>
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground">Auto Repay:</span>
+                      <Badge variant={bot.autoRepay ? "default" : "outline"} className="ml-2">
+                        {bot.autoRepay ? "Enabled" : "Disabled"}
+                      </Badge>
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground">Max Borrow:</span>
+                      <span className="ml-2 font-medium">{bot.maxBorrowPercent}%</span>
+                    </div>
+                  </>
                 )}
               </div>
             </CardContent>
@@ -218,6 +248,22 @@ export function PositionConfirmationDialog({
               </div>
             </CardContent>
           </Card>
+
+          {/* Margin Trading Warning */}
+          {bot.accountType === "MARGIN" && (
+            <div className="bg-amber-50 dark:bg-amber-950 p-4 rounded-lg border border-amber-200 dark:border-amber-800">
+              <div className="flex items-start space-x-2">
+                <Info className="w-5 h-5 text-amber-600 dark:text-amber-400 mt-0.5 flex-shrink-0" />
+                <div className="text-sm">
+                  <p className="font-medium text-amber-900 dark:text-amber-100">Cross Margin Trading Active</p>
+                  <p className="text-amber-700 dark:text-amber-300 mt-1">
+                    This bot uses cross margin trading. You can borrow up to {bot.maxBorrowPercent}% of your collateral. 
+                    {bot.autoRepay && " Auto-repay is enabled - debt will be automatically repaid when you close positions."}
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Position Options */}
           <div className="space-y-4">

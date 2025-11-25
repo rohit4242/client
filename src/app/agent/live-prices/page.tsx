@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from 'react';
-import { useCryptoPrice } from '@/hooks/use-crypto-price';
+import { useCryptoPrice } from '@/hooks/trading/use-crypto-price';
 import { PriceTickerGrid } from '@/components/price-ticker';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';

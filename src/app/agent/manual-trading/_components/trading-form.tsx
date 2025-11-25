@@ -30,9 +30,9 @@ import {
 } from "@/components/ui/select";
 
 // Optimized imports
-import { useAssetData } from "@/hooks/use-asset-data";
-import { useSymbolInfo } from "@/hooks/use-symbol-info";
-import { AssetInfoCard } from "./asset-info-card";
+import { useAssetData } from "@/hooks/trading/use-asset-data";
+import { useSymbolInfo } from "@/hooks/trading/use-symbol-info";
+import { AssetInfoCard } from "@/components/trading/asset-info-card";
 import { ToggleButtonGroup } from "./toggle-button-group";
 import { TradingInputMode } from "./trading-input-mode";
 import { LimitOrderFields } from "./limit-order-fields";

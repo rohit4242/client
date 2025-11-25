@@ -113,6 +113,10 @@ async function createPositionAndOrder(
     source: "BOT",
   });
 
+  // Determine if this is a margin position
+  const bot = await db.bot.findUnique({ where: { id: botId } });
+  const isMargin = bot?.accountType === "MARGIN";
+
   const position = await db.position.create({
     data: {
       portfolioId,
@@ -120,11 +124,15 @@ async function createPositionAndOrder(
       symbol,
       side: dbSide,
       status: "OPEN",
+      accountType: isMargin ? "MARGIN" : "SPOT",
+      marginType: isMargin ? "CROSS" : null,
       entryPrice: currentPrice,
       quantity,
       entryValue,
       currentPrice: currentPrice,
       type: "MARKET",
+      leverage: bot?.leverage || 1,
+      sideEffectType: isMargin ? (bot?.sideEffectType || "NO_SIDE_EFFECT") : "NO_SIDE_EFFECT",
       stopLoss: stopLossPrice,
       takeProfit: takeProfitPrice,
       createdAt: new Date(),
@@ -143,6 +151,9 @@ async function createPositionAndOrder(
       type: "ENTRY",
       side: orderSide,
       orderType: "MARKET",
+      accountType: isMargin ? "MARGIN" : "SPOT",
+      marginType: isMargin ? "CROSS" : null,
+      sideEffectType: isMargin ? (bot?.sideEffectType || "NO_SIDE_EFFECT") : "NO_SIDE_EFFECT",
       price: currentPrice,
       quantity,
       value: entryValue,

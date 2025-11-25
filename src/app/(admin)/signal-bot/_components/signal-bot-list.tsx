@@ -1,7 +1,7 @@
 "use client";
 
 import { SignalBot } from "@/types/signal-bot";
-import { SignalBotCard } from "./signal-bot-card";
+import { SignalBotCard } from "@/components/signal-bot/bot-card";
 
 interface SignalBotListProps {
   signalBots: SignalBot[];

@@ -55,7 +55,7 @@ export async function GET() {
         await db.exchange.update({
           where: { id: exchange.id },
           data: {
-            totalValue: totalPortfolioValue.toString(),
+            totalValue: totalPortfolioValue,
             lastSyncedAt: new Date(),
           },
         });
@@ -168,7 +168,7 @@ export async function POST(request: NextRequest) {
         apiSecret,
         positionMode: positionMode,
         isActive: true,
-        totalValue: totalPortfolioValue.toString(),
+        totalValue: totalPortfolioValue,
       },
     });
 

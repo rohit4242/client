@@ -2,7 +2,7 @@
 
 import { useSelectedUser } from "@/contexts/selected-user-context";
 import { NoUserSelected } from "@/app/(admin)/_components/no-user-selected";
-import ManualTradingView from "./_components/manual-trading-view";
+import ManualTradingView from "@/components/trading/manual-trading-view";
 
 export default function ManualTradingPage() {
   const { selectedUser } = useSelectedUser();

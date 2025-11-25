@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { Exchange, ExchangeSchema } from "./exchange";
+import { Exchange, ExchangeSchema, TradingExchangeSchema } from "./exchange";
 
 // Simple enums for basic trading
 export const OrderSide = z.enum(["BUY", "SELL"]);
@@ -111,13 +111,15 @@ export type CreateOrderData = {
   order: TradingFormData;
   userId?: string;
   portfolioId?: string;
+  accountType?: string;
 }
-// same as Exchange type so use this Exchange type here
+// Use simplified TradingExchangeSchema for API requests (not full database schema)
 export const createOrderDataSchema = z.object({
-  exchange: ExchangeSchema,
+  exchange: TradingExchangeSchema,
   order: TradingFormSchema,
   userId: z.string().optional(),
   portfolioId: z.string().optional(),
+  accountType: z.enum(["spot", "margin"]).optional(),
 });
 
 // Default form values

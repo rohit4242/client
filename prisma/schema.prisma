@@ -7,6 +7,10 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// ============================================================================
+// USER & AUTHENTICATION
+// ============================================================================
+
 model User {
   id            String   @id
   name          String
@@ -74,6 +78,10 @@ model Verification {
   @@map("verification")
 }
 
+// ============================================================================
+// PORTFOLIO & EXCHANGE
+// ============================================================================
+
 model Portfolio {
   id     String @id @default(uuid())
   userId String
@@ -106,9 +114,9 @@ model Portfolio {
   largestLoss   Float @default(0) // Biggest loss
   profitFactor  Float @default(0) // Gross profit / Gross loss
 
-  // Margin trading metrics
-  marginLevel   Float @default(0) // Current margin level
-  totalBorrowed Float @default(0) // Total borrowed amount
+  // Separate spot and margin balances
+  spotBalance   Float @default(0) // Available spot balance
+  marginBalance Float @default(0) // Available margin balance (after borrowed)
 
   // Last updated
   lastCalculatedAt DateTime @default(now()) // When stats were last recalculated
@@ -116,11 +124,14 @@ model Portfolio {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
-  exchanges Exchange[]
-  positions Position[]
-  orders    Order[]
-  bots      Bot[]
+  user              User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  exchanges         Exchange[]
+  positions         Position[]
+  orders            Order[]
+  bots              Bot[]
+  marginAccounts    MarginAccount[] // Portfolio can have multiple margin accounts
+  transactions      Transaction[] // Track all deposits/withdrawals
+  balanceSnapshots  BalanceSnapshot[] // Historical balance tracking
 
   @@map("portfolio")
 }
@@ -133,11 +144,13 @@ model Exchange {
   apiSecret   String // Encrypted
   isActive    Boolean @default(true)
 
+  // Trading mode settings
   positionMode PositionMode @default(Hedge)
 
-  // total value
-  totalValue String @default("0")
+  // Total value across spot and margin
+  totalValue Float @default(0)
 
+  // Sync tracking
   lastSyncedAt DateTime @default(now())
 
   createdAt DateTime @default(now())
@@ -149,21 +162,150 @@ model Exchange {
   @@map("exchange")
 }
 
+// ============================================================================
+// MARGIN TRADING
+// ============================================================================
+
+model MarginAccount {
+  id          String @id @default(uuid())
+  portfolioId String
+
+  // Margin type
+  marginType MarginType @default(CROSS) // CROSS or ISOLATED
+
+  // For isolated margin, this is required
+  symbol String? // NULL for cross margin, required for isolated margin
+
+  // Account status
+  isActive       Boolean @default(true)
+  tradeEnabled   Boolean @default(true)
+  transferEnabled Boolean @default(true)
+
+  // Financial metrics
+  totalAssetValue    Float @default(0) // Total asset value in BTC
+  totalLiability     Float @default(0) // Total borrowed amount in BTC
+  totalNetAssetValue Float @default(0) // Net asset value (asset - liability)
+  marginLevel        Float @default(0) // Current margin level (asset/liability)
+  
+  // Risk metrics
+  marginRatio      Float @default(0) // Maintenance margin ratio
+  indexPrice       Float @default(0) // Current index price for isolated margin
+  liquidationPrice Float @default(0) // Liquidation price for isolated margin
+  
+  // Accrued interest
+  totalInterestAccrued Float @default(0) // Total interest owed
+  lastInterestUpdate   DateTime @default(now())
+
+  // Risk status
+  riskLevel   RiskLevel @default(SAFE) // SAFE, WARNING, DANGER
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  portfolio        Portfolio          @relation(fields: [portfolioId], references: [id], onDelete: Cascade)
+  borrowedAssets   BorrowedAsset[] // Multiple borrowed assets
+
+  @@unique([portfolioId, marginType, symbol]) // One margin account per type/symbol combo
+  @@map("margin_account")
+}
+
+model BorrowedAsset {
+  id              String @id @default(uuid())
+  marginAccountId String
+
+  // Asset details
+  asset        String // e.g., "USDT", "BTC", "ETH"
+  borrowed     Float  @default(0) // Total borrowed amount
+  free         Float  @default(0) // Available balance (owned)
+  interest     Float  @default(0) // Accrued interest
+  locked       Float  @default(0) // Locked in orders
+  netAsset     Float  @default(0) // Net asset (free + locked - borrowed - interest)
+  
+  // Interest tracking
+  interestRate      Float    @default(0) // Current daily interest rate
+  totalInterestPaid Float    @default(0) // Total interest paid
+  lastInterestTime  DateTime @default(now())
+
+  // Status
+  isActive Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  marginAccount MarginAccount @relation(fields: [marginAccountId], references: [id], onDelete: Cascade)
+  borrowHistory BorrowHistory[] // History of borrow/repay actions
+  repayHistory  RepayHistory[] // Separate repay history
+
+  @@unique([marginAccountId, asset]) // One record per asset per margin account
+  @@index([asset])
+  @@map("borrowed_asset")
+}
+
+model BorrowHistory {
+  id              String @id @default(uuid())
+  borrowedAssetId String
+
+  // Transaction details
+  txId            String   @unique // Transaction ID from exchange
+  amount          Float // Amount borrowed
+  asset           String // Asset borrowed
+  timestamp       DateTime @default(now())
+  
+  // Status
+  status          BorrowRepayStatus @default(SUCCESS) // SUCCESS, FAILED, PENDING
+  errorMessage    String? // Error message if failed
+
+  borrowedAsset BorrowedAsset @relation(fields: [borrowedAssetId], references: [id], onDelete: Cascade)
+
+  @@index([borrowedAssetId, timestamp])
+  @@map("borrow_history")
+}
+
+model RepayHistory {
+  id              String @id @default(uuid())
+  borrowedAssetId String
+
+  // Transaction details
+  txId            String   @unique // Transaction ID from exchange
+  amount          Float // Amount repaid
+  principal       Float // Principal amount repaid
+  interest        Float // Interest amount paid
+  asset           String // Asset repaid
+  timestamp       DateTime @default(now())
+
+  // Status
+  status          BorrowRepayStatus @default(SUCCESS) // SUCCESS, FAILED, PENDING
+  errorMessage    String? // Error message if failed
+
+  borrowedAsset BorrowedAsset @relation(fields: [borrowedAssetId], references: [id], onDelete: Cascade)
+
+  @@index([borrowedAssetId, timestamp])
+  @@map("repay_history")
+}
+
+// ============================================================================
+// TRADING POSITIONS & ORDERS
+// ============================================================================
+
 model Position {
   id          String @id @default(uuid())
   portfolioId String
 
+  // Trading type
+  accountType AccountType @default(SPOT) // SPOT or MARGIN
+  marginType  MarginType? // NULL for spot, CROSS or ISOLATED for margin
+
   // Core trade data
   symbol     String
-  side       Side
-  type       OrderOrderType
+  side       Side // LONG (BUY) or SHORT (SELL)
+  type       OrderOrderType // MARKET or LIMIT
   entryPrice Float
   quantity   Float
   entryValue Float
 
   // Current state
   currentPrice Float?
-  status       Status @default(OPEN)
+  status       PositionStatus @default(OPEN)
 
   // Exit data (nullable until closed)
   exitPrice  Float?
@@ -175,25 +317,35 @@ model Position {
   stopLoss   Float?
   takeProfit Float?
 
-  // Margin trading fields
-  isMargin       Boolean @default(false)
-  borrowedAmount Float   @default(0)
-  borrowedAsset  String?
+  // Margin trading fields (only for margin positions)
+  borrowedAmount Float   @default(0) // Total amount borrowed for this position
+  borrowedAsset  String? // Asset borrowed (e.g., "USDT")
+  leverage       Float   @default(1) // Leverage used (1 for spot)
+  
+  // Margin-specific side effects
+  sideEffectType SideEffectType @default(NO_SIDE_EFFECT) // NO_SIDE_EFFECT, MARGIN_BUY, AUTO_REPAY
+  
+  // Interest tracking for this position
+  interestPaid   Float @default(0) // Total interest paid for this position
 
   // Metadata
-  source Source  @default(MANUAL) // MANUAL, BOT
-  botId  String?
-
-  // Strategy information
+  source     Source  @default(MANUAL) // MANUAL, BOT
+  botId      String?
   strategyId String? // Unique strategy identifier
 
+  // Timestamps
+  openedAt  DateTime @default(now())
+  closedAt  DateTime?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  portfolio Portfolio @relation(fields: [portfolioId], references: [id], onDelete: Cascade)
-  bot       Bot?      @relation(fields: [botId], references: [id], onDelete: SetNull)
-  orders    Order[] // Position has many orders
+  portfolio    Portfolio     @relation(fields: [portfolioId], references: [id], onDelete: Cascade)
+  bot          Bot?          @relation(fields: [botId], references: [id], onDelete: SetNull)
+  orders       Order[] // Position has many orders
 
+  @@index([portfolioId, status])
+  @@index([botId])
+  @@index([accountType, marginType])
   @@map("position")
 }
 
@@ -202,38 +354,68 @@ model Order {
   positionId  String
   portfolioId String
 
+  // Trading type
+  accountType AccountType @default(SPOT) // SPOT or MARGIN
+  marginType  MarginType? // NULL for spot, CROSS or ISOLATED for margin
+
   // Order identification
   orderId   String // External order ID from exchange
+  clientOrderId String? // Client order ID for tracking
   symbol    String
-  type      OrderType      @default(ENTRY) // ENTRY, EXIT
+  type      OrderType      @default(ENTRY) // ENTRY, EXIT, STOP_LOSS, TAKE_PROFIT
   side      OrderSide      @default(BUY) // BUY, SELL
-  orderType OrderOrderType @default(MARKET) // MARKET, LIMIT
+  orderType OrderOrderType @default(MARKET) // MARKET, LIMIT, STOP_LOSS, STOP_LOSS_LIMIT, TAKE_PROFIT, TAKE_PROFIT_LIMIT
 
   // Order details
-  price    Float
-  quantity Float
+  price    Float // Order price
+  quantity Float // Order quantity
   value    Float // Total value (price * quantity)
+  
+  // For quote orders (buy with specific USD amount)
+  quoteOrderQty Float? // Amount in quote asset (e.g., USDT)
+
+  // Execution details
+  executedQty   Float @default(0) // Quantity filled
+  cummulativeQuoteQty Float @default(0) // Total quote quantity filled
+  avgPrice      Float? // Average execution price
+
+  // Margin-specific fields
+  sideEffectType SideEffectType @default(NO_SIDE_EFFECT) // NO_SIDE_EFFECT, MARGIN_BUY, AUTO_REPAY
+  
+  // Time in force (for limit orders)
+  timeInForce TimeInForce? // GTC, IOC, FOK
 
   // Order status
   status      OrderStatus @default(NEW)
   fillPercent Float       @default(0) // Fill percentage (0-100)
 
   // P&L for this specific order
-  pnl Float @default(0)
+  pnl        Float @default(0)
+  commission Float @default(0) // Trading commission
+  commissionAsset String? // Asset used for commission
 
   // Details if invalid order like insufficient balance, etc.
-  details String?
+  details      String?
+  errorMessage String?
 
   // Timestamps
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  transactTime DateTime? // Time when order was executed
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
 
   // Relationships
   position  Position  @relation(fields: [positionId], references: [id], onDelete: Cascade)
   portfolio Portfolio @relation(fields: [portfolioId], references: [id], onDelete: Cascade)
 
+  @@index([portfolioId, status])
+  @@index([orderId])
+  @@index([accountType, marginType])
   @@map("order")
 }
+
+// ============================================================================
+// SIGNAL BOTS
+// ============================================================================
 
 model Bot {
   id          String  @id @default(uuid())
@@ -244,28 +426,54 @@ model Bot {
   isActive    Boolean @default(true)
 
   // Trading settings
-  symbols         String[] @default([]) // ["BTCUSDT"]
-  positionPercent Float    @default(10) // % of portfolio per trade
-  orderType       String   @default("Market") // Market, Limit, Stop
-  leverage        Float?   @default(1) // Leverage multiplier
+  symbols         String[]    @default([]) // ["BTCUSDT", "ETHUSDT"]
+  positionPercent Float       @default(10) // % of portfolio per trade
+  orderType       String      @default("Market") // Market, Limit
+  
+  // Account type settings
+  accountType    AccountType    @default(SPOT) // SPOT or MARGIN
+  marginType     MarginType?    // NULL for spot, CROSS or ISOLATED for margin
+  leverage       Float          @default(1) // Leverage multiplier (1 for spot)
+  
+  // Margin-specific settings
+  sideEffectType SideEffectType @default(NO_SIDE_EFFECT) // Default side effect type for margin orders
+  autoRepay      Boolean        @default(false) // Auto repay debt when closing positions
+  maxBorrowPercent Float        @default(50) // Max % of collateral to borrow
 
   // Risk management
   stopLoss   Float? // % stop loss
   takeProfit Float? // % take profit
+  
+  // Daily/position limits
+  maxDailyTrades    Int?   // Max trades per day
+  maxOpenPositions  Int?   // Max simultaneous open positions
+  maxPositionSize   Float? // Max position size in quote asset
 
   // Custom alert messages
   enterLongMsg  String? // Custom enter long message
-  exitLongMsg   String? // Custom exit long message  
+  exitLongMsg   String? // Custom exit long message
   enterShortMsg String? // Custom enter short message
   exitShortMsg  String? // Custom exit short message
 
   // Webhook
   webhookSecret String @default(uuid())
+  webhookUrl    String? // Optional custom webhook URL
 
-  // Stats
-  totalTrades Int   @default(0)
-  winTrades   Int   @default(0)
-  totalPnl    Float @default(0)
+  // Statistics
+  totalTrades    Int   @default(0)
+  winTrades      Int   @default(0)
+  lossTrades     Int   @default(0)
+  totalPnl       Float @default(0)
+  totalVolume    Float @default(0) // Total trading volume
+  
+  // Margin-specific stats
+  totalBorrowed  Float @default(0) // Total borrowed across all trades
+  totalInterest  Float @default(0) // Total interest paid
+
+  // Performance tracking
+  lastTradeAt    DateTime?
+  bestTradeReturn Float @default(0)
+  worstTradeReturn Float @default(0)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -275,6 +483,8 @@ model Bot {
   signals   Signal[]
   positions Position[]
 
+  @@index([portfolioId, isActive])
+  @@index([accountType, marginType])
   @@map("bot")
 }
 
@@ -282,20 +492,116 @@ model Signal {
   id    String @id @default(uuid())
   botId String
 
-  action  Action
+  // Signal details
+  action  Action // ENTER_LONG, EXIT_LONG, ENTER_SHORT, EXIT_SHORT
   symbol  String
   price   Float?
   message String?
 
+  // Processing status
   processed       Boolean  @default(false)
+  processedAt     DateTime?
   error           String?
   visibleToCustomer Boolean @default(true) // Controls if customer can see this signal
+  
+  // Result tracking
+  positionId      String? // Associated position created from this signal
+  ordersFilled    Int @default(0) // Number of orders filled from this signal
+  
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
   bot Bot @relation(fields: [botId], references: [id], onDelete: Cascade)
 
+  @@index([botId, processed])
+  @@index([createdAt])
   @@map("signal")
+}
+
+// ============================================================================
+// FINANCIAL TRACKING
+// ============================================================================
+
+model Transaction {
+  id          String @id @default(uuid())
+  portfolioId String
+
+  // Transaction type
+  type TransactionType // DEPOSIT, WITHDRAWAL, TRANSFER, INTEREST_PAYMENT, LIQUIDATION
+
+  // Transaction details
+  asset       String // Asset (e.g., "USDT", "BTC")
+  amount      Float // Amount
+  accountType AccountType @default(SPOT) // SPOT or MARGIN
+  
+  // Transaction ID from exchange
+  txId        String? @unique
+  
+  // Balance impact
+  balanceBefore Float
+  balanceAfter  Float
+
+  // Status
+  status      TransactionStatus @default(COMPLETED) // PENDING, COMPLETED, FAILED
+  errorMessage String?
+
+  // Additional details
+  notes       String?
+  timestamp   DateTime @default(now())
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  portfolio Portfolio @relation(fields: [portfolioId], references: [id], onDelete: Cascade)
+
+  @@index([portfolioId, type, timestamp])
+  @@map("transaction")
+}
+
+model BalanceSnapshot {
+  id          String @id @default(uuid())
+  portfolioId String
+
+  // Snapshot time
+  timestamp DateTime @default(now())
+
+  // Spot balances
+  spotBalance        Float @default(0)
+  spotAvailable      Float @default(0)
+  spotInOrders       Float @default(0)
+
+  // Margin balances
+  marginBalance      Float @default(0)
+  marginAvailable    Float @default(0)
+  marginBorrowed     Float @default(0)
+  marginInterest     Float @default(0)
+  marginNetAsset     Float @default(0)
+  marginLevel        Float @default(0)
+
+  // Total portfolio value
+  totalValue         Float @default(0)
+  totalPnl           Float @default(0)
+  
+  // Performance metrics
+  dailyReturn        Float @default(0)
+  totalReturnPercent Float @default(0)
+
+  createdAt DateTime @default(now())
+
+  portfolio Portfolio @relation(fields: [portfolioId], references: [id], onDelete: Cascade)
+
+  @@index([portfolioId, timestamp])
+  @@map("balance_snapshot")
+}
+
+// ============================================================================
+// ENUMS
+// ============================================================================
+
+enum UserRole {
+  ADMIN
+  AGENT
+  CUSTOMER
 }
 
 enum PositionMode {
@@ -303,17 +609,25 @@ enum PositionMode {
   Hedge
 }
 
-// Simple Enums
-enum Side {
-  LONG
-  SHORT
+enum AccountType {
+  SPOT
+  MARGIN
 }
 
-enum Status {
+enum MarginType {
+  CROSS // Cross margin
+  ISOLATED // Isolated margin
+}
+
+enum Side {
+  LONG // BUY position
+  SHORT // SELL position
+}
+
+enum PositionStatus {
   OPEN
   CLOSED
   CANCELED
-  MARKET_CLOSED
   FAILED
 }
 
@@ -329,10 +643,11 @@ enum Source {
   BOT
 }
 
-// Order-specific Enums
 enum OrderType {
   ENTRY
   EXIT
+  STOP_LOSS
+  TAKE_PROFIT
 }
 
 enum OrderSide {
@@ -343,20 +658,59 @@ enum OrderSide {
 enum OrderOrderType {
   MARKET
   LIMIT
+  STOP_LOSS
+  STOP_LOSS_LIMIT
+  TAKE_PROFIT
+  TAKE_PROFIT_LIMIT
 }
 
 enum OrderStatus {
   NEW
   PENDING
   FILLED
+  PARTIALLY_FILLED
   COMPLETED
   CANCELED
   REJECTED
-  PARTIALLY_FILLED
+  EXPIRED
 }
 
-enum UserRole {
-  ADMIN
-  AGENT
-  CUSTOMER
+enum SideEffectType {
+  NO_SIDE_EFFECT // No automatic borrow or repay
+  MARGIN_BUY // Automatically borrow if balance is insufficient
+  AUTO_REPAY // Automatically repay debt when selling
+  AUTO_BORROW_REPAY // Combination of both
+}
+
+enum TimeInForce {
+  GTC // Good Till Cancel
+  IOC // Immediate or Cancel
+  FOK // Fill or Kill
+}
+
+enum RiskLevel {
+  SAFE // Margin level > 2.0
+  WARNING // Margin level 1.3 - 2.0
+  DANGER // Margin level 1.1 - 1.3
+}
+
+enum BorrowRepayStatus {
+  SUCCESS
+  FAILED
+  PENDING
+}
+
+enum TransactionType {
+  DEPOSIT
+  WITHDRAWAL
+  TRANSFER
+  INTEREST_PAYMENT
+  COMMISSION
+}
+
+enum TransactionStatus {
+  PENDING
+  COMPLETED
+  FAILED
+  CANCELED
 }

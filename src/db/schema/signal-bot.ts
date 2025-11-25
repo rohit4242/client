@@ -15,6 +15,13 @@ export const createSignalBotSchema = z.object({
   portfolioPercent: z.number().min(1, "Portfolio percentage must be at least 1%").max(100, "Portfolio percentage cannot exceed 100%").default(20),
   leverage: z.number().min(1).max(125).default(1),
   
+  // Account Type - Spot or Margin
+  accountType: z.enum(["SPOT", "MARGIN"]).default("SPOT"),
+  marginType: z.enum(["CROSS"]).default("CROSS").optional(), // For future ISOLATED support
+  sideEffectType: z.enum(["NO_SIDE_EFFECT", "MARGIN_BUY", "AUTO_REPAY", "AUTO_BORROW_REPAY"]).default("NO_SIDE_EFFECT"),
+  autoRepay: z.boolean().default(false),
+  maxBorrowPercent: z.number().min(1).max(100).default(50),
+  
   // Exit Strategies - Simple
   stopLoss: z.number().min(0.1).max(50).nullable().optional(),
   takeProfit: z.number().min(0.1).max(100).nullable().optional(),
@@ -99,6 +106,20 @@ export type CreateBotTradeData = z.infer<typeof createBotTradeSchema>;
 export const ORDER_TYPE_OPTIONS = [
   { label: "Market Order", value: "Market" },
   { label: "Limit Order", value: "Limit" },
+] as const;
+
+// Account Type Options
+export const ACCOUNT_TYPE_OPTIONS = [
+  { label: "Spot Trading", value: "SPOT" },
+  { label: "Margin Trading", value: "MARGIN" },
+] as const;
+
+// Side Effect Type Options (for margin trading)
+export const SIDE_EFFECT_TYPE_OPTIONS = [
+  { label: "No Side Effect", value: "NO_SIDE_EFFECT", description: "Normal order without auto-borrow/repay" },
+  { label: "Margin Buy", value: "MARGIN_BUY", description: "Auto-borrow if balance insufficient" },
+  { label: "Auto Repay", value: "AUTO_REPAY", description: "Auto-repay debt when selling" },
+  { label: "Auto Borrow & Repay", value: "AUTO_BORROW_REPAY", description: "Automatically borrow and repay as needed" },
 ] as const;
 
 // Popular trading symbols for signal bots

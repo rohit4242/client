@@ -18,7 +18,7 @@ import { formatCurrency } from "@/lib/mock-data";
 import { toast } from "sonner";
 import axios from "axios";
 import { TrendPrice } from "@/components/ui/live-price";
-import { useLivePrices } from "@/hooks/use-live-price";
+import { useLivePrices } from "@/hooks/trading/use-live-price";
 import {
   AlertDialog,
   AlertDialogAction,

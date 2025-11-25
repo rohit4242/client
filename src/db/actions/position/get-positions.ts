@@ -1,9 +1,9 @@
 import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
 import db from "@/db";
-import { PositionStatus, PositionData, PositionOrder } from "@/types/position";
+import {  PositionData, PositionOrder, PositionType } from "@/types/position";
 import {
-  Status,
+  PositionStatus,
   Side,
   OrderStatus,
   OrderSide,
@@ -115,38 +115,31 @@ export async function getRawPositions(filters?: {
   }
 }
 
-function mapPositionStatusToDatabase(status: PositionStatus): Status {
+function mapPositionStatusToDatabase(status: PositionStatus): PositionStatus {
   switch (status) {
     case "OPEN":
-      return Status.OPEN;
+      return PositionStatus.OPEN;
     case "CLOSED":
-      return Status.CLOSED;
+      return PositionStatus.CLOSED;
     case "CANCELED":
-      return Status.CANCELED;
-    case "MARKET_CLOSED":
-      return Status.MARKET_CLOSED;
+      return PositionStatus.CANCELED;
     case "FAILED":
-      return Status.FAILED;
+      return PositionStatus.FAILED;
     default:
-      return Status.OPEN;
+      return PositionStatus.OPEN;
   }
 }
 
-function mapDatabaseStatusToPositionStatus(dbStatus: Status): PositionStatus {
+function mapDatabaseStatusToPositionStatus(dbStatus: PositionStatus): PositionStatus {
   switch (dbStatus) {
-    case Status.OPEN:
-      return "OPEN";
-    case Status.CLOSED:
-      return "CLOSED";
-    case Status.CANCELED:
-      return "CANCELED";
-    case Status.MARKET_CLOSED:
-      return "MARKET_CLOSED";
-    case Status.FAILED:
-      return "FAILED";
-
-    default:
-      return "OPEN";
+    case PositionStatus.OPEN:
+      return PositionStatus.OPEN;
+    case PositionStatus.CLOSED:
+      return PositionStatus.CLOSED;
+    case PositionStatus.CANCELED:
+      return PositionStatus.CANCELED;
+    case PositionStatus.FAILED:
+      return PositionStatus.FAILED;
   }
 }
 
@@ -173,7 +166,7 @@ interface DatabasePosition {
   quantity: number;
   entryValue: number;
   currentPrice: number | null;
-  status: Status;
+  status: PositionStatus;
   exitPrice: number | null;
   exitValue: number | null;
   pnl: number;
@@ -196,7 +189,7 @@ interface DatabasePosition {
       apiSecret: string;
       isActive: boolean;
       positionMode: "One_Way" | "Hedge";
-      totalValue: string;
+      totalValue: number;
       lastSyncedAt: Date;
     }>;
   };
@@ -209,7 +202,7 @@ function transformDatabaseOrderToPositionOrder(
 ): PositionOrder {
   return {
     id: order.id,
-    type: order.type,
+    type: order.type as OrderType,
     side: order.side,
     price: order.price,
     amount: order.quantity,
@@ -242,8 +235,8 @@ function transformDatabasePositionToPositionData(
 ): PositionData {
   // Calculate current values
   const isClosedPosition =
-    position.status === Status.CLOSED ||
-    position.status === Status.MARKET_CLOSED;
+    position.status === PositionStatus.CLOSED ||
+    position.status === PositionStatus.CANCELED;
   const currentPrice = isClosedPosition
     ? position.exitPrice ?? position.entryPrice
     : position.currentPrice ?? position.entryPrice;
@@ -286,7 +279,7 @@ function transformDatabasePositionToPositionData(
     status: mapDatabaseStatusToPositionStatus(position.status),
     entryTime: position.createdAt,
     exitTime:
-      position.status === Status.CLOSED ? position.updatedAt : undefined,
+      position.status === PositionStatus.CLOSED ? position.updatedAt : undefined,
     lastUpdated: position.updatedAt,
     exchange: position.portfolio?.exchanges?.[0]?.name || "UNKNOWN",
     strategy: {
@@ -309,8 +302,7 @@ function transformDatabasePositionToPositionData(
             apiSecret: position.portfolio.exchanges[0].apiSecret,
             isActive: position.portfolio.exchanges[0].isActive,
             positionMode: position.portfolio.exchanges[0].positionMode,
-            totalValue:
-              parseFloat(position.portfolio.exchanges[0].totalValue) || 0,
+            totalValue: position.portfolio.exchanges[0].totalValue || 0,
             lastSyncedAt:
               position.portfolio.exchanges[0].lastSyncedAt.toISOString(),
             createdAt: position.portfolio.exchanges[0].createdAt.toISOString(),

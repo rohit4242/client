@@ -1,6 +1,12 @@
 import db from "@/db";
 import type { Bot, Signal } from "@prisma/client";
 import { validatePositionParams } from "./signal-validator";
+import {
+  executeMarginEnterLong,
+  executeMarginExitLong,
+  executeMarginEnterShort,
+  executeMarginExitShort,
+} from "./margin-trade-executor";
 
 /**
  * Trade execution context
@@ -11,7 +17,7 @@ export interface TradeExecutionContext {
       id: string;
       apiKey: string;
       apiSecret: string;
-      totalValue: string;
+      totalValue: number | null;
       isActive: boolean;
     };
     portfolio: {
@@ -44,6 +50,12 @@ export async function executeEnterLong(
 ): Promise<TradeExecutionResult> {
   const { bot, signal, currentPrice } = context;
 
+  // Route to margin executor if bot is configured for margin trading
+  if (bot.accountType === 'MARGIN') {
+    console.log('Routing to margin executor for ENTER_LONG');
+    return executeMarginEnterLong(context);
+  }
+
   try {
     console.log(`Executing ENTER_LONG for ${signal.symbol}`);
 
@@ -67,7 +79,7 @@ export async function executeEnterLong(
     }
 
     // Calculate position size based on portfolio percentage
-    const portfolioValue = parseFloat(bot.exchange.totalValue) || 0;
+    const portfolioValue = bot.exchange.totalValue || 0;
     
     if (portfolioValue <= 0) {
       throw new Error("Invalid portfolio value. Please sync your exchange.");
@@ -175,6 +187,12 @@ export async function executeExitLong(
   context: TradeExecutionContext
 ): Promise<TradeExecutionResult> {
   const { bot, signal, currentPrice } = context;
+
+  // Route to margin executor if bot is configured for margin trading
+  if (bot.accountType === 'MARGIN') {
+    console.log('Routing to margin executor for EXIT_LONG');
+    return executeMarginExitLong(context);
+  }
 
   try {
     console.log(`Executing EXIT_LONG for ${signal.symbol}`);
@@ -288,6 +306,12 @@ export async function executeEnterShort(
 ): Promise<TradeExecutionResult> {
   const { bot, signal, currentPrice } = context;
 
+  // Route to margin executor if bot is configured for margin trading
+  if (bot.accountType === 'MARGIN') {
+    console.log('Routing to margin executor for ENTER_SHORT');
+    return executeMarginEnterShort(context);
+  }
+
   try {
     console.log(`Executing ENTER_SHORT for ${signal.symbol}`);
 
@@ -311,7 +335,7 @@ export async function executeEnterShort(
     }
 
     // Calculate position size based on portfolio percentage
-    const portfolioValue = parseFloat(bot.exchange.totalValue) || 0;
+    const portfolioValue = bot.exchange.totalValue || 0;
     
     if (portfolioValue <= 0) {
       throw new Error("Invalid portfolio value. Please sync your exchange.");
@@ -419,6 +443,12 @@ export async function executeExitShort(
   context: TradeExecutionContext
 ): Promise<TradeExecutionResult> {
   const { bot, signal, currentPrice } = context;
+
+  // Route to margin executor if bot is configured for margin trading
+  if (bot.accountType === 'MARGIN') {
+    console.log('Routing to margin executor for EXIT_SHORT');
+    return executeMarginExitShort(context);
+  }
 
   try {
     console.log(`Executing EXIT_SHORT for ${signal.symbol}`);

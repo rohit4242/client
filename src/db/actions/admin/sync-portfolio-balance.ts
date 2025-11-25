@@ -42,7 +42,7 @@ export async function syncPortfolioBalance(userId: string): Promise<boolean> {
     }
 
     // Get the total value from the exchange
-    const totalValue = parseFloat(activeExchange.totalValue) || 0;
+    const totalValue = activeExchange.totalValue || 0;
 
     // Only update if initialBalance is 0 (not yet set)
     if (portfolio.initialBalance === 0 && totalValue > 0) {

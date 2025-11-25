@@ -14,6 +14,13 @@ export interface SignalBot {
   portfolioPercent: number;
   leverage?: number | null;
   
+  // Account Type - Spot or Margin
+  accountType: "SPOT" | "MARGIN";
+  marginType?: "CROSS" | null;
+  sideEffectType: string; // NO_SIDE_EFFECT, MARGIN_BUY, AUTO_REPAY, AUTO_BORROW_REPAY
+  autoRepay: boolean;
+  maxBorrowPercent: number;
+  
   // Exit Strategies - Simple
   stopLoss?: number | null;
   takeProfit?: number | null;
@@ -30,8 +37,12 @@ export interface SignalBot {
   
   // Statistics
   totalTrades: number;
-  winningTrades: number;
+  winTrades: number;
+  lossTrades: number;
   totalPnl: number;
+  totalVolume: number;
+  totalBorrowed: number;
+  totalInterest: number;
   
   // Exchange details (populated when needed)
   exchange?: {
@@ -61,6 +72,13 @@ export interface CreateSignalBotData {
   // Amount per Trade
   portfolioPercent: number;
   leverage?: number;
+  
+  // Account Type
+  accountType?: "SPOT" | "MARGIN";
+  marginType?: "CROSS";
+  sideEffectType?: string;
+  autoRepay?: boolean;
+  maxBorrowPercent?: number;
   
   // Exit Strategies
   stopLoss?: number | null;

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCryptoPrice } from '@/hooks/use-crypto-price';
+import { useCryptoPrice } from '@/hooks/trading/use-crypto-price';
 import { useState, useEffect } from 'react';
 import { Card } from '@/components/ui/card';
 

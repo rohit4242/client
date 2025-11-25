@@ -1,6 +1,6 @@
 "use client";
 
-import { useLivePrice } from "@/hooks/use-live-price";
+import { useLivePrice } from "@/hooks/trading/use-live-price";
 import { cn } from "@/lib/utils";
 
 interface LivePriceProps {

@@ -2,19 +2,19 @@ import { Exchange } from "./exchange";
 
 // Database-aligned types (matching Prisma schema)
 export type PositionSide = "LONG" | "SHORT";
-export type PositionStatus = "OPEN" | "CLOSED" | "CANCELED" | "MARKET_CLOSED" | "FAILED";
+export type PositionStatus = "OPEN" | "CLOSED" | "CANCELED" | "FAILED";
 export type PositionType = "MARKET" | "LIMIT";
 export type PositionSource = "MANUAL" | "BOT";
 
 // Order types (matching Prisma schema)
-export type OrderType = "ENTRY" | "EXIT";
+export type OrderType = "ENTRY" | "EXIT" | "STOP_LOSS" | "TAKE_PROFIT";
 export type OrderSide = "BUY" | "SELL";
 export type OrderOrderType = "MARKET" | "LIMIT";
 export type OrderStatus = "NEW" | "PENDING" | "FILLED" | "COMPLETED" | "CANCELED" | "REJECTED" | "PARTIALLY_FILLED";
 
 // UI-friendly types for display
 export type PositionSideDisplay = "Long" | "Short";
-export type PositionStatusDisplay = "ENTERED" | "OPEN" | "CLOSED" | "CANCELED" | "MARKET_CLOSED" | "FAILED" | "PENDING" | "PARTIALLY_FILLED";
+export type PositionStatusDisplay = "ENTERED" | "OPEN" | "CLOSED" | "CANCELED" | "FAILED" | "PENDING" | "PARTIALLY_FILLED";
 
 // Database position order (matching Prisma schema)
 export interface DatabasePositionOrder {

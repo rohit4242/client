@@ -40,7 +40,7 @@ export function PositionActions({ position, onAction, disabled = false }: Positi
   const [showCloseDialog, setShowCloseDialog] = useState(false);
   
   // Check if position is closed
-  const isClosedPosition = position.status === "CLOSED" || position.status === "MARKET_CLOSED";
+  const isClosedPosition = position.status === "CLOSED"
 
 
   const handleClosePosition = async () => {

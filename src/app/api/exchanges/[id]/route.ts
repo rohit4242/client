@@ -50,7 +50,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     const updatedExchange = await db.exchange.update({
       where: { id },
       data: {
-        totalValue: totalPortfolioValue.toString(),
+        totalValue: totalPortfolioValue,
         lastSyncedAt: new Date(),
       },
     });

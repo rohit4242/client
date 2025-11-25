@@ -2,8 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { headers } from 'next/headers';
 import { auth } from '@/lib/auth';
 import db from '@/db';
-import { getMarginAccount } from '@/lib/binance-margin';
-import { calculateMarginLevel, getRiskLevel, isLiquidationRisk } from '@/lib/margin-utils';
+import { getMarginAccount } from '@/lib/margin/binance-margin';
+import { calculateMarginLevel, getRiskLevel, isLiquidationRisk } from '@/lib/margin/margin-utils';
 
 /**
  * GET /api/margin/account
