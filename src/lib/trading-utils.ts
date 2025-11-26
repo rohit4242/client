@@ -55,7 +55,7 @@ export const getPriceBySymbols = async (
 ) => {
   const client = new Spot({ configurationRestAPI });
   const response = await client.restAPI.tickerPrice({
-    symbols: symbols,
+    symbols: JSON.parse(JSON.stringify(symbols)),
   });
   const prices = await response.data();
   console.log("prices from the getPriceBySymbols function: ", prices);
@@ -139,7 +139,12 @@ export const calculateTotalUSDValue = async (
         .map((balance) => `${balance.asset}USDT`) || []
     ),
   ];
-  const prices = await getPriceBySymbols(configurationRestAPI, uniqueAssets);
+
+  // If there are no non-stablecoin assets, just calculate from balances without fetching prices
+  let prices: AssetPrice[] = [];
+  if (uniqueAssets.length > 0) {
+    prices = (await getPriceBySymbols(configurationRestAPI, uniqueAssets)) as AssetPrice[];
+  }
 
   const totalPortfolioValue = calculateTotalPortfolioValue(
     balances || [],
