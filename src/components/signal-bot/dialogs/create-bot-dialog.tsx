@@ -453,6 +453,66 @@ export function CreateSignalBotDialog({ open, onOpenChange, onSuccess }: CreateS
                       </>
                     )}
 
+                    {/* Portfolio Value Preview */}
+                    {form.watch("exchangeId") && (
+                      <Card className="bg-blue-50 dark:bg-blue-950 border-blue-200 dark:border-blue-800">
+                        <CardHeader className="pb-3">
+                          <CardTitle className="text-sm text-blue-700 dark:text-blue-300">Portfolio Overview</CardTitle>
+                        </CardHeader>
+                        <CardContent className="space-y-3">
+                          {(() => {
+                            const selectedExchange = activeExchanges.find(e => e.id === form.watch("exchangeId"));
+                            if (!selectedExchange) return null;
+                            
+                            const accountType = form.watch("accountType") || "SPOT";
+                            const portfolioPercent = form.watch("portfolioPercent") || 0;
+                            const leverage = form.watch("leverage") || 1;
+                            
+                            const spotValue = selectedExchange.spotValue || 0;
+                            const marginValue = selectedExchange.marginValue || 0;
+                            const activeValue = accountType === "SPOT" ? spotValue : marginValue;
+                            const positionValue = (activeValue * portfolioPercent) / 100;
+                            const totalPositionSize = positionValue * leverage;
+                            
+                            return (
+                              <div className="space-y-2 text-sm">
+                                <div className="flex justify-between text-blue-600 dark:text-blue-400">
+                                  <span>Spot Balance:</span>
+                                  <span className="font-mono">${spotValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                                </div>
+                                <div className="flex justify-between text-blue-600 dark:text-blue-400">
+                                  <span>Margin Balance:</span>
+                                  <span className="font-mono">${marginValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                                </div>
+                                <div className="pt-2 border-t border-blue-200 dark:border-blue-800">
+                                  <div className="flex justify-between text-blue-800 dark:text-blue-200 font-medium">
+                                    <span>Using ({accountType}):</span>
+                                    <span className="font-mono">${activeValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                                  </div>
+                                  <div className="flex justify-between text-blue-700 dark:text-blue-300 text-xs mt-1">
+                                    <span>Position Size ({portfolioPercent}%):</span>
+                                    <span className="font-mono">${positionValue.toFixed(2)}</span>
+                                  </div>
+                                  {leverage > 1 && (
+                                    <div className="flex justify-between text-blue-700 dark:text-blue-300 text-xs mt-1">
+                                      <span>With {leverage}x Leverage:</span>
+                                      <span className="font-mono">${totalPositionSize.toFixed(2)}</span>
+                                    </div>
+                                  )}
+                                </div>
+                                {activeValue <= 0 && (
+                                  <div className="pt-2 text-xs text-amber-600 dark:text-amber-400 flex items-start space-x-1">
+                                    <Shield className="w-3 h-3 mt-0.5 flex-shrink-0" />
+                                    <span>⚠️ Low or zero balance in {accountType} account. Please add funds or select a different account type.</span>
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })()}
+                        </CardContent>
+                      </Card>
+                    )}
+
                     {form.watch("accountType") === "MARGIN" && (
                       <div className="bg-amber-50 dark:bg-amber-950 p-4 rounded-lg">
                         <div className="flex items-start space-x-2">

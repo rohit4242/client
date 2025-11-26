@@ -147,8 +147,10 @@ model Exchange {
   // Trading mode settings
   positionMode PositionMode @default(Hedge)
 
-  // Total value across spot and margin
-  totalValue Float @default(0)
+  // Portfolio values by account type
+  spotValue Float @default(0)     // Value of spot account assets in USD
+  marginValue Float @default(0)   // Net value of margin account in USD
+  totalValue Float @default(0)    // Total value (spotValue + marginValue) - kept for backward compatibility
 
   // Sync tracking
   lastSyncedAt DateTime @default(now())

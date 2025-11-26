@@ -6,7 +6,9 @@ export interface Exchange {
   apiSecret: string;
   isActive: boolean;
   positionMode: "One_Way" | "Hedge";
-  totalValue: number | null; // Number from Prisma
+  spotValue: number | null; // Value of spot account assets in USD
+  marginValue: number | null; // Net value of margin account in USD
+  totalValue: number | null; // Total value (spotValue + marginValue) - kept for backward compatibility
   lastSyncedAt: string | null; // Date converted to ISO string for client compatibility
   createdAt: string; // Date converted to ISO string for client compatibility
   updatedAt: string; // Date converted to ISO string for client compatibility

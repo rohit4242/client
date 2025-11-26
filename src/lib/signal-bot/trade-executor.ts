@@ -17,6 +17,8 @@ export interface TradeExecutionContext {
       id: string;
       apiKey: string;
       apiSecret: string;
+      spotValue: number | null;
+      marginValue: number | null;
       totalValue: number | null;
       isActive: boolean;
     };
@@ -79,7 +81,9 @@ export async function executeEnterLong(
     }
 
     // Calculate position size based on portfolio percentage
-    const portfolioValue = bot.exchange.totalValue || 0;
+    // For SPOT bots, use spotValue from the exchange
+    // Fallback to totalValue if spotValue is not available (migration not run or exchange not synced)
+    const portfolioValue = bot.exchange.spotValue || bot.exchange.totalValue || 0;
     
     if (portfolioValue <= 0) {
       throw new Error("Invalid portfolio value. Please sync your exchange.");
@@ -349,7 +353,9 @@ export async function executeEnterShort(
     }
 
     // Calculate position size based on portfolio percentage
-    const portfolioValue = bot.exchange.totalValue || 0;
+    // For SPOT bots, use spotValue from the exchange
+    // Fallback to totalValue if spotValue is not available (migration not run or exchange not synced)
+    const portfolioValue = bot.exchange.spotValue || bot.exchange.totalValue || 0;
     
     if (portfolioValue <= 0) {
       throw new Error("Invalid portfolio value. Please sync your exchange.");

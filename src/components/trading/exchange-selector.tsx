@@ -156,6 +156,26 @@ export function ExchangeSelector({
               </span>
             </div>
 
+            {/* Spot Balance */}
+            <div className="flex items-center justify-between">
+              <span className="text-xs text-muted-foreground">
+                Spot Balance
+              </span>
+              <span className="text-xs font-mono">
+                ${selectedExchange.spotValue?.toLocaleString() ?? "0"}
+              </span>
+            </div>
+
+            {/* Margin Balance */}
+            <div className="flex items-center justify-between">
+              <span className="text-xs text-muted-foreground">
+                Margin Balance
+              </span>
+              <span className="text-xs font-mono">
+                ${selectedExchange.marginValue?.toLocaleString() ?? "0"}
+              </span>
+            </div>
+
             {/* Additional Info */}
             <div className="pt-2 border-t border-border/50">
               <div className="flex items-center justify-between text-xs text-muted-foreground">

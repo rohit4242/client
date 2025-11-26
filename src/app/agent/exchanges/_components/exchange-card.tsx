@@ -97,8 +97,15 @@ export function ExchangeCard({
         </div>
       </TableCell>
       <TableCell>
-        <div className="font-medium">
-          {formatCurrency(exchange.totalValue)}
+        <div className="space-y-1">
+          <div className="font-medium">
+            {formatCurrency(exchange.totalValue)}
+          </div>
+          <div className="flex gap-2 text-xs text-muted-foreground">
+            <span>Spot: {formatCurrency(exchange.spotValue)}</span>
+            <span>•</span>
+            <span>Margin: {formatCurrency(exchange.marginValue)}</span>
+          </div>
         </div>
       </TableCell>
       <TableCell className="text-sm text-muted-foreground">

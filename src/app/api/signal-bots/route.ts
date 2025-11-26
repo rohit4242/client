@@ -37,6 +37,8 @@ export async function GET() {
             id: true,
             name: true,
             isActive: true,
+            spotValue: true,
+            marginValue: true,
             totalValue: true,
           },
         },

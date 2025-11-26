@@ -2,6 +2,7 @@ import { configurationRestAPI } from "@/types/binance";
 import { Spot } from "@binance/spot";
 import { extractBaseAsset } from "@/lib/utils";
 import { AssetPrice } from "@/types/trading";
+import { getMarginAccount } from "@/lib/margin/binance-margin";
 
 export const getBalance = async (
   configurationRestAPI: configurationRestAPI
@@ -121,9 +122,51 @@ export const calculateTotalPortfolioValue = (
   return totalValue;
 };
 
+/**
+ * Calculate margin account value in USD
+ * Returns the net asset value of the margin account
+ */
+export const calculateMarginUSDValue = async (
+  configurationRestAPI: configurationRestAPI
+): Promise<number> => {
+  try {
+    const marginAccount = await getMarginAccount(configurationRestAPI);
+    
+    // Get the net asset value in BTC (totalNetAssetOfBtc includes borrowed amounts)
+    const netAssetBTC = parseFloat(marginAccount.totalNetAssetOfBtc || "0");
+    
+    if (netAssetBTC === 0) {
+      return 0;
+    }
+
+    // Convert BTC value to USD
+    const btcPrice = await getPriceBySymbol(configurationRestAPI, "BTCUSDT");
+    const btcPriceUSD = parseFloat(btcPrice.price);
+    
+    const marginValueUSD = netAssetBTC * btcPriceUSD;
+    
+    console.log("Margin account value calculation:", {
+      netAssetBTC,
+      btcPriceUSD,
+      marginValueUSD
+    });
+    
+    return marginValueUSD;
+  } catch (error) {
+    console.error("Error calculating margin USD value:", error);
+    // If margin account doesn't exist or API fails, return 0
+    return 0;
+  }
+};
+
+/**
+ * Calculate total portfolio value separated by account type
+ * Returns spot value, margin value, and total value in USD
+ */
 export const calculateTotalUSDValue = async (
   configurationRestAPI: configurationRestAPI
-) => {
+): Promise<{ spotValue: number; marginValue: number; totalValue: number }> => {
+  // Calculate SPOT account value
   const balances = await getBalance(configurationRestAPI);
 
   const uniqueAssets = [
@@ -146,10 +189,18 @@ export const calculateTotalUSDValue = async (
     prices = (await getPriceBySymbols(configurationRestAPI, uniqueAssets)) as AssetPrice[];
   }
 
-  const totalPortfolioValue = calculateTotalPortfolioValue(
+  const spotValue = calculateTotalPortfolioValue(
     balances || [],
     prices
   );
 
-  return totalPortfolioValue;
+  // Calculate MARGIN account value
+  const marginValue = await calculateMarginUSDValue(configurationRestAPI);
+
+  // Calculate total value
+  const totalValue = spotValue + marginValue;
+
+  console.log("Portfolio values:", { spotValue, marginValue, totalValue });
+
+  return { spotValue, marginValue, totalValue };
 };

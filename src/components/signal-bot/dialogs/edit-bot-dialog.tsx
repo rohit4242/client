@@ -49,6 +49,7 @@ import {
 } from "@/db/schema/signal-bot";
 import { SignalBot } from "@/types/signal-bot";
 import { Exchange } from "@/types/exchange";
+import { Badge } from "@/components/ui/badge";
 
 interface EditSignalBotDialogProps {
   bot: SignalBot;
@@ -459,6 +460,82 @@ export function EditSignalBotDialog({ bot, open, onOpenChange, onSuccess }: Edit
                       </div>
                     </div>
                   </>
+                )}
+
+                {/* Portfolio Status Preview */}
+                {form.watch("exchangeId") && bot.exchange && (
+                  <Card className="bg-green-50 dark:bg-green-950 border-green-200 dark:border-green-800">
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-sm text-green-700 dark:text-green-300">Current Portfolio Status</CardTitle>
+                      <CardDescription className="text-xs">
+                        Shows the portfolio value your bot will use based on current settings
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-3">
+                      {(() => {
+                        const accountType = form.watch("accountType") || "SPOT";
+                        const portfolioPercent = form.watch("portfolioPercent") || 0;
+                        const leverage = form.watch("leverage") || 1;
+                        
+                        const spotValue = bot.exchange.spotValue || 0;
+                        const marginValue = bot.exchange.marginValue || 0;
+                        const activeValue = accountType === "SPOT" ? spotValue : marginValue;
+                        const positionValue = (activeValue * portfolioPercent) / 100;
+                        const totalPositionSize = positionValue * leverage;
+                        
+                        const originalAccountType = bot.accountType || "SPOT";
+                        const accountTypeChanged = accountType !== originalAccountType;
+                        
+                        return (
+                          <div className="space-y-2 text-sm">
+                            <div className="flex justify-between text-green-600 dark:text-green-400">
+                              <span>Spot Balance:</span>
+                              <span className="font-mono">${spotValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                            </div>
+                            <div className="flex justify-between text-green-600 dark:text-green-400">
+                              <span>Margin Balance:</span>
+                              <span className="font-mono">${marginValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                            </div>
+                            <div className="pt-2 border-t border-green-200 dark:border-green-800">
+                              <div className="flex justify-between text-green-800 dark:text-green-200 font-medium">
+                                <span>
+                                  Using ({accountType}):
+                                  {accountTypeChanged && (
+                                    <Badge variant="outline" className="ml-2 text-xs border-amber-300 text-amber-700 dark:text-amber-300">
+                                      Changed
+                                    </Badge>
+                                  )}
+                                </span>
+                                <span className="font-mono">${activeValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                              </div>
+                              <div className="flex justify-between text-green-700 dark:text-green-300 text-xs mt-1">
+                                <span>Position Size ({portfolioPercent}%):</span>
+                                <span className="font-mono">${positionValue.toFixed(2)}</span>
+                              </div>
+                              {leverage > 1 && (
+                                <div className="flex justify-between text-green-700 dark:text-green-300 text-xs mt-1">
+                                  <span>With {leverage}x Leverage:</span>
+                                  <span className="font-mono">${totalPositionSize.toFixed(2)}</span>
+                                </div>
+                              )}
+                            </div>
+                            {accountTypeChanged && (
+                              <div className="pt-2 text-xs text-amber-600 dark:text-amber-400 flex items-start space-x-1">
+                                <Shield className="w-3 h-3 mt-0.5 flex-shrink-0" />
+                                <span>⚠️ Changing account type will affect which portfolio balance is used for trading.</span>
+                              </div>
+                            )}
+                            {activeValue <= 0 && (
+                              <div className="pt-2 text-xs text-red-600 dark:text-red-400 flex items-start space-x-1">
+                                <Shield className="w-3 h-3 mt-0.5 flex-shrink-0" />
+                                <span>⚠️ Low or zero balance in {accountType} account. Please add funds or change account type.</span>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })()}
+                    </CardContent>
+                  </Card>
                 )}
               </TabsContent>
 

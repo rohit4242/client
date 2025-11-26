@@ -27,6 +27,7 @@ import {
 
 import { SignalBot } from "@/types/signal-bot";
 import { useLivePrice } from "@/hooks/trading/use-live-price";
+import { getBotPortfolioValue } from "@/lib/signal-bot/portfolio-utils";
 
 interface PositionConfirmationDialogProps {
   bot: SignalBot;
@@ -114,10 +115,19 @@ export function PositionConfirmationDialog({
   };
 
   // Calculate potential position details
-  // Use exchange totalValue if available, otherwise fallback to placeholder
-  const portfolioValue = bot.exchange?.totalValue ? parseFloat(bot.exchange.totalValue.toString()) : 10000;
+  // Use appropriate portfolio value based on account type (spot or margin)
+  let portfolioValue = getBotPortfolioValue(bot) || 0;
+  
+  // Fallback: If spotValue/marginValue are not set (migration not run or exchange not synced),
+  // use totalValue as fallback
+  if (portfolioValue === 0 && bot.exchange?.totalValue) {
+    portfolioValue = parseFloat(bot.exchange.totalValue.toString());
+  }
+  
   const positionValue = (portfolioValue * bot.portfolioPercent) / 100;
   const quantity = displayPrice ? positionValue / displayPrice : 0;
+  const accountTypeLabel = bot.accountType === 'SPOT' ? 'Spot' : 'Margin';
+  const needsSync = !bot.exchange?.spotValue && !bot.exchange?.marginValue && bot.exchange?.totalValue;
 
   // Calculate stop loss and take profit prices
   const stopLossPrice = displayPrice && bot.stopLoss ? {
@@ -132,7 +142,7 @@ export function PositionConfirmationDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl">
+      <DialogContent className="max-w-2xl max-h-[85vh]">
         <DialogHeader>
           <DialogTitle className="flex items-center space-x-2">
             <CheckCircle2 className="h-5 w-5 text-green-600" />
@@ -143,7 +153,59 @@ export function PositionConfirmationDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-6">
+        <div className="max-h-[calc(85vh-8rem)] overflow-y-auto pr-2">
+          <div className="space-y-6">
+          {/* Portfolio Information */}
+          <Card className="bg-purple-50 dark:bg-purple-950 border-purple-200 dark:border-purple-800">
+            <CardHeader className="pb-3">
+              <CardTitle className="flex items-center space-x-2 text-lg text-purple-700 dark:text-purple-300">
+                <Info className="h-5 w-5" />
+                <span>Portfolio Information</span>
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2">
+              <div className="space-y-2 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-purple-600 dark:text-purple-400">Account Type:</span>
+                  <Badge variant="outline" className="border-purple-300 text-purple-700 dark:text-purple-300">
+                    {accountTypeLabel} Trading
+                  </Badge>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-purple-600 dark:text-purple-400">Using Balance:</span>
+                  <span className="font-mono font-medium text-purple-900 dark:text-purple-100">
+                    ${portfolioValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    {needsSync && (
+                      <span className="text-xs text-purple-500 dark:text-purple-400 ml-1">(Total)</span>
+                    )}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-purple-600 dark:text-purple-400">Position ({bot.portfolioPercent}%):</span>
+                  <span className="font-mono font-medium text-purple-900 dark:text-purple-100">
+                    ${positionValue.toFixed(2)}
+                  </span>
+                </div>
+                {bot.exchange && (
+                  <div className="pt-2 border-t border-purple-200 dark:border-purple-800 text-xs text-purple-500 dark:text-purple-400">
+                    <div className="flex justify-between">
+                      <span>Total Portfolio:</span>
+                      <span>${(bot.exchange.totalValue ? parseFloat(bot.exchange.totalValue.toString()) : 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                    </div>
+                  </div>
+                )}
+                {needsSync && (
+                  <div className="pt-2 border-t border-purple-200 dark:border-purple-800">
+                    <div className="flex items-start gap-2 text-xs text-amber-600 dark:text-amber-400">
+                      <Info className="h-3 w-3 mt-0.5 flex-shrink-0" />
+                      <span>Exchange needs sync. Using total portfolio value. Visit exchanges page to sync for accurate {accountTypeLabel.toLowerCase()} balance.</span>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+
           {/* Bot Summary */}
           <Card>
             <CardHeader className="pb-3">
@@ -369,6 +431,7 @@ export function PositionConfirmationDialog({
               <span>Creating {selectedSide} position...</span>
             </div>
           )}
+          </div>
         </div>
       </DialogContent>
     </Dialog>

@@ -115,6 +115,8 @@ export async function processSignal(signalId: string): Promise<SignalProcessingR
               id: string;
               apiKey: string;
               apiSecret: string;
+              spotValue: number;
+              marginValue: number;
               totalValue: number;
               isActive: boolean;
             };
@@ -135,6 +137,8 @@ export async function processSignal(signalId: string): Promise<SignalProcessingR
               apiKey: string;
               apiSecret: string;
               totalValue: number;
+              spotValue: number;
+              marginValue: number;
               isActive: boolean;
             };
             portfolio: {
@@ -154,6 +158,8 @@ export async function processSignal(signalId: string): Promise<SignalProcessingR
               apiKey: string;
               apiSecret: string;
               totalValue: number;
+              spotValue: number;
+              marginValue: number;
               isActive: boolean;
             };
             portfolio: {

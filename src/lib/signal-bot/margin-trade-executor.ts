@@ -14,6 +14,8 @@ interface MarginTradeExecutionContext {
       id: string;
       apiKey: string;
       apiSecret: string;
+      spotValue: number | null;
+      marginValue: number | null;
       totalValue: number | null;
       isActive: boolean;
     };
@@ -219,7 +221,9 @@ export async function executeMarginEnterLong(
     const { baseAsset, quoteAsset } = extractAssets(signal.symbol);
 
     // Calculate position size based on portfolio percentage
-    const portfolioValue = bot.exchange.totalValue || 0;
+    // For MARGIN bots, use marginValue from the exchange
+    // Fallback to totalValue if marginValue is not available (migration not run or exchange not synced)
+    const portfolioValue = bot.exchange.marginValue || bot.exchange.totalValue || 0;
     
     if (portfolioValue <= 0) {
       throw new Error("Invalid portfolio value. Please sync your exchange.");
@@ -584,7 +588,9 @@ export async function executeMarginEnterShort(
     const { baseAsset, quoteAsset } = extractAssets(signal.symbol);
 
     // Calculate position size
-    const portfolioValue = bot.exchange.totalValue || 0;
+    // For MARGIN bots, use marginValue from the exchange
+    // Fallback to totalValue if marginValue is not available (migration not run or exchange not synced)
+    const portfolioValue = bot.exchange.marginValue || bot.exchange.totalValue || 0;
     
     if (portfolioValue <= 0) {
       throw new Error("Invalid portfolio value. Please sync your exchange.");

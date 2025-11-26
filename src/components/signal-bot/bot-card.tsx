@@ -231,6 +231,34 @@ export function SignalBotCard({ bot, onBotUpdated }: SignalBotCardProps) {
             </div>
           </div>
 
+          {/* Exchange & Portfolio Info */}
+          {bot.exchange && (
+            <div className="mt-4 p-3 bg-purple-50 dark:bg-purple-950 rounded-lg border border-purple-200 dark:border-purple-800">
+              <div className="flex items-center justify-between text-sm">
+                <div className="space-y-1">
+                  <p className="text-xs font-medium text-purple-700 dark:text-purple-300">
+                    Exchange: {bot.exchange.name}
+                  </p>
+                  <div className="flex items-center gap-3 text-xs text-purple-600 dark:text-purple-400">
+                    <span>
+                      {bot.accountType === "SPOT" ? "Spot" : "Margin"} Balance: 
+                      <span className="font-mono ml-1">
+                        {bot.accountType === "SPOT" 
+                          ? formatCurrency(bot.exchange.spotValue || 0)
+                          : formatCurrency(bot.exchange.marginValue || 0)
+                        }
+                      </span>
+                    </span>
+                    <span className="text-purple-400 dark:text-purple-600">•</span>
+                    <span className="text-muted-foreground">
+                      Total: {formatCurrency(bot.exchange.totalValue ? parseFloat(bot.exchange.totalValue) : 0)}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Trading Configuration */}
           <div className="mt-4 p-3 bg-gray-50 dark:bg-gray-900 rounded-lg">
             <div className="flex items-center justify-between text-sm">

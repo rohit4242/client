@@ -43,14 +43,16 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       apiSecret: exchange.apiSecret,
     };
 
-    const totalPortfolioValue = await calculateTotalUSDValue(
+    const { spotValue, marginValue, totalValue } = await calculateTotalUSDValue(
       configurationRestAPI
     );
 
     const updatedExchange = await db.exchange.update({
       where: { id },
       data: {
-        totalValue: totalPortfolioValue,
+        spotValue,
+        marginValue,
+        totalValue,
         lastSyncedAt: new Date(),
       },
     });

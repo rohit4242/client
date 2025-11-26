@@ -48,14 +48,16 @@ export async function GET() {
           apiSecret: exchange.apiSecret,
         };
 
-        const totalPortfolioValue = await calculateTotalUSDValue(
+        const { spotValue, marginValue, totalValue } = await calculateTotalUSDValue(
           configurationRestAPI
         );
 
         await db.exchange.update({
           where: { id: exchange.id },
           data: {
-            totalValue: totalPortfolioValue,
+            spotValue,
+            marginValue,
+            totalValue,
             lastSyncedAt: new Date(),
           },
         });
@@ -152,12 +154,12 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const totalPortfolioValue = await calculateTotalUSDValue(
+    const { spotValue, marginValue, totalValue } = await calculateTotalUSDValue(
       configurationRestAPI
     );
     console.log(
-      "totalPortfolioValue from the calculateTotalUSDValue function: ",
-      totalPortfolioValue
+      "Portfolio values from the calculateTotalUSDValue function: ",
+      { spotValue, marginValue, totalValue }
     );
 
     const exchange = await db.exchange.create({
@@ -168,7 +170,9 @@ export async function POST(request: NextRequest) {
         apiSecret,
         positionMode: positionMode,
         isActive: true,
-        totalValue: totalPortfolioValue,
+        spotValue,
+        marginValue,
+        totalValue,
       },
     });
 

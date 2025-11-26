@@ -3,6 +3,7 @@ import { TradingFormData } from "@/db/schema/order";
 import { configurationRestAPI } from "@/types/binance";
 import { Spot } from "@binance/spot";
 import { SpotRestAPI } from "@binance/spot";
+import { getSymbolLotSize, formatQuantityToLotSize } from '@/lib/signal-bot/exchange-info-utils';
 
 export interface PlaceOrderResult {
   success: boolean;
@@ -16,28 +17,65 @@ export interface PlaceOrderResult {
 
 /**
  * Round quantity to appropriate precision for Binance trading
+ * This is the fallback function when LOT_SIZE info is not available
  * Different trading pairs have different precision requirements
+ * Checks the BASE asset (first part of symbol) for precision
  */
-function formatQuantityPrecision(quantity: number, symbol: string): number {
-  // Default precision based on asset type
-  let precision = 6; // Default for most pairs
+function formatQuantityPrecisionFallback(quantity: number, symbol: string): number {
+  // Default precision - use 8 decimals for safety (Binance supports up to 8)
+  let precision = 8;
   
-  // BTC pairs typically use 5-6 decimals for quantity
-  if (symbol.includes('BTC')) {
+  // Extract base asset by removing common quote assets
+  const baseAsset = symbol.replace(/USDT|BUSD|USDC|BTC|ETH|BNB|USD$/i, '');
+  
+  // BTC pairs use 5-6 decimals for BTC quantity
+  if (baseAsset === 'BTC' || symbol.startsWith('BTC')) {
+    precision = 6;
+  }
+  // ETH pairs use 4-5 decimals for ETH quantity
+  else if (baseAsset === 'ETH' || symbol.startsWith('ETH')) {
     precision = 5;
   }
-  // ETH pairs typically use 4-5 decimals
-  else if (symbol.includes('ETH')) {
-    precision = 4;
+  // BNB and similar altcoins
+  else if (baseAsset === 'BNB' || symbol.startsWith('BNB')) {
+    precision = 5;
   }
-  // Stablecoins and most altcoins use 2-4 decimals
-  else if (symbol.includes('USDT') || symbol.includes('USDC') || symbol.includes('BUSD')) {
-    precision = 3;
-  }
+  // Most other altcoins - keep 8 decimals for safety
   
   // Round down to avoid "over maximum" errors
   const multiplier = Math.pow(10, precision);
   return Math.floor(quantity * multiplier) / multiplier;
+}
+
+/**
+ * Format quantity to meet Binance LOT_SIZE requirements
+ * Fetches actual LOT_SIZE filters from Binance and formats accordingly
+ * Falls back to hardcoded precision if API call fails
+ */
+async function formatQuantityPrecision(
+  quantity: number,
+  symbol: string,
+  config: configurationRestAPI
+): Promise<number> {
+  try {
+    // Try to get actual LOT_SIZE filter from Binance
+    const lotSize = await getSymbolLotSize(config, symbol);
+    
+    if (lotSize) {
+      // Use actual Binance LOT_SIZE constraints
+      const formattedQuantity = formatQuantityToLotSize(quantity, lotSize);
+      console.log(`Using LOT_SIZE filter for ${symbol}: minQty=${lotSize.minQty}, stepSize=${lotSize.stepSize}`);
+      return formattedQuantity;
+    } else {
+      // Fall back to hardcoded precision
+      console.warn(`Could not fetch LOT_SIZE for ${symbol}, using fallback precision`);
+      return formatQuantityPrecisionFallback(quantity, symbol);
+    }
+  } catch (error) {
+    // If anything fails, use fallback
+    console.error(`Error formatting quantity for ${symbol}, using fallback:`, error);
+    return formatQuantityPrecisionFallback(quantity, symbol);
+  }
 }
 
 /**
@@ -231,7 +269,7 @@ export async function placeCloseOrder(
     const side = position.side === "LONG" ? "SELL" : "BUY";
 
     // Format quantity to proper precision for Binance
-    const formattedQuantity = formatQuantityPrecision(position.quantity, position.symbol);
+    const formattedQuantity = await formatQuantityPrecision(position.quantity, position.symbol, configurationRestAPI);
     
     console.log(`Close order quantity formatted: ${position.quantity} -> ${formattedQuantity}`);
 

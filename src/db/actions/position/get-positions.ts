@@ -189,6 +189,8 @@ interface DatabasePosition {
       apiSecret: string;
       isActive: boolean;
       positionMode: "One_Way" | "Hedge";
+      spotValue: number;
+      marginValue: number;
       totalValue: number;
       lastSyncedAt: Date;
     }>;
@@ -302,6 +304,8 @@ function transformDatabasePositionToPositionData(
             apiSecret: position.portfolio.exchanges[0].apiSecret,
             isActive: position.portfolio.exchanges[0].isActive,
             positionMode: position.portfolio.exchanges[0].positionMode,
+            spotValue: position.portfolio.exchanges[0].spotValue || 0,
+            marginValue: position.portfolio.exchanges[0].marginValue || 0,
             totalValue: position.portfolio.exchanges[0].totalValue || 0,
             lastSyncedAt:
               position.portfolio.exchanges[0].lastSyncedAt.toISOString(),
@@ -317,6 +321,8 @@ function transformDatabasePositionToPositionData(
             isActive: false,
             positionMode: "One_Way" as const,
             totalValue: 0,
+            spotValue: 0,
+            marginValue: 0,
             lastSyncedAt: null,
             createdAt: new Date().toISOString(),
             updatedAt: new Date().toISOString(),

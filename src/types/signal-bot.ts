@@ -51,6 +51,8 @@ export interface SignalBot {
     apiKey: string;
     apiSecret: string;
     isActive: boolean;
+    spotValue?: number;
+    marginValue?: number;
     totalValue?: string;
   };
   
