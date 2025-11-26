@@ -15,6 +15,32 @@ export interface PlaceOrderResult {
 }
 
 /**
+ * Round quantity to appropriate precision for Binance trading
+ * Different trading pairs have different precision requirements
+ */
+function formatQuantityPrecision(quantity: number, symbol: string): number {
+  // Default precision based on asset type
+  let precision = 6; // Default for most pairs
+  
+  // BTC pairs typically use 5-6 decimals for quantity
+  if (symbol.includes('BTC')) {
+    precision = 5;
+  }
+  // ETH pairs typically use 4-5 decimals
+  else if (symbol.includes('ETH')) {
+    precision = 4;
+  }
+  // Stablecoins and most altcoins use 2-4 decimals
+  else if (symbol.includes('USDT') || symbol.includes('USDC') || symbol.includes('BUSD')) {
+    precision = 3;
+  }
+  
+  // Round down to avoid "over maximum" errors
+  const multiplier = Math.pow(10, precision);
+  return Math.floor(quantity * multiplier) / multiplier;
+}
+
+/**
  * Universal function for placing orders on Binance (no database operations)
  *
  * This function only places the order on Binance exchange and returns the response.
@@ -192,47 +218,91 @@ export async function placeCloseOrder(
     symbol: string;
     side: "LONG" | "SHORT";
     quantity: number;
+    accountType?: "SPOT" | "MARGIN";
+    autoRepay?: boolean;
   },
   configurationRestAPI: configurationRestAPI
 ): Promise<PlaceOrderResult> {
   try {
     console.log("Placing close order on Binance...");
-
-    const client = new Spot({
-      configurationRestAPI,
-    });
+    console.log(`Position type: ${position.accountType || 'SPOT'}`);
 
     // Determine opposite side for closing the position
-    const side: SpotRestAPI.NewOrderSideEnum =
-      position.side === "LONG"
-        ? SpotRestAPI.NewOrderSideEnum.SELL // Close long position with sell order
-        : SpotRestAPI.NewOrderSideEnum.BUY; // Close short position with buy order
+    const side = position.side === "LONG" ? "SELL" : "BUY";
 
-    // Use market order for quick execution
-    const type: SpotRestAPI.NewOrderTypeEnum = SpotRestAPI.NewOrderTypeEnum.MARKET;
+    // Format quantity to proper precision for Binance
+    const formattedQuantity = formatQuantityPrecision(position.quantity, position.symbol);
+    
+    console.log(`Close order quantity formatted: ${position.quantity} -> ${formattedQuantity}`);
 
-    const orderParams = {
-      symbol: position.symbol,
-      side,
-      type,
-      quantity: position.quantity.toString(),
-    };
+    // Check if this is a margin position
+    if (position.accountType === "MARGIN") {
+      // Use Margin API for margin positions
+      const { placeMarginOrder } = await import("@/lib/margin/binance-margin");
+      
+      // Determine side effect based on bot's autoRepay setting
+      // If autoRepay is enabled, use AUTO_REPAY to automatically repay borrowed amounts
+      // Otherwise, use NO_SIDE_EFFECT and user must manually repay
+      const sideEffectType = position.autoRepay ? 'AUTO_REPAY' : 'NO_SIDE_EFFECT';
+      
+      console.log(`Margin close order - autoRepay: ${position.autoRepay}, sideEffectType: ${sideEffectType}`);
+      
+      const orderParams = {
+        symbol: position.symbol,
+        side: side as 'BUY' | 'SELL',
+        type: 'MARKET' as const,
+        quantity: formattedQuantity.toString(),
+        sideEffectType: sideEffectType as 'NO_SIDE_EFFECT' | 'AUTO_REPAY',
+      };
 
-    console.log("Placing close order with params:", orderParams);
+      console.log("Placing MARGIN close order with params:", orderParams);
 
-    // Place the close order on Binance
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const orderResponse = await client.restAPI.newOrder(orderParams as any);
-    const data = await orderResponse.data();
+      const data = await placeMarginOrder(configurationRestAPI, orderParams);
 
-    console.log("Close order placed successfully on Binance:", data);
+      console.log("Margin close order placed successfully:", data);
 
-    return {
-      success: true,
-      message: "Close order placed successfully",
-      data,
-      warnings: [],
-    };
+      return {
+        success: true,
+        message: "Margin close order placed successfully",
+        data,
+        warnings: [],
+      };
+    } else {
+      // Use Spot API for spot positions
+      const client = new Spot({
+        configurationRestAPI,
+      });
+
+      const sideEnum: SpotRestAPI.NewOrderSideEnum =
+        side === "SELL" 
+          ? SpotRestAPI.NewOrderSideEnum.SELL
+          : SpotRestAPI.NewOrderSideEnum.BUY;
+
+      const type: SpotRestAPI.NewOrderTypeEnum = SpotRestAPI.NewOrderTypeEnum.MARKET;
+
+      const orderParams = {
+        symbol: position.symbol,
+        side: sideEnum,
+        type,
+        quantity: formattedQuantity.toString(),
+      };
+
+      console.log("Placing SPOT close order with params:", orderParams);
+
+      // Place the close order on Binance
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const orderResponse = await client.restAPI.newOrder(orderParams as any);
+      const data = await orderResponse.data();
+
+      console.log("Spot close order placed successfully on Binance:", data);
+
+      return {
+        success: true,
+        message: "Spot close order placed successfully",
+        data,
+        warnings: [],
+      };
+    }
   } catch (error: unknown) {
     console.error("Error placing close order on Binance:", error);
 

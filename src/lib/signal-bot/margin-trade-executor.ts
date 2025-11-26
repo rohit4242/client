@@ -81,42 +81,105 @@ function determineSideEffectType(
 }
 
 /**
- * Validate margin order against max borrowable limits
+ * Calculate optimal order size considering available balance, leverage, and borrow limits
  */
-async function validateMarginOrder(
+async function calculateOptimalOrderSize(
   config: configurationRestAPI,
   requiredAsset: string,
-  requiredAmount: number
-): Promise<{ valid: boolean; error?: string; maxBorrowable?: number }> {
+  desiredAmount: number,
+  maxBorrowPercent: number,
+  accountType: 'QUOTE' | 'BASE'
+): Promise<{ 
+  valid: boolean; 
+  error?: string; 
+  availableAmount: number;
+  borrowAmount: number;
+  totalAmount: number;
+  maxBorrowable: number;
+}> {
   try {
     // Get current balance
     const balance = await getMarginBalance(config, requiredAsset);
+    console.log(`Current balance for ${requiredAsset}:`, {
+      available: balance.available,
+      borrowed: balance.borrowed,
+      total: balance.total
+    });
     
-    // If we have enough balance, no need to check borrowable
-    if (balance.available >= requiredAmount) {
-      return { valid: true };
+    // If we have enough balance, no need to borrow
+    if (balance.available >= desiredAmount) {
+      return { 
+        valid: true, 
+        availableAmount: balance.available,
+        borrowAmount: 0,
+        totalAmount: desiredAmount,
+        maxBorrowable: 0
+      };
     }
     
-    // Check max borrowable
+    // Calculate how much we need to borrow
+    const amountNeededToBorrow = desiredAmount - balance.available;
+    
+    // Check max borrowable from exchange
     const maxBorrowableData = await getMaxBorrowable(config, requiredAsset);
     const maxBorrowable = parseFloat(maxBorrowableData.amount || '0');
     
-    const amountNeededToBorrow = requiredAmount - balance.available;
+    console.log(`Borrow calculation for ${requiredAsset}:`, {
+      desired: desiredAmount,
+      available: balance.available,
+      needToBorrow: amountNeededToBorrow,
+      maxBorrowable: maxBorrowable
+    });
     
+    // Check if we can borrow enough from exchange
     if (amountNeededToBorrow > maxBorrowable) {
       return {
         valid: false,
         error: `Insufficient borrowable amount. Need ${amountNeededToBorrow.toFixed(8)} ${requiredAsset}, but max borrowable is ${maxBorrowable.toFixed(8)}`,
-        maxBorrowable,
+        availableAmount: balance.available,
+        borrowAmount: 0,
+        totalAmount: balance.available,
+        maxBorrowable: maxBorrowable
       };
     }
     
-    return { valid: true, maxBorrowable };
+    // Check bot's maxBorrowPercent limit
+    // The maxBorrowPercent is the percentage of the desired position that can be borrowed
+    const maxAllowedBorrow = (desiredAmount * maxBorrowPercent) / 100;
+    
+    console.log(`Borrow limit check:`, {
+      maxBorrowPercent: maxBorrowPercent,
+      maxAllowedBorrow: maxAllowedBorrow,
+      amountNeededToBorrow: amountNeededToBorrow
+    });
+    
+    if (amountNeededToBorrow > maxAllowedBorrow) {
+      return {
+        valid: false,
+        error: `Borrow amount ${amountNeededToBorrow.toFixed(8)} ${requiredAsset} exceeds bot's max borrow limit of ${maxBorrowPercent}% (${maxAllowedBorrow.toFixed(8)} ${requiredAsset})`,
+        availableAmount: balance.available,
+        borrowAmount: 0,
+        totalAmount: balance.available,
+        maxBorrowable: maxBorrowable
+      };
+    }
+    
+    return { 
+      valid: true,
+      availableAmount: balance.available,
+      borrowAmount: amountNeededToBorrow,
+      totalAmount: desiredAmount,
+      maxBorrowable: maxBorrowable
+    };
   } catch (error) {
-    console.error('Error validating margin order:', error);
+    console.error('Error calculating optimal order size:', error);
     return {
       valid: false,
-      error: error instanceof Error ? error.message : 'Failed to validate margin order',
+      error: error instanceof Error ? error.message : 'Failed to calculate order size',
+      availableAmount: 0,
+      borrowAmount: 0,
+      totalAmount: 0,
+      maxBorrowable: 0
     };
   }
 }
@@ -162,11 +225,26 @@ export async function executeMarginEnterLong(
       throw new Error("Invalid portfolio value. Please sync your exchange.");
     }
 
-    const positionValue = (portfolioValue * bot.positionPercent) / 100;
-    const adjustedQuantity = positionValue / currentPrice;
-
-    // Apply leverage if configured
-    const leveragedQuantity = adjustedQuantity * (bot.leverage || 1);
+    // Calculate YOUR capital allocation (what you're willing to risk)
+    // This is EXACTLY positionPercent of portfolio - we'll use this much of your balance
+    const yourCapitalAllocation = (portfolioValue * bot.positionPercent) / 100;
+    
+    // Apply leverage to get total position size
+    const leverage = bot.leverage || 1;
+    const totalPositionSize = yourCapitalAllocation * leverage;
+    
+    // Calculate how much needs to be borrowed
+    // Formula: borrow = your capital × (leverage - 1)
+    const amountToBorrow = yourCapitalAllocation * (leverage - 1);
+    
+    console.log(`Position calculation:`, {
+      portfolioValue,
+      positionPercent: bot.positionPercent,
+      yourCapitalAllocation,
+      leverage,
+      totalPositionSize,
+      amountToBorrow
+    });
 
     // Configuration for API calls
     const config: configurationRestAPI = {
@@ -174,19 +252,70 @@ export async function executeMarginEnterLong(
       apiSecret: bot.exchange.apiSecret,
     };
 
-    // For BUY orders, we need USDT (or quote asset)
-    const requiredAmount = leveragedQuantity * currentPrice;
+    // Check if you have enough of YOUR OWN capital
+    const balance = await getMarginBalance(config, quoteAsset);
     
-    // Validate order against max borrowable
-    const validation = await validateMarginOrder(config, quoteAsset, requiredAmount);
-    if (!validation.valid) {
-      throw new Error(validation.error || 'Order validation failed');
+    if (balance.available < yourCapitalAllocation) {
+      throw new Error(
+        `Insufficient balance. Need ${yourCapitalAllocation.toFixed(2)} ${quoteAsset} but only have ${balance.available.toFixed(2)} available. ` +
+        `Please add more funds or reduce position percentage.`
+      );
     }
 
-    // Determine side effect type based on bot configuration
-    const sideEffectType = determineSideEffectType(bot, 'BUY');
+    // If leverage > 1, validate borrowing
+    if (leverage > 1 && amountToBorrow > 0) {
+      // Get exchange's max borrowable amount
+      const maxBorrowableData = await getMaxBorrowable(config, quoteAsset);
+      const exchangeMaxBorrowable = parseFloat(maxBorrowableData.amount || '0');
+      
+      // Calculate bot's max borrow limit (percentage of exchange's max)
+      // If exchange allows 100 USDT and bot maxBorrowPercent is 50%, bot can only borrow 50 USDT
+      const botMaxBorrowLimit = exchangeMaxBorrowable * (bot.maxBorrowPercent / 100);
+      
+      console.log(`Borrow limits:`, {
+        exchangeMaxBorrowable: exchangeMaxBorrowable.toFixed(2) + ' ' + quoteAsset,
+        botMaxBorrowPercent: bot.maxBorrowPercent + '%',
+        botMaxBorrowLimit: botMaxBorrowLimit.toFixed(2) + ' ' + quoteAsset,
+        amountNeeded: amountToBorrow.toFixed(2) + ' ' + quoteAsset
+      });
+      
+      // Check if amount needed exceeds bot's allowed limit
+      if (amountToBorrow > botMaxBorrowLimit) {
+        throw new Error(
+          `Cannot borrow ${amountToBorrow.toFixed(2)} ${quoteAsset}. ` +
+          `Bot's max borrow limit is ${botMaxBorrowLimit.toFixed(2)} ${quoteAsset} ` +
+          `(${bot.maxBorrowPercent}% of exchange's ${exchangeMaxBorrowable.toFixed(2)} ${quoteAsset} max). ` +
+          `Increase maxBorrowPercent, reduce leverage, or reduce position size.`
+        );
+      }
+      
+      console.log(`✅ Borrow validation passed - borrowing ${amountToBorrow.toFixed(2)} ${quoteAsset}`);
+    }
 
-    console.log(`Margin order details: quantity=${leveragedQuantity}, price=${currentPrice}, sideEffect=${sideEffectType}`);
+    // Calculate quantity to buy
+    const finalQuantity = totalPositionSize / currentPrice;
+
+    // Determine side effect type based on whether we need to borrow
+    let sideEffectType: 'NO_SIDE_EFFECT' | 'MARGIN_BUY' | 'AUTO_REPAY' | 'AUTO_BORROW_REPAY';
+    
+    if (amountToBorrow > 0) {
+      // Need to borrow
+      sideEffectType = bot.autoRepay ? 'AUTO_BORROW_REPAY' : 'MARGIN_BUY';
+    } else {
+      // No borrowing needed (leverage = 1)
+      sideEffectType = bot.autoRepay ? 'AUTO_REPAY' : 'NO_SIDE_EFFECT';
+    }
+
+    console.log(`Margin order details:`, {
+      quantity: finalQuantity,
+      price: currentPrice,
+      totalValue: totalPositionSize,
+      yourCapital: yourCapitalAllocation,
+      borrowAmount: amountToBorrow,
+      availableBalance: balance.available,
+      sideEffect: sideEffectType,
+      leverage
+    });
 
     // Calculate stop loss and take profit
     const stopLoss = bot.stopLoss 
@@ -197,7 +326,40 @@ export async function executeMarginEnterLong(
       ? currentPrice * (1 + bot.takeProfit / 100) 
       : null;
 
-    // Create position in database
+    // FIRST: Place margin order on exchange
+    // Only create database records if exchange order succeeds
+    console.log('Placing margin order on exchange...');
+    const marginOrderResult = await placeMarginOrder(config, {
+      symbol: signal.symbol,
+      side: 'BUY',
+      type: 'MARKET',
+      quantity: finalQuantity.toString(),
+      sideEffectType: sideEffectType as SideEffectType,
+    });
+
+    console.log('✅ Margin order successful:', marginOrderResult);
+
+    // Use the actual executed quantity from Binance (it's already properly formatted)
+    let executedQuantity = parseFloat(marginOrderResult.executedQty || marginOrderResult.origQty || finalQuantity.toString());
+    const executedPrice = parseFloat(marginOrderResult.fills?.[0]?.price || currentPrice.toString());
+    
+    // Subtract commission if it was paid in the same asset (BTC for BTC/USDT)
+    // This is important because Binance deducts the commission from the purchased asset
+    if (marginOrderResult.fills && marginOrderResult.fills.length > 0) {
+      const fill = marginOrderResult.fills[0];
+      const commission = parseFloat(fill.commission || '0');
+      const commissionAsset = fill.commissionAsset;
+      
+      // If commission was paid in base asset (buying BTC, commission in BTC)
+      if (commissionAsset === baseAsset && commission > 0) {
+        executedQuantity = executedQuantity - commission;
+        console.log(`Commission deducted: ${commission} ${commissionAsset}, Net quantity: ${executedQuantity}`);
+      }
+    }
+    
+    console.log(`Executed: ${executedQuantity} @ ${executedPrice}`);
+
+    // NOW: Create position in database (after successful exchange order)
     const position = await db.position.create({
       data: {
         portfolioId: bot.portfolio.id,
@@ -208,13 +370,13 @@ export async function executeMarginEnterLong(
         status: "OPEN",
         accountType: "MARGIN",
         marginType: "CROSS",
-        entryPrice: currentPrice,
-        currentPrice: currentPrice,
-        quantity: leveragedQuantity,
-        entryValue: leveragedQuantity * currentPrice,
-        borrowedAmount: 0, // Will be updated after order execution
+        entryPrice: executedPrice,
+        currentPrice: executedPrice,
+        quantity: executedQuantity,
+        entryValue: executedQuantity * executedPrice,
+        borrowedAmount: amountToBorrow,
         borrowedAsset: quoteAsset,
-        leverage: bot.leverage || 1,
+        leverage: leverage,
         sideEffectType: sideEffectType,
         stopLoss,
         takeProfit,
@@ -222,41 +384,22 @@ export async function executeMarginEnterLong(
       },
     });
 
-    // Create order in database
+    // Create order in database with actual executed values
     const order = await db.order.create({
       data: {
         positionId: position.id,
         portfolioId: bot.portfolio.id,
-        orderId: `BOT-MARGIN-${Date.now()}-${Math.random().toString(36).substring(7)}`,
+        orderId: marginOrderResult.orderId?.toString() || `BOT-MARGIN-${Date.now()}-${Math.random().toString(36).substring(7)}`,
         type: "ENTRY",
         side: "BUY",
         orderType: "MARKET",
         accountType: "MARGIN",
         marginType: "CROSS",
         symbol: signal.symbol,
-        quantity: leveragedQuantity,
-        price: currentPrice,
-        value: leveragedQuantity * currentPrice,
+        quantity: executedQuantity,
+        price: executedPrice,
+        value: executedQuantity * executedPrice,
         sideEffectType: sideEffectType,
-        status: "PENDING",
-      },
-    });
-
-    // Place margin order on exchange
-    const marginOrderResult = await placeMarginOrder(config, {
-      symbol: signal.symbol,
-      side: 'BUY',
-      type: 'MARKET',
-      quantity: leveragedQuantity.toString(),
-      sideEffectType: sideEffectType as SideEffectType,
-    });
-
-    console.log('Margin order result:', marginOrderResult);
-
-    // Update order status
-    await db.order.update({
-      where: { id: order.id },
-      data: {
         status: "FILLED",
         fillPercent: 100,
       },
@@ -447,9 +590,33 @@ export async function executeMarginEnterShort(
       throw new Error("Invalid portfolio value. Please sync your exchange.");
     }
 
-    const positionValue = (portfolioValue * bot.positionPercent) / 100;
-    const baseQuantity = positionValue / currentPrice;
-    const leveragedQuantity = baseQuantity * (bot.leverage || 1);
+    // Calculate YOUR capital allocation (what you're willing to risk)
+    const yourCapitalAllocation = (portfolioValue * bot.positionPercent) / 100;
+    
+    // Apply leverage to get total position size
+    const leverage = bot.leverage || 1;
+    const totalPositionSize = yourCapitalAllocation * leverage;
+    
+    // For SHORT, calculate the quantity of base asset needed
+    const totalQuantityNeeded = totalPositionSize / currentPrice;
+    
+    // Your capital in base asset terms
+    const yourBaseAssetAllocation = yourCapitalAllocation / currentPrice;
+    
+    // Amount of base asset to borrow
+    const baseAssetToBorrow = yourBaseAssetAllocation * (leverage - 1);
+    
+    console.log(`Short position calculation:`, {
+      portfolioValue,
+      positionPercent: bot.positionPercent,
+      yourCapitalAllocation,
+      leverage,
+      totalPositionSize,
+      totalQuantityNeeded: totalQuantityNeeded + ' ' + baseAsset,
+      yourBaseAssetAllocation: yourBaseAssetAllocation + ' ' + baseAsset,
+      baseAssetToBorrow: baseAssetToBorrow + ' ' + baseAsset,
+      currentPrice
+    });
 
     // Configuration for API calls
     const config: configurationRestAPI = {
@@ -457,17 +624,70 @@ export async function executeMarginEnterShort(
       apiSecret: bot.exchange.apiSecret,
     };
 
-    // For SHORT (SELL), we need to borrow the base asset
-    // Validate we can borrow enough
-    const validation = await validateMarginOrder(config, baseAsset, leveragedQuantity);
-    if (!validation.valid) {
-      throw new Error(validation.error || 'Order validation failed');
+    // Check if you have enough base asset
+    const balance = await getMarginBalance(config, baseAsset);
+    
+    if (balance.available < yourBaseAssetAllocation) {
+      throw new Error(
+        `Insufficient ${baseAsset} balance. Need ${yourBaseAssetAllocation.toFixed(8)} ${baseAsset} but only have ${balance.available.toFixed(8)} available. ` +
+        `For SHORT positions, you need collateral in the base asset.`
+      );
     }
 
-    // For short selling, we typically use MARGIN_BUY side effect to borrow
-    const sideEffectType = 'MARGIN_BUY'; // This will borrow the asset if needed
+    // If leverage > 1, validate borrowing
+    if (leverage > 1 && baseAssetToBorrow > 0) {
+      // Get exchange's max borrowable amount for base asset
+      const maxBorrowableData = await getMaxBorrowable(config, baseAsset);
+      const exchangeMaxBorrowable = parseFloat(maxBorrowableData.amount || '0');
+      
+      // Calculate bot's max borrow limit (percentage of exchange's max)
+      // If exchange allows 1 BTC and bot maxBorrowPercent is 50%, bot can only borrow 0.5 BTC
+      const botMaxBorrowLimit = exchangeMaxBorrowable * (bot.maxBorrowPercent / 100);
+      
+      console.log(`Borrow limits (SHORT):`, {
+        exchangeMaxBorrowable: exchangeMaxBorrowable.toFixed(8) + ' ' + baseAsset,
+        botMaxBorrowPercent: bot.maxBorrowPercent + '%',
+        botMaxBorrowLimit: botMaxBorrowLimit.toFixed(8) + ' ' + baseAsset,
+        amountNeeded: baseAssetToBorrow.toFixed(8) + ' ' + baseAsset
+      });
+      
+      // Check if amount needed exceeds bot's allowed limit
+      if (baseAssetToBorrow > botMaxBorrowLimit) {
+        throw new Error(
+          `Cannot borrow ${baseAssetToBorrow.toFixed(8)} ${baseAsset}. ` +
+          `Bot's max borrow limit is ${botMaxBorrowLimit.toFixed(8)} ${baseAsset} ` +
+          `(${bot.maxBorrowPercent}% of exchange's ${exchangeMaxBorrowable.toFixed(8)} ${baseAsset} max). ` +
+          `Increase maxBorrowPercent, reduce leverage, or reduce position size.`
+        );
+      }
+      
+      console.log(`✅ Borrow validation passed - borrowing ${baseAssetToBorrow.toFixed(8)} ${baseAsset}`);
+    }
 
-    console.log(`Margin short order details: quantity=${leveragedQuantity}, price=${currentPrice}, sideEffect=${sideEffectType}`);
+    // Final quantity to short
+    const finalQuantity = totalQuantityNeeded;
+
+    // For short selling, we use MARGIN_BUY side effect to borrow base asset
+    let sideEffectType: 'NO_SIDE_EFFECT' | 'MARGIN_BUY' | 'AUTO_REPAY' | 'AUTO_BORROW_REPAY';
+    
+    if (baseAssetToBorrow > 0) {
+      // Need to borrow base asset for shorting
+      sideEffectType = 'MARGIN_BUY';
+    } else {
+      // No borrowing needed (leverage = 1)
+      sideEffectType = 'NO_SIDE_EFFECT';
+    }
+
+    console.log(`Margin short order details:`, {
+      quantity: finalQuantity,
+      price: currentPrice,
+      totalValue: totalPositionSize,
+      yourCapital: yourCapitalAllocation,
+      borrowAmount: baseAssetToBorrow + ' ' + baseAsset,
+      availableBalance: balance.available,
+      sideEffect: sideEffectType,
+      leverage
+    });
 
     // Calculate stop loss and take profit (inverted for shorts)
     const stopLoss = bot.stopLoss 
@@ -478,7 +698,41 @@ export async function executeMarginEnterShort(
       ? currentPrice * (1 - bot.takeProfit / 100) 
       : null;
 
-    // Create position in database
+    // FIRST: Place margin short order (SELL with MARGIN_BUY to borrow)
+    // Only create database records if exchange order succeeds
+    console.log('Placing margin SHORT order on exchange...');
+    const marginOrderResult = await placeMarginOrder(config, {
+      symbol: signal.symbol,
+      side: 'SELL',
+      type: 'MARKET',
+      quantity: finalQuantity.toString(),
+      sideEffectType: sideEffectType as SideEffectType,
+    });
+
+    console.log('✅ Margin SHORT order successful:', marginOrderResult);
+
+    // Use the actual executed quantity from Binance (it's already properly formatted)
+    let executedQuantity = parseFloat(marginOrderResult.executedQty || marginOrderResult.origQty || finalQuantity.toString());
+    const executedPrice = parseFloat(marginOrderResult.fills?.[0]?.price || currentPrice.toString());
+    
+    // For SHORT positions, we're selling the base asset
+    // Commission might be in quote asset (USDT) or base asset
+    // We only need to adjust quantity if commission is in base asset
+    if (marginOrderResult.fills && marginOrderResult.fills.length > 0) {
+      const fill = marginOrderResult.fills[0];
+      const commission = parseFloat(fill.commission || '0');
+      const commissionAsset = fill.commissionAsset;
+      
+      // If commission was paid in base asset (selling BTC, commission in BTC)
+      if (commissionAsset === baseAsset && commission > 0) {
+        executedQuantity = executedQuantity - commission;
+        console.log(`Commission deducted: ${commission} ${commissionAsset}, Net quantity: ${executedQuantity}`);
+      }
+    }
+    
+    console.log(`Executed SHORT: ${executedQuantity} @ ${executedPrice}`);
+
+    // NOW: Create position in database (after successful exchange order)
     const position = await db.position.create({
       data: {
         portfolioId: bot.portfolio.id,
@@ -489,13 +743,13 @@ export async function executeMarginEnterShort(
         status: "OPEN",
         accountType: "MARGIN",
         marginType: "CROSS",
-        entryPrice: currentPrice,
-        currentPrice: currentPrice,
-        quantity: leveragedQuantity,
-        entryValue: leveragedQuantity * currentPrice,
-        borrowedAmount: 0, // Will be updated after order execution
+        entryPrice: executedPrice,
+        currentPrice: executedPrice,
+        quantity: executedQuantity,
+        entryValue: executedQuantity * executedPrice,
+        borrowedAmount: baseAssetToBorrow,
         borrowedAsset: baseAsset,
-        leverage: bot.leverage || 1,
+        leverage: leverage,
         sideEffectType: sideEffectType,
         stopLoss,
         takeProfit,
@@ -503,41 +757,22 @@ export async function executeMarginEnterShort(
       },
     });
 
-    // Create order in database
+    // Create order in database with actual executed values
     const order = await db.order.create({
       data: {
         positionId: position.id,
         portfolioId: bot.portfolio.id,
-        orderId: `BOT-MARGIN-SHORT-${Date.now()}-${Math.random().toString(36).substring(7)}`,
+        orderId: marginOrderResult.orderId?.toString() || `BOT-MARGIN-SHORT-${Date.now()}-${Math.random().toString(36).substring(7)}`,
         type: "ENTRY",
         side: "SELL",
         orderType: "MARKET",
         accountType: "MARGIN",
         marginType: "CROSS",
         symbol: signal.symbol,
-        quantity: leveragedQuantity,
-        price: currentPrice,
-        value: leveragedQuantity * currentPrice,
+        quantity: executedQuantity,
+        price: executedPrice,
+        value: executedQuantity * executedPrice,
         sideEffectType: sideEffectType,
-        status: "PENDING",
-      },
-    });
-
-    // Place margin short order (SELL with MARGIN_BUY to borrow)
-    const marginOrderResult = await placeMarginOrder(config, {
-      symbol: signal.symbol,
-      side: 'SELL',
-      type: 'MARKET',
-      quantity: leveragedQuantity.toString(),
-      sideEffectType: sideEffectType as SideEffectType,
-    });
-
-    console.log('Margin short order result:', marginOrderResult);
-
-    // Update order status
-    await db.order.update({
-      where: { id: order.id },
-      data: {
         status: "FILLED",
         fillPercent: 100,
       },

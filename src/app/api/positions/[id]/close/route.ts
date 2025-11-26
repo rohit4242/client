@@ -39,7 +39,7 @@ export async function POST(
 
     const targetUserId = userId || session.user.id;
 
-    // Find the position with user account
+    // Find the position with user account and bot (if any)
     const position = await db.position.findUnique({
       where: { id: id, portfolio: { userId: targetUserId } },
       include: {
@@ -48,6 +48,7 @@ export async function POST(
             exchanges: true,
           },
         },
+        bot: true, // Include bot to get autoRepay setting
       },
     });
 
@@ -96,6 +97,8 @@ export async function POST(
         symbol: position.symbol,
         side: position.side,
         quantity: Number(position.quantity.toFixed(8)),
+        accountType: position.accountType || "SPOT", // Pass account type to determine API
+        autoRepay: position.bot?.autoRepay ?? true, // Use bot's autoRepay setting, default to true
       },
       configurationRestAPI
     );

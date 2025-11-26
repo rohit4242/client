@@ -85,11 +85,23 @@ export async function executeEnterLong(
       throw new Error("Invalid portfolio value. Please sync your exchange.");
     }
 
-    const positionValue = (portfolioValue * bot.positionPercent) / 100;
-    const quantity = positionValue / currentPrice;
-
-    // Apply leverage if configured
-    const leveragedQuantity = quantity * (bot.leverage || 1);
+    // Base position value (without leverage)
+    const basePositionValue = (portfolioValue * bot.positionPercent) / 100;
+    
+    // For spot trading, leverage is typically 1 (no actual leverage without margin)
+    const leverage = 1; // Spot can't use leverage
+    
+    // Calculate quantity based on available balance
+    const quantity = basePositionValue / currentPrice;
+    
+    console.log(`Spot LONG position calculation:`, {
+      portfolioValue,
+      positionPercent: bot.positionPercent,
+      basePositionValue,
+      leverage,
+      quantity,
+      currentPrice
+    });
 
     // Calculate stop loss and take profit
     const stopLoss = bot.stopLoss 
@@ -102,7 +114,7 @@ export async function executeEnterLong(
 
     // Validate position parameters
     const validation = validatePositionParams({
-      quantity: leveragedQuantity,
+      quantity: quantity,
       entryPrice: currentPrice,
       stopLoss,
       takeProfit,
@@ -122,11 +134,13 @@ export async function executeEnterLong(
         side: "LONG",
         type: bot.orderType === "Market" ? "MARKET" : "LIMIT",
         entryPrice: currentPrice,
-        quantity: leveragedQuantity,
-        entryValue: positionValue,
+        quantity: quantity,
+        entryValue: basePositionValue,
         currentPrice: currentPrice,
         stopLoss,
         takeProfit,
+        leverage: leverage,
+        accountType: "SPOT",
         source: "BOT",
         status: "OPEN",
       },
@@ -145,8 +159,8 @@ export async function executeEnterLong(
         side: "BUY",
         orderType: bot.orderType === "Market" ? "MARKET" : "LIMIT",
         price: currentPrice,
-        quantity: leveragedQuantity,
-        value: positionValue,
+        quantity: quantity,
+        value: basePositionValue,
         status: "FILLED",
         fillPercent: 100,
         pnl: 0,
@@ -341,11 +355,23 @@ export async function executeEnterShort(
       throw new Error("Invalid portfolio value. Please sync your exchange.");
     }
 
-    const positionValue = (portfolioValue * bot.positionPercent) / 100;
-    const quantity = positionValue / currentPrice;
-
-    // Apply leverage if configured
-    const leveragedQuantity = quantity * (bot.leverage || 1);
+    // Base position value (without leverage)
+    const basePositionValue = (portfolioValue * bot.positionPercent) / 100;
+    
+    // For spot trading, leverage is typically 1 (no actual leverage without margin)
+    const leverage = 1; // Spot can't use leverage
+    
+    // Calculate quantity based on available balance
+    const quantity = basePositionValue / currentPrice;
+    
+    console.log(`Spot SHORT position calculation:`, {
+      portfolioValue,
+      positionPercent: bot.positionPercent,
+      basePositionValue,
+      leverage,
+      quantity,
+      currentPrice
+    });
 
     // Calculate stop loss and take profit (inverse for SHORT)
     const stopLoss = bot.stopLoss 
@@ -358,7 +384,7 @@ export async function executeEnterShort(
 
     // Validate position parameters
     const validation = validatePositionParams({
-      quantity: leveragedQuantity,
+      quantity: quantity,
       entryPrice: currentPrice,
       stopLoss,
       takeProfit,
@@ -378,11 +404,13 @@ export async function executeEnterShort(
         side: "SHORT",
         type: bot.orderType === "Market" ? "MARKET" : "LIMIT",
         entryPrice: currentPrice,
-        quantity: leveragedQuantity,
-        entryValue: positionValue,
+        quantity: quantity,
+        entryValue: basePositionValue,
         currentPrice: currentPrice,
         stopLoss,
         takeProfit,
+        leverage: leverage,
+        accountType: "SPOT",
         source: "BOT",
         status: "OPEN",
       },
@@ -401,8 +429,8 @@ export async function executeEnterShort(
         side: "SELL",
         orderType: bot.orderType === "Market" ? "MARKET" : "LIMIT",
         price: currentPrice,
-        quantity: leveragedQuantity,
-        value: positionValue,
+        quantity: quantity,
+        value: basePositionValue,
         status: "FILLED",
         fillPercent: 100,
         pnl: 0,

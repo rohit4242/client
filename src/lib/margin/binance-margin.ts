@@ -2,6 +2,32 @@ import { MarginTrading, MarginTradingRestAPI } from '@binance/margin-trading';
 import { configurationRestAPI } from '@/types/binance';
 
 /**
+ * Round quantity to appropriate precision for Binance trading
+ * Different trading pairs have different precision requirements
+ */
+function formatQuantityPrecision(quantity: number, symbol: string): number {
+  // Default precision based on asset type
+  let precision = 6; // Default for most pairs
+  
+  // BTC pairs typically use 5-6 decimals for quantity
+  if (symbol.includes('BTC')) {
+    precision = 5;
+  }
+  // ETH pairs typically use 4-5 decimals
+  else if (symbol.includes('ETH')) {
+    precision = 4;
+  }
+  // Stablecoins and most altcoins use 2-4 decimals
+  else if (symbol.includes('USDT') || symbol.includes('USDC') || symbol.includes('BUSD')) {
+    precision = 3;
+  }
+  
+  // Round down to avoid "over maximum" errors
+  const multiplier = Math.pow(10, precision);
+  return Math.floor(quantity * multiplier) / multiplier;
+}
+
+/**
  * Get cross margin account details
  * Returns account information including balances, borrowed amounts, and margin level
  */
@@ -121,7 +147,12 @@ export const placeMarginOrder = async (
   };
 
   if (params.quantity) {
-    orderParams.quantity = parseFloat(params.quantity);
+    // Parse and format quantity with proper precision
+    const rawQuantity = parseFloat(params.quantity);
+    const formattedQuantity = formatQuantityPrecision(rawQuantity, params.symbol);
+    orderParams.quantity = formattedQuantity;
+    
+    console.log(`Quantity formatted: ${rawQuantity} -> ${formattedQuantity}`);
   }
   
   if (params.quoteOrderQty) {
