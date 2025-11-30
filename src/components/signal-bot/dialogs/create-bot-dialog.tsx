@@ -184,16 +184,16 @@ export function CreateSignalBotDialog({ open, onOpenChange, onSuccess }: CreateS
 
   // Extract base and quote assets from symbol
   const extractAssets = (symbol: string) => {
-    const quoteAssets = ['USDT','FUSDT', 'BUSD', 'USDC'];
+    const quoteAssets = ['USDT','FDUSD', 'BUSD', 'USDC'];
     for (const quote of quoteAssets) {
       if (symbol.endsWith(quote)) {
         return { baseAsset: symbol.slice(0, -quote.length), quoteAsset: quote };
       }
     }
-    return { baseAsset: symbol.slice(0, -4), quoteAsset: symbol.slice(-4) };
+    return { baseAsset: symbol.slice(0, -5), quoteAsset: symbol.slice(-5) };
   };
 
-  const selectedSymbol = watchedSymbols?.[0] || "BTCUSDT";
+  const selectedSymbol = watchedSymbols?.[0] || "BTCFDUSD";
   const { baseAsset, quoteAsset } = extractAssets(selectedSymbol);
 
   // Get live price for real-time conversion
