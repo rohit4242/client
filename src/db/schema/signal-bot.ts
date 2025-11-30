@@ -126,9 +126,9 @@ export const TRADE_AMOUNT_TYPE_OPTIONS = [
 // Popular trading symbols for signal bots
 export const SIGNAL_BOT_SYMBOLS = [
   "BTCUSDT",
-  "BTCFUSDT",
+  "BTCFDUSD",
   "ETHUSDT", 
-  "ETHFUSDT",
+  "ETHFDUSD",
   "BNBUSDT",
   "ADAUSDT",
   "XRPUSDT",

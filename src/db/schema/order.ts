@@ -159,9 +159,9 @@ export const safeValidateTradingForm = (data: unknown) => {
 // Popular trading pairs for form dropdowns
 export const POPULAR_SYMBOLS = [
   "BTCUSDT",
-  "BTCFUSDT",
+  "BTCFDUSD",
   "ETHUSDT", 
-  "ETHFUSDT",
+  "ETHFDUSD",
   "BNBUSDT",
   "ADAUSDT",
   "SOLUSDT",

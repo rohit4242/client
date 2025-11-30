@@ -70,7 +70,7 @@ export function generatePortfolioData(): PortfolioDataPoint[] {
 
 // Generate mock recent orders
 export function generateMockOrders(): MockOrder[] {
-  const symbols = ['BTCUSDT', 'BTCFUSDT', 'ETHUSDT', 'ETHFUSDT', 'BNBUSDT', 'ADAUSDT', 'SOLUSDT', 'XRPUSDT', 'DOTUSDT', 'DOGEUSDT'];
+  const symbols = ['BTCUSDT', 'BTCFDUSD', 'ETHUSDT', 'ETHFDUSD', 'BNBUSDT', 'ADAUSDT', 'SOLUSDT', 'XRPUSDT', 'DOTUSDT', 'DOGEUSDT'];
   const sides: ('BUY' | 'SELL')[] = ['BUY', 'SELL'];
   const types: ('MARKET' | 'LIMIT')[] = ['MARKET', 'LIMIT'];
   const statuses: ('FILLED' | 'PENDING' | 'CANCELED')[] = ['FILLED', 'PENDING', 'CANCELED'];
@@ -120,7 +120,7 @@ export function generateMockOrders(): MockOrder[] {
 
 // Generate mock positions
 export function generateMockPositions(): MockPosition[] {
-  const symbols = ['BTCUSDT', 'BTCFUSDT', 'ETHUSDT', 'ETHFUSDT', 'BNBUSDT', 'ADAUSDT', 'SOLUSDT'];
+  const symbols = ['BTCUSDT', 'BTCFDUSD', 'ETHUSDT', 'ETHFDUSD', 'BNBUSDT', 'ADAUSDT', 'SOLUSDT'];
   const positions: MockPosition[] = [];
   
   symbols.forEach((symbol, index) => {

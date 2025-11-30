@@ -100,7 +100,7 @@ export const getOrders = async (symbol?: string, limit: number = 500) => {
       // For getting all orders across symbols, we'll fetch from popular trading pairs
       // This is a workaround since Binance requires a symbol for allOrders endpoint
       const popularSymbols = [
-        'BTCUSDT', 'BTCFUSDT', 'ETHUSDT', 'BNBUSDT', 'XRPUSDT', 'ADAUSDT', 
+        'BTCUSDT', 'BTCFDUSD', 'ETHUSDT', 'BNBUSDT', 'XRPUSDT', 'ADAUSDT', 
         'SOLUSDT', 'DOGEUSDT', 'DOTUSDT', 'LTCUSDT', 'LINKUSDT'
       ];
 
