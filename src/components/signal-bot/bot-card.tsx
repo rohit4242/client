@@ -78,7 +78,11 @@ export function SignalBotCard({ bot, onBotUpdated }: SignalBotCardProps) {
                     <Badge key={symbol} variant="outline" className="text-xs">{symbol}</Badge>
                   ))}
                   <span className="text-xs">•</span>
-                  <span>{bot.portfolioPercent}%</span>
+                  <span>
+                    {bot.tradeAmountType === "QUOTE" 
+                      ? `$${bot.tradeAmount?.toFixed(0) || 0}` 
+                      : `${bot.tradeAmount?.toFixed(6) || 0}`}
+                  </span>
                   {bot.leverage && bot.leverage > 1 && (
                     <>
                       <span className="text-xs">•</span>

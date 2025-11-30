@@ -55,9 +55,11 @@ export function BotWebhookInfo({ bot, open, onOpenChange }: BotWebhookInfoProps)
     }
   };
 
-  const webhookPayload = webhookInfo?.testingInfo?.examplePayload 
-    ? JSON.stringify(webhookInfo.testingInfo.examplePayload, null, 2)
+  const webhookPayload = webhookInfo?.formats?.json?.example 
+    ? JSON.stringify(webhookInfo?.formats?.json?.example, null, 2)
     : "";
+
+  console.log("webhookPayload", webhookPayload);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -102,8 +104,12 @@ export function BotWebhookInfo({ bot, open, onOpenChange }: BotWebhookInfoProps)
                     <span className="ml-2">{bot.symbols.join(', ')}</span>
                   </div>
                   <div>
-                    <span className="text-muted-foreground">Portfolio %:</span>
-                    <span className="ml-2 font-medium">{bot.portfolioPercent}%</span>
+                    <span className="text-muted-foreground">Trade Amount:</span>
+                    <span className="ml-2 font-medium">
+                      {bot.tradeAmountType === "QUOTE" 
+                        ? `$${bot.tradeAmount?.toFixed(2) || 0}`
+                        : `${bot.tradeAmount?.toFixed(6) || 0}`}
+                    </span>
                   </div>
                   <div>
                     <span className="text-muted-foreground">Order Type:</span>
@@ -205,12 +211,12 @@ export function BotWebhookInfo({ bot, open, onOpenChange }: BotWebhookInfoProps)
                   <h4 className="text-sm font-medium">Signal Actions</h4>
                   <div className="grid grid-cols-2 gap-2 text-xs">
                     <div className="space-y-1">
-                      <p><strong>Long Entry:</strong> {bot.enterLongMsg || "ENTER_LONG, BUY, LONG"}</p>
-                      <p><strong>Long Exit:</strong> {bot.exitLongMsg || "EXIT_LONG, SELL_LONG, CLOSE_LONG"}</p>
+                      <p><strong>Long Entry:</strong> {"ENTER_LONG, BUY, LONG"}</p>
+                      <p><strong>Long Exit:</strong> {"EXIT_LONG, SELL_LONG, CLOSE_LONG"}</p>
                     </div>
                     <div className="space-y-1">
-                      <p><strong>Short Entry:</strong> {bot.enterShortMsg || "ENTER_SHORT, SELL, SHORT"}</p>
-                      <p><strong>Short Exit:</strong> {bot.exitShortMsg || "EXIT_SHORT, BUY_SHORT, CLOSE_SHORT"}</p>
+                      <p><strong>Short Entry:</strong> {"ENTER_SHORT, SELL, SHORT"}</p>
+                      <p><strong>Short Exit:</strong> {"EXIT_SHORT, BUY_SHORT, CLOSE_SHORT"}</p>
                     </div>
                   </div>
                 </div>

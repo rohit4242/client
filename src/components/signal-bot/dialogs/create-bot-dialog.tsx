@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery } from "@tanstack/react-query";
@@ -37,24 +37,35 @@ import { Separator } from "@/components/ui/separator";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
-import { Bot, TrendingUp, Shield, MessageSquare } from "lucide-react";
+import { Bot, TrendingUp, Shield, Wallet, Loader2, AlertTriangle, DollarSign } from "lucide-react";
 
-import { 
-  createSignalBotSchema, 
-  CreateSignalBotData, 
+import {
+  createSignalBotSchema,
+  CreateSignalBotData,
   SIGNAL_BOT_SYMBOLS,
   ORDER_TYPE_OPTIONS,
   ACCOUNT_TYPE_OPTIONS,
-  SIDE_EFFECT_TYPE_OPTIONS 
+  SIDE_EFFECT_TYPE_OPTIONS,
+  TRADE_AMOUNT_TYPE_OPTIONS
 } from "@/db/schema/signal-bot";
 import { Exchange } from "@/types/exchange";
 import { SignalBot } from "@/types/signal-bot";
 import { PositionConfirmationDialog } from "@/app/(admin)/signal-bot/_components/dialogs/position-confirmation-dialog";
+import { useLivePrice } from "@/hooks/trading/use-live-price";
+import { useTradeValidation } from "@/hooks/signal-bot/use-trade-validation";
 
 interface CreateSignalBotDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSuccess: () => void;
+}
+
+interface MaxBorrowData {
+  asset: string;
+  maxBorrowable: string;
+  currentBorrowed: string;
+  interest: string;
+  totalOwed: string;
 }
 
 export function CreateSignalBotDialog({ open, onOpenChange, onSuccess }: CreateSignalBotDialogProps) {
@@ -70,7 +81,8 @@ export function CreateSignalBotDialog({ open, onOpenChange, onSuccess }: CreateS
       exchangeId: "",
       symbols: ["BTCUSDT"],
       orderType: "Market" as const,
-      portfolioPercent: 20,
+      tradeAmount: 100,
+      tradeAmountType: "QUOTE" as const,
       leverage: 1,
       accountType: "SPOT" as const,
       marginType: "CROSS" as const,
@@ -79,12 +91,15 @@ export function CreateSignalBotDialog({ open, onOpenChange, onSuccess }: CreateS
       maxBorrowPercent: 50,
       stopLoss: null,
       takeProfit: null,
-      enterLongMsg: "",
-      exitLongMsg: "",
-      enterShortMsg: "",
-      exitShortMsg: "",
     },
   });
+
+  const watchedExchangeId = form.watch("exchangeId");
+  const watchedAccountType = form.watch("accountType");
+  const watchedTradeAmount = form.watch("tradeAmount");
+  const watchedTradeAmountType = form.watch("tradeAmountType");
+  const watchedLeverage = form.watch("leverage");
+  const watchedSymbols = form.watch("symbols");
 
   // Fetch exchanges for the dropdown
   const { data: exchanges = [] } = useQuery<Exchange[]>({
@@ -96,6 +111,32 @@ export function CreateSignalBotDialog({ open, onOpenChange, onSuccess }: CreateS
     enabled: open,
   });
 
+  const activeExchanges = useMemo(() =>
+    exchanges.filter(exchange => exchange.isActive),
+    [exchanges]
+  );
+
+  const selectedExchange = useMemo(() =>
+    activeExchanges.find(e => e.id === watchedExchangeId),
+    [activeExchanges, watchedExchangeId]
+  );
+
+  // Fetch max borrowable amount when margin is selected
+  const { data: maxBorrowData, isLoading: isLoadingMaxBorrow } = useQuery<{ data: MaxBorrowData }>({
+    queryKey: ["maxBorrow", selectedExchange?.id, "USDT"],
+    queryFn: async () => {
+      if (!selectedExchange) throw new Error("No exchange selected");
+      const response = await axios.post("/api/margin/max-borrow", {
+        asset: "USDT",
+        apiKey: selectedExchange.apiKey,
+        apiSecret: selectedExchange.apiSecret,
+      });
+      return response.data;
+    },
+    enabled: open && watchedAccountType === "MARGIN" && !!selectedExchange,
+    staleTime: 30000, // Cache for 30 seconds
+  });
+
   const createBotMutation = useMutation({
     mutationFn: async (data: CreateSignalBotData) => {
       const response = await axios.post("/api/signal-bots", data);
@@ -105,8 +146,8 @@ export function CreateSignalBotDialog({ open, onOpenChange, onSuccess }: CreateS
       toast.success("Signal bot created successfully!");
       form.reset();
       setCreatedBot(data);
-      onOpenChange(false); // Close create dialog
-      setShowPositionDialog(true); // Show position dialog
+      onOpenChange(false);
+      setShowPositionDialog(true);
     },
     onError: (error: AxiosError<{ error: string }>) => {
       toast.error(error.response?.data?.error || "Failed to create signal bot");
@@ -117,179 +158,163 @@ export function CreateSignalBotDialog({ open, onOpenChange, onSuccess }: CreateS
   });
 
   const onSubmit = (data: CreateSignalBotData) => {
-    setIsSubmitting(true);
-    createBotMutation.mutate(data);
-  };
+    // Validate that we have a valid formatted quantity
+    if (!validationResult?.valid || !validationResult.formattedQuantity) {
+      toast.error("Please fix validation errors before creating bot");
+      return;
+    }
 
-  const activeExchanges = exchanges.filter(exchange => exchange.isActive);
+    setIsSubmitting(true);
+
+    // Override with formatted values
+    const formattedData: CreateSignalBotData = {
+      ...data,
+      tradeAmount: validationResult.formattedQuantity,
+      tradeAmountType: "BASE", // Always BASE after formatting
+    };
+
+    createBotMutation.mutate(formattedData);
+  };
 
   const handlePositionDialogComplete = () => {
     setShowPositionDialog(false);
     setCreatedBot(null);
-    onSuccess(); // Refresh the bot list
+    onSuccess();
   };
+
+  // Extract base and quote assets from symbol
+  const extractAssets = (symbol: string) => {
+    const quoteAssets = ['USDT', 'BUSD', 'USDC'];
+    for (const quote of quoteAssets) {
+      if (symbol.endsWith(quote)) {
+        return { baseAsset: symbol.slice(0, -quote.length), quoteAsset: quote };
+      }
+    }
+    return { baseAsset: symbol.slice(0, -4), quoteAsset: symbol.slice(-4) };
+  };
+
+  const selectedSymbol = watchedSymbols?.[0] || "BTCUSDT";
+  const { baseAsset, quoteAsset } = extractAssets(selectedSymbol);
+
+  // Get live price for real-time conversion
+  const { price: currentPrice, isUpdating: isPriceLoading } = useLivePrice(selectedSymbol);
+
+  // Trade amount validation
+  const { data: validationResult, isLoading: isValidating } = useTradeValidation({
+    symbol: selectedSymbol,
+    tradeAmount: watchedTradeAmount || 0,
+    tradeAmountType: watchedTradeAmountType || "QUOTE",
+    exchangeId: watchedExchangeId,
+    enabled: open && !!watchedExchangeId && (watchedTradeAmount || 0) > 0,
+  });
+
+  // Calculate trading values with fixed amount and real-time price conversion
+  const tradingCalculations = useMemo(() => {
+    if (!selectedExchange) return null;
+
+    const spotValue = selectedExchange.spotValue || 0;
+    const marginValue = selectedExchange.marginValue || 0;
+    const activeValue = watchedAccountType === "SPOT" ? spotValue : marginValue;
+    const tradeAmount = watchedTradeAmount || 0;
+    const leverage = watchedLeverage || 1;
+    const isQuoteType = watchedTradeAmountType === "QUOTE";
+    const price = currentPrice || 0;
+
+    // Calculate USDT equivalent (always needed for balance check)
+    const usdtValue = isQuoteType
+      ? tradeAmount
+      : tradeAmount * price;
+
+    // Calculate BASE equivalent (for display)
+    const baseValue = isQuoteType
+      ? (price > 0 ? tradeAmount / price : 0)
+      : tradeAmount;
+
+    // Position value is always in USDT for calculations
+    const positionValue = usdtValue;
+    const leveragedValue = positionValue * leverage;
+    const borrowAmount = leveragedValue - positionValue;
+
+    const maxBorrowable = maxBorrowData?.data?.maxBorrowable
+      ? parseFloat(maxBorrowData.data.maxBorrowable)
+      : 0;
+
+    // Check if balance is sufficient - always compare against USDT value
+    const hasSufficientBalance = activeValue >= usdtValue;
+    const hasSufficientWithBorrow = watchedAccountType === "MARGIN"
+      ? (activeValue + maxBorrowable) >= leveragedValue
+      : hasSufficientBalance;
+
+    return {
+      spotValue,
+      marginValue,
+      activeValue,
+      positionValue,
+      leveragedValue,
+      borrowAmount,
+      maxBorrowable,
+      currentBorrowed: maxBorrowData?.data?.currentBorrowed
+        ? parseFloat(maxBorrowData.data.currentBorrowed)
+        : 0,
+      exceedsMaxBorrow: borrowAmount > maxBorrowable && watchedAccountType === "MARGIN" && leverage > 1,
+      hasSufficientBalance,
+      hasSufficientWithBorrow,
+      // New fields for conversion display
+      usdtValue,
+      baseValue,
+      currentPrice: price,
+      hasPrice: price > 0,
+    };
+  }, [selectedExchange, watchedAccountType, watchedTradeAmount, watchedTradeAmountType, watchedLeverage, maxBorrowData, currentPrice]);
 
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle className="flex items-center space-x-2">
-            <Bot className="h-5 w-5" />
-            <span>Create Signal Bot</span>
-          </DialogTitle>
-          <DialogDescription>
-            Set up a simple, effective trading bot that responds to TradingView signals.
-          </DialogDescription>
-        </DialogHeader>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center space-x-2">
+              <Bot className="h-5 w-5" />
+              <span>Create Signal Bot</span>
+            </DialogTitle>
+            <DialogDescription>
+              Set up a trading bot that responds to TradingView signals.
+            </DialogDescription>
+          </DialogHeader>
 
-        <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-            <Tabs defaultValue="basic" className="w-full">
-              <TabsList className="grid w-full grid-cols-3">
-                <TabsTrigger value="basic" className="flex items-center space-x-1">
-                  <TrendingUp className="h-4 w-4" />
-                  <span>Basic Setup</span>
-                </TabsTrigger>
-                <TabsTrigger value="risk" className="flex items-center space-x-1">
-                  <Shield className="h-4 w-4" />
-                  <span>Risk Management</span>
-                </TabsTrigger>
-                <TabsTrigger value="alerts" className="flex items-center space-x-1">
-                  <MessageSquare className="h-4 w-4" />
-                  <span>Alert Messages</span>
-                </TabsTrigger>
-              </TabsList>
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+              <Tabs defaultValue="basic" className="w-full">
+                <TabsList className="grid w-full grid-cols-2">
+                  <TabsTrigger value="basic" className="flex items-center space-x-1">
+                    <TrendingUp className="h-4 w-4" />
+                    <span>Basic Setup</span>
+                  </TabsTrigger>
+                  <TabsTrigger value="risk" className="flex items-center space-x-1">
+                    <Shield className="h-4 w-4" />
+                    <span>Risk Management</span>
+                  </TabsTrigger>
+                </TabsList>
 
-              <TabsContent value="basic" className="space-y-4">
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Bot Configuration</CardTitle>
-                    <CardDescription>
-                      Configure your bot&apos;s basic settings and trading parameters.
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <FormField
-                      control={form.control}
-                      name="name"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Bot Name</FormLabel>
-                          <FormControl>
-                            <Input placeholder="My BTC Trading Bot" {...field} />
-                          </FormControl>
-                          <FormDescription>
-                            Give your bot a unique, descriptive name.
-                          </FormDescription>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-
-                    <FormField
-                      control={form.control}
-                      name="description"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Description (Optional)</FormLabel>
-                          <FormControl>
-                            <Textarea 
-                              placeholder="Describe your trading strategy or bot purpose..."
-                              {...field}
-                              rows={3}
-                            />
-                          </FormControl>
-                          <FormDescription>
-                            Optional description to help you remember this bot&apos;s purpose.
-                          </FormDescription>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-
-                    <FormField
-                      control={form.control}
-                      name="exchangeId"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Exchange Account</FormLabel>
-                          <Select onValueChange={field.onChange} value={field.value}>
-                            <FormControl>
-                              <SelectTrigger>
-                                <SelectValue placeholder="Select an exchange account" />
-                              </SelectTrigger>
-                            </FormControl>
-                            <SelectContent>
-                              {activeExchanges.map((exchange) => (
-                                <SelectItem key={exchange.id} value={exchange.id}>
-                                  {exchange.name} {exchange.name && `(${exchange.name})`}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                          <FormDescription>
-                            Choose which exchange account to use for trading.
-                          </FormDescription>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-
-                    <FormField
-                      control={form.control}
-                      name="symbols"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Trading Symbol</FormLabel>
-                          <Select 
-                            onValueChange={(value) => field.onChange([value])} 
-                            value={field.value?.[0] || ""}
-                          >
-                            <FormControl>
-                              <SelectTrigger>
-                                <SelectValue placeholder="Select a trading pair" />
-                              </SelectTrigger>
-                            </FormControl>
-                            <SelectContent>
-                              {SIGNAL_BOT_SYMBOLS.map((symbol) => (
-                                <SelectItem key={symbol} value={symbol}>
-                                  {symbol}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                          <FormDescription>
-                            Choose the cryptocurrency pair you want to trade.
-                          </FormDescription>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-
-                    <div className="grid grid-cols-2 gap-4">
+                <TabsContent value="basic" className="space-y-4">
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>Bot Configuration</CardTitle>
+                      <CardDescription>
+                        Configure your bot&apos;s basic settings and trading parameters.
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
                       <FormField
                         control={form.control}
-                        name="orderType"
+                        name="name"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel>Order Type</FormLabel>
-                            <Select onValueChange={field.onChange} value={field.value}>
-                              <FormControl>
-                                <SelectTrigger>
-                                  <SelectValue placeholder="Select order type" />
-                                </SelectTrigger>
-                              </FormControl>
-                              <SelectContent>
-                                {ORDER_TYPE_OPTIONS.map((option) => (
-                                  <SelectItem key={option.value} value={option.value}>
-                                    {option.label}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
+                            <FormLabel>Bot Name</FormLabel>
+                            <FormControl>
+                              <Input placeholder="My BTC Trading Bot" {...field} />
+                            </FormControl>
                             <FormDescription>
-                              Market orders execute immediately.
+                              Give your bot a unique, descriptive name.
                             </FormDescription>
                             <FormMessage />
                           </FormItem>
@@ -298,82 +323,481 @@ export function CreateSignalBotDialog({ open, onOpenChange, onSuccess }: CreateS
 
                       <FormField
                         control={form.control}
-                        name="portfolioPercent"
+                        name="description"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel>Portfolio Percentage (%)</FormLabel>
+                            <FormLabel>Description (Optional)</FormLabel>
                             <FormControl>
-                              <Input 
-                                type="number" 
-                                min="1" 
-                                max="100" 
+                              <Textarea
+                                placeholder="Describe your trading strategy or bot purpose..."
                                 {...field}
-                                onChange={(e) => field.onChange(Number(e.target.value))}
+                                rows={2}
                               />
                             </FormControl>
-                            <FormDescription>
-                              % of portfolio to use per trade.
-                            </FormDescription>
                             <FormMessage />
                           </FormItem>
                         )}
                       />
-                    </div>
 
-                    <FormField
-                      control={form.control}
-                      name="leverage"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Leverage (Optional)</FormLabel>
-                          <FormControl>
-                            <Input 
-                              type="number" 
-                              min="1" 
-                              max="125" 
-                              {...field}
-                              onChange={(e) => field.onChange(e.target.value ? Number(e.target.value) : 1)}
-                              value={field.value || 1}
-                            />
-                          </FormControl>
-                          <FormDescription>
-                            Leverage multiplier (1x = no leverage). Use with extreme caution!
-                          </FormDescription>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
+                      <div className="grid grid-cols-2 gap-4">
+                        <FormField
+                          control={form.control}
+                          name="exchangeId"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Exchange Account</FormLabel>
+                              <Select onValueChange={field.onChange} value={field.value}>
+                                <FormControl>
+                                  <SelectTrigger>
+                                    <SelectValue placeholder="Select exchange" />
+                                  </SelectTrigger>
+                                </FormControl>
+                                <SelectContent>
+                                  {activeExchanges.map((exchange) => (
+                                    <SelectItem key={exchange.id} value={exchange.id}>
+                                      {exchange.name}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
 
-                    <FormField
-                      control={form.control}
-                      name="accountType"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Account Type</FormLabel>
-                          <Select onValueChange={field.onChange} value={field.value}>
+                        <FormField
+                          control={form.control}
+                          name="symbols"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Trading Symbol</FormLabel>
+                              <Select
+                                onValueChange={(value) => field.onChange([value])}
+                                value={field.value?.[0] || ""}
+                              >
+                                <FormControl>
+                                  <SelectTrigger>
+                                    <SelectValue placeholder="Select pair" />
+                                  </SelectTrigger>
+                                </FormControl>
+                                <SelectContent>
+                                  {SIGNAL_BOT_SYMBOLS.map((symbol) => (
+                                    <SelectItem key={symbol} value={symbol}>
+                                      {symbol}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-4">
+                        <FormField
+                          control={form.control}
+                          name="orderType"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Order Type</FormLabel>
+                              <Select onValueChange={field.onChange} value={field.value}>
+                                <FormControl>
+                                  <SelectTrigger>
+                                    <SelectValue placeholder="Select type" />
+                                  </SelectTrigger>
+                                </FormControl>
+                                <SelectContent>
+                                  {ORDER_TYPE_OPTIONS.map((option) => (
+                                    <SelectItem key={option.value} value={option.value}>
+                                      {option.label}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+
+                        <FormField
+                          control={form.control}
+                          name="accountType"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Account Type</FormLabel>
+                              <Select onValueChange={field.onChange} value={field.value}>
+                                <FormControl>
+                                  <SelectTrigger>
+                                    <SelectValue placeholder="Select account" />
+                                  </SelectTrigger>
+                                </FormControl>
+                                <SelectContent>
+                                  {ACCOUNT_TYPE_OPTIONS.map((option) => (
+                                    <SelectItem key={option.value} value={option.value}>
+                                      {option.label}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  {/* Trading Amount Card */}
+                  <Card className="border-2 border-primary/20">
+                    <CardHeader className="pb-3">
+                      <CardTitle className="flex items-center gap-2 text-base">
+                        <Wallet className="h-4 w-4" />
+                        Trading Amount
+                      </CardTitle>
+                      <CardDescription>
+                        Specify the exact amount to trade per signal
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      {/* Amount Type Toggle + Live Price Row */}
+                      <div className="flex items-start justify-between gap-4">
+                        <FormField
+                          control={form.control}
+                          name="tradeAmountType"
+                          render={({ field }) => (
+                            <FormItem className="flex-1">
+                              <div className="flex rounded-lg border p-1 bg-muted/30">
+                                {TRADE_AMOUNT_TYPE_OPTIONS.map((option) => (
+                                  <button
+                                    key={option.value}
+                                    type="button"
+                                    className={`flex-1 px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${field.value === option.value
+                                      ? "bg-primary text-primary-foreground shadow-sm"
+                                      : "text-muted-foreground hover:text-foreground"
+                                      }`}
+                                    onClick={() => field.onChange(option.value)}
+                                  >
+                                    {option.value === "QUOTE" ? quoteAsset : baseAsset}
+                                  </button>
+                                ))}
+                              </div>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+
+                        {/* Live Price Display */}
+                        <div className="text-right shrink-0">
+                          <p className="text-xs text-muted-foreground">{baseAsset} Price</p>
+                          <div className="flex items-center gap-1 justify-end">
+                            {isPriceLoading ? (
+                              <Loader2 className="h-3 w-3 animate-spin" />
+                            ) : (
+                              <TrendingUp className="h-3 w-3 text-green-500" />
+                            )}
+                            <span className="font-mono font-semibold text-sm">
+                              ${currentPrice?.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || '-.--'}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Amount Input + Conversion Preview */}
+                      <div className="grid grid-cols-2 gap-4">
+                        <FormField
+                          control={form.control}
+                          name="tradeAmount"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel className="text-xs">
+                                Amount in {watchedTradeAmountType === "QUOTE" ? quoteAsset : baseAsset}
+                              </FormLabel>
+                              <FormControl>
+                                <Input
+                                  type="number"
+                                  min="0"
+                                  step={watchedTradeAmountType === "QUOTE" ? "1" : "0.00001"}
+                                  placeholder={watchedTradeAmountType === "QUOTE" ? "100" : "0.00001"}
+                                  className="font-mono"
+                                  {...field}
+                                  onChange={(e) => field.onChange(Number(e.target.value))}
+                                />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+
+                        {/* Real-time Conversion Preview */}
+                        <div className="space-y-1">
+                          <p className="text-xs text-muted-foreground">You&apos;ll Trade</p>
+                          {tradingCalculations?.hasPrice ? (
+                            <div className="rounded-md border bg-muted/30 p-2.5 h-10 flex items-center">
+                              <div className="text-sm">
+                                {watchedTradeAmountType === "QUOTE" ? (
+                                  <span className="font-mono">
+                                    <span className="text-muted-foreground">≈</span>{" "}
+                                    <span className="font-semibold">{tradingCalculations.baseValue.toFixed(6)}</span>{" "}
+                                    <span className="text-muted-foreground">{baseAsset}</span>
+                                  </span>
+                                ) : (
+                                  <span className="font-mono">
+                                    <span className="text-muted-foreground">≈</span>{" "}
+                                    <span className="font-semibold">${tradingCalculations.usdtValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="rounded-md border bg-muted/30 p-2.5 h-10 flex items-center">
+                              <span className="text-xs text-muted-foreground">Waiting for price...</span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Leverage */}
+                      <FormField
+                        control={form.control}
+                        name="leverage"
+                        render={({ field }) => (
+                          <FormItem>
+                            <div className="flex items-center justify-between">
+                              <FormLabel className="text-xs">Leverage</FormLabel>
+                              <span className="text-xs text-muted-foreground">
+                                {watchedAccountType === "SPOT" ? "Spot (no leverage)" : "1x to 10x"}
+                              </span>
+                            </div>
                             <FormControl>
-                              <SelectTrigger>
-                                <SelectValue placeholder="Select account type" />
-                              </SelectTrigger>
+                              <Input
+                                type="number"
+                                min="1"
+                                max={watchedAccountType === "MARGIN" ? 10 : 1}
+                                className="font-mono"
+                                {...field}
+                                onChange={(e) => field.onChange(e.target.value ? Number(e.target.value) : 1)}
+                                value={field.value || 1}
+                                disabled={watchedAccountType === "SPOT"}
+                              />
                             </FormControl>
-                            <SelectContent>
-                              {ACCOUNT_TYPE_OPTIONS.map((option) => (
-                                <SelectItem key={option.value} value={option.value}>
-                                  {option.label}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                          <FormDescription>
-                            Choose between spot or margin trading.
-                          </FormDescription>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
 
-                    {form.watch("accountType") === "MARGIN" && (
-                      <>
+                      {/* Balance Validation Panel */}
+                      {selectedExchange && tradingCalculations && (
+                        <div className="rounded-lg border bg-card p-4 space-y-3">
+                          {/* Status Header */}
+                          <div className="flex items-center justify-between">
+                            <span className="text-sm font-medium">Balance Check</span>
+                            {tradingCalculations.hasSufficientWithBorrow ? (
+                              <span className="text-xs font-medium px-2 py-1 rounded-full bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400">
+                                ✓ Sufficient
+                              </span>
+                            ) : (
+                              <span className="text-xs font-medium px-2 py-1 rounded-full bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400">
+                                ✗ Insufficient
+                              </span>
+                            )}
+                          </div>
+
+                          {/* Balance Comparison */}
+                          <div className="grid grid-cols-2 gap-3 text-sm">
+                            <div className="rounded-md bg-muted/50 p-2.5">
+                              <p className="text-xs text-muted-foreground mb-1">Available ({watchedAccountType})</p>
+                              <p className="font-mono font-medium">
+                                ${tradingCalculations.activeValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                              </p>
+                            </div>
+                            <div className="rounded-md bg-muted/50 p-2.5">
+                              <p className="text-xs text-muted-foreground mb-1">Required Amount</p>
+                              <p className={`font-mono font-medium ${!tradingCalculations.hasSufficientBalance ? 'text-red-600' : ''}`}>
+                                ${tradingCalculations.usdtValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                              </p>
+                              {watchedTradeAmountType === "BASE" && tradingCalculations.hasPrice && (
+                                <p className="text-xs text-muted-foreground mt-0.5">
+                                  ({watchedTradeAmount} {baseAsset})
+                                </p>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Leveraged Position Details */}
+                          {watchedLeverage && watchedLeverage > 1 && (
+                            <div className="border-t pt-3 space-y-2">
+                              <div className="flex justify-between text-sm">
+                                <span className="text-muted-foreground">
+                                  Total Position ({watchedLeverage}x):
+                                </span>
+                                <span className="font-mono font-semibold">
+                                  ${tradingCalculations.leveragedValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                </span>
+                              </div>
+                              <div className="flex justify-between text-sm">
+                                <span className="text-muted-foreground">To Borrow:</span>
+                                <span className="font-mono text-amber-600">
+                                  ${tradingCalculations.borrowAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                </span>
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Max Borrowable for Margin */}
+                          {watchedAccountType === "MARGIN" && (
+                            <div className="border-t pt-3 space-y-2">
+                              <div className="flex justify-between text-sm">
+                                <span className="text-muted-foreground flex items-center gap-1">
+                                  <DollarSign className="h-3 w-3" />
+                                  Max Borrowable:
+                                </span>
+                                {isLoadingMaxBorrow ? (
+                                  <Loader2 className="h-4 w-4 animate-spin" />
+                                ) : (
+                                  <span className="font-mono font-medium text-green-600">
+                                    ${tradingCalculations.maxBorrowable.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                  </span>
+                                )}
+                              </div>
+                              {tradingCalculations.currentBorrowed > 0 && (
+                                <div className="flex justify-between text-sm">
+                                  <span className="text-muted-foreground">Currently Borrowed:</span>
+                                  <span className="font-mono text-amber-600">
+                                    ${tradingCalculations.currentBorrowed.toFixed(2)}
+                                  </span>
+                                </div>
+                              )}
+                            </div>
+                          )}
+
+                          {/* Warnings */}
+                          {!tradingCalculations.hasSufficientBalance && watchedAccountType === "SPOT" && (
+                            <div className="flex items-start gap-2 text-red-600 text-xs bg-red-50 dark:bg-red-950/50 p-2 rounded">
+                              <AlertTriangle className="h-3.5 w-3.5 mt-0.5 flex-shrink-0" />
+                              <span>Insufficient balance. Reduce amount or switch to margin trading.</span>
+                            </div>
+                          )}
+
+                          {tradingCalculations.exceedsMaxBorrow && (
+                            <div className="flex items-start gap-2 text-red-600 text-xs bg-red-50 dark:bg-red-950/50 p-2 rounded">
+                              <AlertTriangle className="h-3.5 w-3.5 mt-0.5 flex-shrink-0" />
+                              <span>Exceeds borrowing limit. Reduce leverage or trade amount.</span>
+                            </div>
+                          )}
+
+                          {!tradingCalculations.hasPrice && (
+                            <div className="flex items-start gap-2 text-amber-600 text-xs bg-amber-50 dark:bg-amber-950/50 p-2 rounded">
+                              <AlertTriangle className="h-3.5 w-3.5 mt-0.5 flex-shrink-0" />
+                              <span>Waiting for live price to calculate accurate values...</span>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+
+                  {/* Trading Constraints Validation */}
+                  {validationResult && (
+                    <Card className={`border-2 ${validationResult.valid ? 'border-green-500/20' : 'border-red-500/20'}`}>
+                      <CardHeader className="pb-3">
+                        <CardTitle className="flex items-center gap-2 text-base">
+                          {validationResult.valid ? (
+                            <span className="text-green-600">✓ Validated Trade Amount</span>
+                          ) : (
+                            <span className="text-red-600">✗ Invalid Trade Amount</span>
+                          )}
+                        </CardTitle>
+                        <CardDescription>
+                          Binance trading constraints applied
+                        </CardDescription>
+                      </CardHeader>
+                      <CardContent className="space-y-3">
+                        {/* Formatted Quantity Display */}
+                        <div className="rounded-lg border bg-muted/30 p-3 space-y-2">
+                          <div className="flex justify-between text-sm">
+                            <span className="text-muted-foreground">You Entered:</span>
+                            <span className="font-mono">
+                              {watchedTradeAmount} {watchedTradeAmountType === "QUOTE" ? quoteAsset : baseAsset}
+                            </span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="font-medium">Bot Will Trade:</span>
+                            <span className="font-mono font-bold text-green-600">
+                              {validationResult.formattedQuantity?.toFixed(8)} {baseAsset}
+                            </span>
+                          </div>
+                          <div className="flex justify-between text-sm">
+                            <span className="text-muted-foreground">Notional Value:</span>
+                            <span className="font-mono">
+                              ${validationResult.notionalValue?.toFixed(2)}
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Constraints Info */}
+                        {validationResult.constraints && (
+                          <div className="grid grid-cols-2 gap-2 text-xs">
+                            <div className="rounded bg-muted/50 p-2">
+                              <p className="text-muted-foreground mb-1">Min Quantity</p>
+                              <p className="font-mono">{validationResult.constraints.minQty}</p>
+                            </div>
+                            <div className="rounded bg-muted/50 p-2">
+                              <p className="text-muted-foreground mb-1">Step Size</p>
+                              <p className="font-mono">{validationResult.constraints.stepSize}</p>
+                            </div>
+                            <div className="rounded bg-muted/50 p-2">
+                              <p className="text-muted-foreground mb-1">Min Notional</p>
+                              <p className="font-mono">${validationResult.constraints.minNotional}</p>
+                            </div>
+                            <div className="rounded bg-muted/50 p-2">
+                              <p className="text-muted-foreground mb-1">Current Price</p>
+                              <p className="font-mono">${validationResult.currentPrice?.toFixed(2)}</p>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Errors */}
+                        {validationResult.errors && validationResult.errors.length > 0 && (
+                          <div className="space-y-1">
+                            {validationResult.errors.map((error, index) => (
+                              <div key={index} className="flex items-start gap-2 text-red-600 text-xs bg-red-50 dark:bg-red-950/50 p-2 rounded">
+                                <AlertTriangle className="h-3.5 w-3.5 mt-0.5 flex-shrink-0" />
+                                <span>{error}</span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+
+                        {/* Warnings */}
+                        {validationResult.warnings && validationResult.warnings.length > 0 && (
+                          <div className="space-y-1">
+                            {validationResult.warnings.map((warning, index) => (
+                              <div key={index} className="flex items-start gap-2 text-amber-600 text-xs bg-amber-50 dark:bg-amber-950/50 p-2 rounded">
+                                <AlertTriangle className="h-3.5 w-3.5 mt-0.5 flex-shrink-0" />
+                                <span>{warning}</span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+
+                        {isValidating && (
+                          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                            <span>Validating trade amount...</span>
+                          </div>
+                        )}
+                      </CardContent>
+                    </Card>
+                  )}
+
+                  {/* Margin Settings */}
+                  {watchedAccountType === "MARGIN" && (
+                    <Card>
+                      <CardHeader className="pb-3">
+                        <CardTitle className="text-base">Margin Settings</CardTitle>
+                      </CardHeader>
+                      <CardContent className="space-y-4">
                         <FormField
                           control={form.control}
                           name="sideEffectType"
@@ -389,17 +813,14 @@ export function CreateSignalBotDialog({ open, onOpenChange, onSuccess }: CreateS
                                 <SelectContent>
                                   {SIDE_EFFECT_TYPE_OPTIONS.map((option) => (
                                     <SelectItem key={option.value} value={option.value}>
-                                      <div>
-                                        <div>{option.label}</div>
-                                        <div className="text-xs text-muted-foreground">{option.description}</div>
+                                      <div className="flex flex-col">
+                                        <span>{option.label}</span>
+                                        <span className="text-xs text-muted-foreground">{option.description}</span>
                                       </div>
                                     </SelectItem>
                                   ))}
                                 </SelectContent>
                               </Select>
-                              <FormDescription>
-                                Controls automatic borrowing and repayment behavior for margin orders.
-                              </FormDescription>
                               <FormMessage />
                             </FormItem>
                           )}
@@ -410,11 +831,11 @@ export function CreateSignalBotDialog({ open, onOpenChange, onSuccess }: CreateS
                             control={form.control}
                             name="autoRepay"
                             render={({ field }) => (
-                              <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
+                              <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3">
                                 <div className="space-y-0.5">
-                                  <FormLabel className="text-base">Auto Repay</FormLabel>
-                                  <FormDescription>
-                                    Automatically repay debt when closing positions
+                                  <FormLabel className="text-sm">Auto Repay</FormLabel>
+                                  <FormDescription className="text-xs">
+                                    Repay debt on close
                                   </FormDescription>
                                 </div>
                                 <FormControl>
@@ -432,320 +853,156 @@ export function CreateSignalBotDialog({ open, onOpenChange, onSuccess }: CreateS
                             name="maxBorrowPercent"
                             render={({ field }) => (
                               <FormItem>
-                                <FormLabel>Max Borrow (%)</FormLabel>
+                                <FormLabel>Max Borrow %</FormLabel>
                                 <FormControl>
-                                  <Input 
-                                    type="number" 
-                                    min="1" 
-                                    max="100" 
+                                  <Input
+                                    type="number"
+                                    min="1"
+                                    max="100"
                                     {...field}
                                     onChange={(e) => field.onChange(Number(e.target.value))}
                                   />
                                 </FormControl>
-                                <FormDescription>
-                                  Maximum % of collateral to borrow
-                                </FormDescription>
                                 <FormMessage />
                               </FormItem>
                             )}
                           />
                         </div>
-                      </>
-                    )}
 
-                    {/* Portfolio Value Preview */}
-                    {form.watch("exchangeId") && (
-                      <Card className="bg-blue-50 dark:bg-blue-950 border-blue-200 dark:border-blue-800">
-                        <CardHeader className="pb-3">
-                          <CardTitle className="text-sm text-blue-700 dark:text-blue-300">Portfolio Overview</CardTitle>
-                        </CardHeader>
-                        <CardContent className="space-y-3">
-                          {(() => {
-                            const selectedExchange = activeExchanges.find(e => e.id === form.watch("exchangeId"));
-                            if (!selectedExchange) return null;
-                            
-                            const accountType = form.watch("accountType") || "SPOT";
-                            const portfolioPercent = form.watch("portfolioPercent") || 0;
-                            const leverage = form.watch("leverage") || 1;
-                            
-                            const spotValue = selectedExchange.spotValue || 0;
-                            const marginValue = selectedExchange.marginValue || 0;
-                            const activeValue = accountType === "SPOT" ? spotValue : marginValue;
-                            const positionValue = (activeValue * portfolioPercent) / 100;
-                            const totalPositionSize = positionValue * leverage;
-                            
-                            return (
-                              <div className="space-y-2 text-sm">
-                                <div className="flex justify-between text-blue-600 dark:text-blue-400">
-                                  <span>Spot Balance:</span>
-                                  <span className="font-mono">${spotValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-                                </div>
-                                <div className="flex justify-between text-blue-600 dark:text-blue-400">
-                                  <span>Margin Balance:</span>
-                                  <span className="font-mono">${marginValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-                                </div>
-                                <div className="pt-2 border-t border-blue-200 dark:border-blue-800">
-                                  <div className="flex justify-between text-blue-800 dark:text-blue-200 font-medium">
-                                    <span>Using ({accountType}):</span>
-                                    <span className="font-mono">${activeValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-                                  </div>
-                                  <div className="flex justify-between text-blue-700 dark:text-blue-300 text-xs mt-1">
-                                    <span>Position Size ({portfolioPercent}%):</span>
-                                    <span className="font-mono">${positionValue.toFixed(2)}</span>
-                                  </div>
-                                  {leverage > 1 && (
-                                    <div className="flex justify-between text-blue-700 dark:text-blue-300 text-xs mt-1">
-                                      <span>With {leverage}x Leverage:</span>
-                                      <span className="font-mono">${totalPositionSize.toFixed(2)}</span>
-                                    </div>
-                                  )}
-                                </div>
-                                {activeValue <= 0 && (
-                                  <div className="pt-2 text-xs text-amber-600 dark:text-amber-400 flex items-start space-x-1">
-                                    <Shield className="w-3 h-3 mt-0.5 flex-shrink-0" />
-                                    <span>⚠️ Low or zero balance in {accountType} account. Please add funds or select a different account type.</span>
-                                  </div>
-                                )}
-                              </div>
-                            );
-                          })()}
-                        </CardContent>
-                      </Card>
-                    )}
+                        <div className="bg-amber-50 dark:bg-amber-950/50 p-3 rounded-lg">
+                          <div className="flex items-start space-x-2">
+                            <Shield className="w-4 h-4 text-amber-600 dark:text-amber-400 mt-0.5 flex-shrink-0" />
+                            <div className="text-xs text-amber-700 dark:text-amber-300">
+                              <p className="font-medium">Margin Trading Warning</p>
+                              <p className="mt-1">Borrowed assets accrue interest hourly. Only use margin if you understand the risks.</p>
+                            </div>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  )}
+                </TabsContent>
 
-                    {form.watch("accountType") === "MARGIN" && (
-                      <div className="bg-amber-50 dark:bg-amber-950 p-4 rounded-lg">
+                <TabsContent value="risk" className="space-y-4">
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>Risk Management</CardTitle>
+                      <CardDescription>
+                        Set automatic stop loss and take profit levels to protect your capital.
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      <div className="grid grid-cols-2 gap-4">
+                        <FormField
+                          control={form.control}
+                          name="stopLoss"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Stop Loss (%)</FormLabel>
+                              <FormControl>
+                                <Input
+                                  type="number"
+                                  step="0.1"
+                                  min="0.1"
+                                  max="50"
+                                  {...field}
+                                  onChange={(e) => field.onChange(e.target.value ? Number(e.target.value) : null)}
+                                  value={field.value || ""}
+                                  placeholder="e.g., 2.0"
+                                />
+                              </FormControl>
+                              <FormDescription>
+                                Automatic stop loss to limit losses.
+                              </FormDescription>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+
+                        <FormField
+                          control={form.control}
+                          name="takeProfit"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Take Profit (%)</FormLabel>
+                              <FormControl>
+                                <Input
+                                  type="number"
+                                  step="0.1"
+                                  min="0.1"
+                                  max="100"
+                                  {...field}
+                                  onChange={(e) => field.onChange(e.target.value ? Number(e.target.value) : null)}
+                                  value={field.value || ""}
+                                  placeholder="e.g., 4.0"
+                                />
+                              </FormControl>
+                              <FormDescription>
+                                Automatic take profit to secure gains.
+                              </FormDescription>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      </div>
+
+                      <div className="bg-blue-50 dark:bg-blue-950/50 p-4 rounded-lg">
                         <div className="flex items-start space-x-2">
-                          <Shield className="w-5 h-5 text-amber-600 dark:text-amber-400 mt-0.5 flex-shrink-0" />
+                          <Shield className="w-5 h-5 text-blue-600 dark:text-blue-400 mt-0.5 flex-shrink-0" />
                           <div className="text-sm">
-                            <p className="font-medium text-amber-900 dark:text-amber-100">Cross Margin Trading Warning</p>
-                            <ul className="text-amber-700 dark:text-amber-300 mt-1 space-y-1">
-                              <li>• Cross margin allows borrowing assets across your entire margin account</li>
-                              <li>• Borrowed assets accrue interest hourly and must be repaid</li>
-                              <li>• Auto repay will automatically repay debt when you close positions</li>
-                              <li>• Max borrow % limits how much you can borrow relative to your collateral</li>
-                              <li>• Only use margin if you understand the risks</li>
+                            <p className="font-medium text-blue-900 dark:text-blue-100">Risk Management Tips</p>
+                            <ul className="text-blue-700 dark:text-blue-300 mt-1 space-y-1 text-xs">
+                              <li>• Use a 1:2 risk-reward ratio (e.g., 2% SL, 4% TP)</li>
+                              <li>• Never risk more than 2-5% of your portfolio per trade</li>
+                              <li>• Always set stop loss to protect your capital</li>
                             </ul>
                           </div>
                         </div>
                       </div>
-                    )}
-                  </CardContent>
-                </Card>
-              </TabsContent>
+                    </CardContent>
+                  </Card>
+                </TabsContent>
+              </Tabs>
 
-              <TabsContent value="risk" className="space-y-4">
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Risk Management</CardTitle>
-                    <CardDescription>
-                      Set automatic stop loss and take profit levels to protect your capital.
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <div className="grid grid-cols-2 gap-4">
-                      <FormField
-                        control={form.control}
-                        name="stopLoss"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Stop Loss (%)</FormLabel>
-                            <FormControl>
-                              <Input 
-                                type="number" 
-                                step="0.1" 
-                                min="0.1" 
-                                max="50" 
-                                {...field}
-                                onChange={(e) => field.onChange(e.target.value ? Number(e.target.value) : null)}
-                                value={field.value || ""}
-                                placeholder="e.g., 2.0"
-                              />
-                            </FormControl>
-                            <FormDescription>
-                              Automatic stop loss to limit losses.
-                            </FormDescription>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
+              <Separator />
 
-                      <FormField
-                        control={form.control}
-                        name="takeProfit"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Take Profit (%)</FormLabel>
-                            <FormControl>
-                              <Input 
-                                type="number" 
-                                step="0.1" 
-                                min="0.1" 
-                                max="100" 
-                                {...field}
-                                onChange={(e) => field.onChange(e.target.value ? Number(e.target.value) : null)}
-                                value={field.value || ""}
-                                placeholder="e.g., 4.0"
-                              />
-                            </FormControl>
-                            <FormDescription>
-                              Automatic take profit to secure gains.
-                            </FormDescription>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                    </div>
+              <div className="flex justify-end space-x-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => onOpenChange(false)}
+                  disabled={isSubmitting}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="submit"
+                  disabled={isSubmitting || !tradingCalculations?.hasSufficientWithBorrow}
+                >
+                  {isSubmitting ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Creating...
+                    </>
+                  ) : (
+                    "Create Bot"
+                  )}
+                </Button>
+              </div>
+            </form>
+          </Form>
+        </DialogContent>
+      </Dialog>
 
-                    <div className="bg-amber-50 dark:bg-amber-950 p-4 rounded-lg">
-                      <div className="flex items-start space-x-2">
-                        <Shield className="w-5 h-5 text-amber-600 dark:text-amber-400 mt-0.5 flex-shrink-0" />
-                        <div className="text-sm">
-                          <p className="font-medium text-amber-900 dark:text-amber-100">Risk Management Best Practices</p>
-                          <ul className="text-amber-700 dark:text-amber-300 mt-1 space-y-1">
-                            <li>• Use a 1:2 risk-reward ratio (e.g., 2% stop loss, 4% take profit)</li>
-                            <li>• Never risk more than 2-5% of your portfolio per trade</li>
-                            <li>• Always set stop loss to protect your capital</li>
-                            <li>• Start with small position sizes until you&apos;re confident</li>
-                          </ul>
-                        </div>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              </TabsContent>
-
-              <TabsContent value="alerts" className="space-y-4">
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Custom Alert Messages</CardTitle>
-                    <CardDescription>
-                      Configure custom messages to match your TradingView alerts. Leave blank to use standard actions.
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <div className="grid grid-cols-2 gap-4">
-                      <FormField
-                        control={form.control}
-                        name="enterLongMsg"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Enter Long Message</FormLabel>
-                            <FormControl>
-                              <Input placeholder="BUY" {...field} />
-                            </FormControl>
-                            <FormDescription>
-                              Custom message for long entries.
-                            </FormDescription>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-
-                      <FormField
-                        control={form.control}
-                        name="exitLongMsg"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Exit Long Message</FormLabel>
-                            <FormControl>
-                              <Input placeholder="SELL" {...field} />
-                            </FormControl>
-                            <FormDescription>
-                              Custom message for long exits.
-                            </FormDescription>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-
-                      <FormField
-                        control={form.control}
-                        name="enterShortMsg"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Enter Short Message</FormLabel>
-                            <FormControl>
-                              <Input placeholder="SHORT" {...field} />
-                            </FormControl>
-                            <FormDescription>
-                              Custom message for short entries.
-                            </FormDescription>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-
-                      <FormField
-                        control={form.control}
-                        name="exitShortMsg"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Exit Short Message</FormLabel>
-                            <FormControl>
-                              <Input placeholder="COVER" {...field} />
-                            </FormControl>
-                            <FormDescription>
-                              Custom message for short exits.
-                            </FormDescription>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                    </div>
-
-                    <div className="bg-blue-50 dark:bg-blue-950 p-4 rounded-lg">
-                      <div className="text-sm">
-                        <p className="font-medium mb-2 text-blue-900 dark:text-blue-100">TradingView Alert Example</p>
-                        <div className="space-y-2 text-blue-700 dark:text-blue-300">
-                          <p>In your TradingView alert, use this webhook URL and payload:</p>
-                          <div className="bg-white dark:bg-gray-800 p-2 rounded border font-mono text-xs">
-                            {`{
-  "botId": "your-bot-id",
-  "secret": "your-webhook-secret",
-  "action": "BUY",
-  "symbol": "BTCUSDT",
-  "price": {{close}}
-}`}
-                          </div>
-                          <p className="text-xs">You&apos;ll get the webhook URL and secret after creating the bot.</p>
-                        </div>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              </TabsContent>
-            </Tabs>
-
-            <Separator />
-
-            <div className="flex justify-end space-x-2">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => onOpenChange(false)}
-                disabled={isSubmitting}
-              >
-                Cancel
-              </Button>
-              <Button type="submit" disabled={isSubmitting}>
-                {isSubmitting ? "Creating..." : "Create Bot"}
-              </Button>
-            </div>
-          </form>
-        </Form>
-      </DialogContent>
-    </Dialog>
-
-    {/* Position Confirmation Dialog */}
-    {createdBot && (
-      <PositionConfirmationDialog
-        bot={createdBot}
-        open={showPositionDialog}
-        onOpenChange={setShowPositionDialog}
-        onSuccess={handlePositionDialogComplete}
-      />
-    )}
+      {/* Position Confirmation Dialog */}
+      {createdBot && (
+        <PositionConfirmationDialog
+          bot={createdBot}
+          open={showPositionDialog}
+          onOpenChange={setShowPositionDialog}
+          onSuccess={handlePositionDialogComplete}
+        />
+      )}
     </>
   );
 }

@@ -18,8 +18,19 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { TrendingDown, Loader2 } from "lucide-react";
+import { TrendingDown, Loader2, XCircle } from "lucide-react";
 import { toast } from "sonner";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import {
   PositionData,
   PositionAction,
@@ -41,6 +52,7 @@ export function AdvancedPositionsTable({
   const [filters, setFilters] = useState<PositionFilters>({});
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
   const [isClosingAll, setIsClosingAll] = useState(false);
+  const [isForceClosing, setIsForceClosing] = useState(false);
   const [positions, setPositions] = useState<PositionData[]>(
     propPositions || []
   );
@@ -166,6 +178,28 @@ export function AdvancedPositionsTable({
     }
   };
 
+  const handleForceCloseAll = async () => {
+    setIsForceClosing(true);
+    try {
+      const response = await axios.post("/api/positions/force-close-all", {
+        userId: selectedUser?.id
+      });
+
+      if (response.data.success) {
+        toast.success(response.data.message);
+        // Refresh positions data
+        await fetchPositions();
+      } else {
+        toast.error(response.data.error || "Failed to force close positions");
+      }
+    } catch (error) {
+      console.error("Error force closing positions:", error);
+      toast.error("Failed to force close positions");
+    } finally {
+      setIsForceClosing(false);
+    }
+  };
+
   const filteredPositions = positions.filter((position) => {
     if (filters.exchange && position.exchange !== filters.exchange)
       return false;
@@ -282,6 +316,43 @@ export function AdvancedPositionsTable({
                 "Close All"
               )}
             </Button>
+
+            {positions.length > 0 && (
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button variant="destructive" size="sm" className="h-9 text-sm">
+                    <XCircle className="h-4 w-4 mr-2" />
+                    Force Close All (DB Only)
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Force Close All Positions?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      This will mark all open positions as CLOSED in the database only.
+                      No actual trades will be executed on the exchange.
+
+                      This action should only be used for:
+                      - Testing/development
+                      - Cleaning up stale positions
+                      - Emergency database cleanup
+
+                      {positions.length} positions will be affected.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                    <AlertDialogAction
+                      onClick={handleForceCloseAll}
+                      className="bg-red-600 hover:bg-red-700"
+                      disabled={isForceClosing}
+                    >
+                      {isForceClosing ? "Closing..." : "Force Close All"}
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            )}
           </div>
         </div>
 
@@ -318,8 +389,8 @@ export function AdvancedPositionsTable({
                         </td>
                       </tr>
                     ) : filteredPositions.filter(
-                        (p) => p.status === "OPEN" || p.status === "ENTERED"
-                      ).length === 0 ? (
+                      (p) => p.status === "OPEN" || p.status === "ENTERED"
+                    ).length === 0 ? (
                       <tr>
                         <td colSpan={13} className="text-center py-8">
                           <p className="text-muted-foreground">

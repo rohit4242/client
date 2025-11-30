@@ -114,8 +114,7 @@ export function PositionConfirmationDialog({
     onSuccess();
   };
 
-  // Calculate potential position details
-  // Use appropriate portfolio value based on account type (spot or margin)
+  // Calculate potential position details using fixed trade amount
   let portfolioValue = getBotPortfolioValue(bot) || 0;
   
   // Fallback: If spotValue/marginValue are not set (migration not run or exchange not synced),
@@ -124,7 +123,10 @@ export function PositionConfirmationDialog({
     portfolioValue = parseFloat(bot.exchange.totalValue.toString());
   }
   
-  const positionValue = (portfolioValue * bot.portfolioPercent) / 100;
+  // Use fixed trade amount instead of percentage
+  const positionValue = bot.tradeAmountType === "BASE" && displayPrice
+    ? (bot.tradeAmount || 0) * displayPrice // Convert BASE to quote value
+    : (bot.tradeAmount || 0); // Already in quote value
   const quantity = displayPrice ? positionValue / displayPrice : 0;
   const accountTypeLabel = bot.accountType === 'SPOT' ? 'Spot' : 'Margin';
   const needsSync = !bot.exchange?.spotValue && !bot.exchange?.marginValue && bot.exchange?.totalValue;
@@ -181,9 +183,13 @@ export function PositionConfirmationDialog({
                   </span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-purple-600 dark:text-purple-400">Position ({bot.portfolioPercent}%):</span>
+                  <span className="text-purple-600 dark:text-purple-400">
+                    Trade Amount ({bot.tradeAmountType === "QUOTE" ? "USDT" : "BASE"}):
+                  </span>
                   <span className="font-mono font-medium text-purple-900 dark:text-purple-100">
-                    ${positionValue.toFixed(2)}
+                    {bot.tradeAmountType === "QUOTE" 
+                      ? `$${positionValue.toFixed(2)}`
+                      : `${bot.tradeAmount?.toFixed(6) || 0}`}
                   </span>
                 </div>
                 {bot.exchange && (
@@ -221,8 +227,12 @@ export function PositionConfirmationDialog({
                   <Badge variant="outline" className="ml-2">{primarySymbol}</Badge>
                 </div>
                 <div>
-                  <span className="text-muted-foreground">Portfolio %:</span>
-                  <span className="ml-2 font-medium">{bot.portfolioPercent}%</span>
+                  <span className="text-muted-foreground">Trade Amount:</span>
+                  <span className="ml-2 font-medium">
+                    {bot.tradeAmountType === "QUOTE" 
+                      ? `$${bot.tradeAmount?.toFixed(2) || 0}`
+                      : `${bot.tradeAmount?.toFixed(6) || 0}`}
+                  </span>
                 </div>
                 <div>
                   <span className="text-muted-foreground">Account Type:</span>

@@ -62,7 +62,7 @@ export async function GET(
     }
 
     // Generate webhook URL
-    const webhookUrl = `${process.env.NEXTAUTH_URL}/api/webhook/signal-bot`;
+    const webhookUrl = `${process.env.BETTER_AUTH_URL}/api/webhook/signal-bot`;
 
     // Transform to match SignalBot interface
     const response = {
@@ -74,7 +74,8 @@ export async function GET(
       symbols: signalBot.symbols,
       isActive: signalBot.isActive,
       orderType: signalBot.orderType as "Market" | "Limit" | "Stop",
-      portfolioPercent: signalBot.positionPercent,
+      tradeAmount: signalBot.tradeAmount,
+      tradeAmountType: signalBot.tradeAmountType,
       leverage: signalBot.leverage,
       accountType: signalBot.accountType,
       marginType: signalBot.marginType,
@@ -85,10 +86,6 @@ export async function GET(
       takeProfit: signalBot.takeProfit,
       webhookUrl,
       webhookSecret: signalBot.webhookSecret,
-      enterLongMsg: signalBot.enterLongMsg,
-      exitLongMsg: signalBot.exitLongMsg,
-      enterShortMsg: signalBot.enterShortMsg,
-      exitShortMsg: signalBot.exitShortMsg,
       totalTrades: signalBot.totalTrades,
       winTrades: signalBot.winTrades,
       lossTrades: signalBot.lossTrades,
@@ -193,7 +190,8 @@ export async function PUT(
         ...(data.exchangeId && { exchangeId: data.exchangeId }),
         ...(data.symbols && { symbols: data.symbols }),
         ...(data.orderType && { orderType: data.orderType }),
-        ...(data.portfolioPercent && { positionPercent: data.portfolioPercent }),
+        ...(data.tradeAmount !== undefined && { tradeAmount: data.tradeAmount }),
+        ...(data.tradeAmountType !== undefined && { tradeAmountType: data.tradeAmountType }),
         ...(data.leverage !== undefined && { leverage: data.leverage }),
         ...(data.accountType && { accountType: data.accountType }),
         ...(data.marginType !== undefined && { marginType: data.marginType }),
@@ -202,10 +200,6 @@ export async function PUT(
         ...(data.maxBorrowPercent !== undefined && { maxBorrowPercent: data.maxBorrowPercent }),
         ...(data.stopLoss !== undefined && { stopLoss: data.stopLoss }),
         ...(data.takeProfit !== undefined && { takeProfit: data.takeProfit }),
-        ...(data.enterLongMsg !== undefined && { enterLongMsg: data.enterLongMsg }),
-        ...(data.exitLongMsg !== undefined && { exitLongMsg: data.exitLongMsg }),
-        ...(data.enterShortMsg !== undefined && { enterShortMsg: data.enterShortMsg }),
-        ...(data.exitShortMsg !== undefined && { exitShortMsg: data.exitShortMsg }),
         ...(data.isActive !== undefined && { isActive: data.isActive }),
       },
       include: {
@@ -221,19 +215,20 @@ export async function PUT(
     });
 
     // Generate webhook URL
-    const webhookUrl = `${process.env.NEXTAUTH_URL}/api/webhook/signal-bot`;
+    const webhookUrl = `${process.env.BETTER_AUTH_URL}/api/webhook/signal-bot`;
 
     // Transform response to match SignalBot interface
     const response = {
       id: updatedBot.id,
       name: updatedBot.name,
       description: updatedBot.description,
-        portfolioId: updatedBot.portfolioId,
+      portfolioId: updatedBot.portfolioId,
       exchangeId: updatedBot.exchangeId,
       symbols: updatedBot.symbols,
       isActive: updatedBot.isActive,
       orderType: updatedBot.orderType as "Market" | "Limit" | "Stop",
-      portfolioPercent: updatedBot.positionPercent,
+      tradeAmount: updatedBot.tradeAmount,
+      tradeAmountType: updatedBot.tradeAmountType,
       leverage: updatedBot.leverage,
       accountType: updatedBot.accountType,
       marginType: updatedBot.marginType,
@@ -244,10 +239,6 @@ export async function PUT(
       takeProfit: updatedBot.takeProfit,
       webhookUrl,
       webhookSecret: updatedBot.webhookSecret,
-      enterLongMsg: updatedBot.enterLongMsg,
-      exitLongMsg: updatedBot.exitLongMsg,
-      enterShortMsg: updatedBot.enterShortMsg,
-      exitShortMsg: updatedBot.exitShortMsg,
       totalTrades: updatedBot.totalTrades,
       winTrades: updatedBot.winTrades,
       lossTrades: updatedBot.lossTrades,

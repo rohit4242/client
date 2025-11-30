@@ -105,40 +105,48 @@ export interface PositionData {
   quantity: number;
   filledQuantity: number;
   remainingQuantity: number;
-  
+
   // Risk Management
   maxDrawdown: number;
   takeProfit?: number;
   stopLoss?: number;
   breakEven?: number;
   trailing?: number;
-  
+
   // Portfolio & Performance
   portfolioPercent: number;
   pnlPercent: number;
   roiPercent: number;
   unrealizedPnl: number;
   realizedPnl: number;
-  
+
   // Status & Timing
   status: PositionStatusDisplay; // UI-friendly status
   entryTime: Date;
   exitTime?: Date;
   lastUpdated: Date;
-  
+
   // Exchange & Strategy Info
   exchange: string;
   strategy: PositionStrategy;
   account: PositionAccount;
-  
+
+  // Bot Information
+  botId?: string;
+  botName?: string;
+
+  // Account Type Information
+  accountType: "SPOT" | "MARGIN";
+  marginType?: "CROSS" | "ISOLATED";
+
   // Orders
   orders: PositionOrder[];
-  
+
   // Calculated Fields
   totalVolume: number;
   profitLoss: number;
   fees: number;
-  
+
   // Additional Metadata
   tags?: string[];
   notes?: string;
@@ -190,7 +198,7 @@ export interface MarketCloseResponse {
 }
 
 // Position Action Types
-export type PositionAction = 
+export type PositionAction =
   | { type: "CLOSE_POSITION"; payload: MarketCloseRequest }
   | { type: "UPDATE_STOP_LOSS"; payload: { positionId: string; stopLoss: number } }
   | { type: "UPDATE_TAKE_PROFIT"; payload: { positionId: string; takeProfit: number } }

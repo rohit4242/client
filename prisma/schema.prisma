@@ -429,7 +429,8 @@ model Bot {
 
   // Trading settings
   symbols         String[]    @default([]) // ["BTCUSDT", "ETHUSDT"]
-  positionPercent Float       @default(10) // % of portfolio per trade
+  tradeAmount     Float       @default(100) // Fixed trade amount
+  tradeAmountType String      @default("QUOTE") // QUOTE (USDT) or BASE (BTC)
   orderType       String      @default("Market") // Market, Limit
   
   // Account type settings

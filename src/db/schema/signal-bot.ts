@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-// Simple Signal Bot Configuration Schema
+// Signal Bot Configuration Schema (Simplified - No Alert Messages)
 export const createSignalBotSchema = z.object({
   // General Configuration
   name: z.string().min(1, "Bot name is required").max(50, "Bot name must be less than 50 characters"),
@@ -8,36 +8,31 @@ export const createSignalBotSchema = z.object({
   exchangeId: z.string().uuid("Invalid exchange ID"),
   symbols: z.array(z.string().regex(/^[A-Z]+USDT?$/, "Invalid symbol format")).min(1, "At least one symbol is required").max(10, "Maximum 10 symbols allowed").default([]),
   
-  // Entry Settings - Simple
+  // Entry Settings
   orderType: z.enum(["Market", "Limit"]).default("Market"),
   
-  // Amount per Trade - Simplified
-  portfolioPercent: z.number().min(1, "Portfolio percentage must be at least 1%").max(100, "Portfolio percentage cannot exceed 100%").default(20),
-  leverage: z.number().min(1).max(125).default(1),
+  // Trading Amount (Fixed amount instead of percentage)
+  tradeAmount: z.number().positive("Amount must be positive"),
+  tradeAmountType: z.enum(["QUOTE", "BASE"]).default("QUOTE"), // QUOTE = USDT, BASE = BTC
+  leverage: z.number().min(1).max(10).default(1),
   
   // Account Type - Spot or Margin
   accountType: z.enum(["SPOT", "MARGIN"]).default("SPOT"),
-  marginType: z.enum(["CROSS"]).default("CROSS").optional(), // For future ISOLATED support
+  marginType: z.enum(["CROSS"]).default("CROSS").optional(),
   sideEffectType: z.enum(["NO_SIDE_EFFECT", "MARGIN_BUY", "AUTO_REPAY", "AUTO_BORROW_REPAY"]).default("NO_SIDE_EFFECT"),
   autoRepay: z.boolean().default(false),
   maxBorrowPercent: z.number().min(1).max(100).default(50),
   
-  // Exit Strategies - Simple
+  // Risk Management
   stopLoss: z.number().min(0.1).max(50).nullable().optional(),
   takeProfit: z.number().min(0.1).max(100).nullable().optional(),
-  
-  // Alert Messages - Simple (4 signals only)
-  enterLongMsg: z.string().max(100).optional(),
-  exitLongMsg: z.string().max(100).optional(),
-  enterShortMsg: z.string().max(100).optional(),
-  exitShortMsg: z.string().max(100).optional(),
 });
 
 export const updateSignalBotSchema = createSignalBotSchema.partial().extend({
   isActive: z.boolean().optional(),
 });
 
-// Signal Action Schema - Only 4 actions
+// Signal Action Schema - Standard 4 actions
 export const signalActionSchema = z.enum([
   "ENTER_LONG",
   "EXIT_LONG", 
@@ -45,7 +40,7 @@ export const signalActionSchema = z.enum([
   "EXIT_SHORT"
 ]);
 
-// Simple TradingView Alert Schema
+// TradingView Alert Schema (supports both JSON and plain text parsed)
 export const tradingViewAlertSchema = z.object({
   action: z.string(),
   symbol: z.string(),
@@ -72,7 +67,7 @@ export const createSignalSchema = z.object({
   timeframe: z.string().optional(),
 });
 
-// Bot Trade Schema - Simplified
+// Bot Trade Schema
 export const botTradeStatusSchema = z.enum(["Open", "Closed", "Canceled"]);
 
 export const createBotTradeSchema = z.object({
@@ -90,7 +85,7 @@ export const createBotTradeSchema = z.object({
 // Webhook Validation Schema
 export const webhookValidationSchema = z.object({
   botId: z.string().uuid().optional(),
-  secret: z.string().min(8, "Webhook secret must be at least 8 characters"),
+  secret: z.string().min(8, "Webhook secret must be at least 8 characters").optional(),
 });
 
 // Type exports
@@ -120,6 +115,12 @@ export const SIDE_EFFECT_TYPE_OPTIONS = [
   { label: "Margin Buy", value: "MARGIN_BUY", description: "Auto-borrow if balance insufficient" },
   { label: "Auto Repay", value: "AUTO_REPAY", description: "Auto-repay debt when selling" },
   { label: "Auto Borrow & Repay", value: "AUTO_BORROW_REPAY", description: "Automatically borrow and repay as needed" },
+] as const;
+
+// Trade Amount Type Options
+export const TRADE_AMOUNT_TYPE_OPTIONS = [
+  { label: "Quote Currency", value: "QUOTE", example: "USDT" },
+  { label: "Base Currency", value: "BASE", example: "BTC" },
 ] as const;
 
 // Popular trading symbols for signal bots

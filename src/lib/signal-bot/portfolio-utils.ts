@@ -36,25 +36,30 @@ export function formatBotPortfolioDisplay(bot: SignalBot): string {
 }
 
 /**
- * Calculate position size based on bot settings and appropriate portfolio value
+ * Calculate position size based on bot settings using fixed trade amount
  * @param bot - Signal bot with exchange and settings
  * @param currentPrice - Current price of the asset
  * @returns Calculated position size in USD
  */
 export function calculateBotPositionSize(bot: SignalBot, currentPrice: number): {
   portfolioValue: number;
-  positionPercent: number;
+  tradeAmount: number;
+  tradeAmountType: string;
   positionValue: number;
   quantity: number;
   leverage: number;
   totalPositionSize: number;
 } {
   const portfolioValue = getBotPortfolioValue(bot);
-  const positionPercent = bot.portfolioPercent || 0;
+  const tradeAmount = bot.tradeAmount || 0;
+  const tradeAmountType = bot.tradeAmountType || "QUOTE";
   const leverage = bot.leverage || 1;
   
-  // Your capital allocation (what you're risking)
-  const positionValue = (portfolioValue * positionPercent) / 100;
+  // Calculate position value based on amount type
+  // If BASE currency, convert to quote value using current price
+  const positionValue = tradeAmountType === "BASE" 
+    ? tradeAmount * currentPrice 
+    : tradeAmount;
   
   // Total position size with leverage
   const totalPositionSize = positionValue * leverage;
@@ -64,7 +69,8 @@ export function calculateBotPositionSize(bot: SignalBot, currentPrice: number): 
   
   return {
     portfolioValue,
-    positionPercent,
+    tradeAmount,
+    tradeAmountType,
     positionValue,
     quantity,
     leverage,

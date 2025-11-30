@@ -1,7 +1,7 @@
 import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
 import db from "@/db";
-import {  PositionData, PositionOrder, PositionType } from "@/types/position";
+import { PositionData, PositionOrder, PositionType } from "@/types/position";
 import {
   PositionStatus,
   Side,
@@ -43,6 +43,7 @@ export async function getPositions(filters?: {
             exchanges: true,
           },
         },
+        bot: true,
         orders: {
           orderBy: {
             createdAt: "desc",
@@ -96,6 +97,7 @@ export async function getRawPositions(filters?: {
             exchanges: true,
           },
         },
+        bot: true,
         orders: {
           orderBy: {
             createdAt: "desc",
@@ -175,6 +177,9 @@ interface DatabasePosition {
   stopLoss: number | null;
   source: "MANUAL" | "BOT";
   strategyId: string | null;
+  botId: string | null;
+  accountType: "SPOT" | "MARGIN";
+  marginType: "CROSS" | "ISOLATED" | null;
   portfolioId: string;
   createdAt: Date;
   updatedAt: Date;
@@ -195,6 +200,11 @@ interface DatabasePosition {
       lastSyncedAt: Date;
     }>;
   };
+  bot: {
+    id: string;
+    name: string;
+    description: string | null;
+  } | null;
   orders: DatabaseOrder[];
 }
 
@@ -216,14 +226,14 @@ function transformDatabaseOrderToPositionOrder(
       order.status === OrderStatus.FILLED
         ? "COMPLETED"
         : order.status === OrderStatus.CANCELED
-        ? "CANCELED"
-        : order.status === OrderStatus.PARTIALLY_FILLED
-        ? "PARTIALLY_FILLED"
-        : order.status === OrderStatus.REJECTED
-        ? "REJECTED"
-        : order.status === OrderStatus.PENDING
-        ? "NEW"
-        : "NEW",
+          ? "CANCELED"
+          : order.status === OrderStatus.PARTIALLY_FILLED
+            ? "PARTIALLY_FILLED"
+            : order.status === OrderStatus.REJECTED
+              ? "REJECTED"
+              : order.status === OrderStatus.PENDING
+                ? "NEW"
+                : "NEW",
     fill: order.fillPercent,
     volume: order.value,
     pnl: order.pnl,
@@ -285,48 +295,53 @@ function transformDatabasePositionToPositionData(
     lastUpdated: position.updatedAt,
     exchange: position.portfolio?.exchanges?.[0]?.name || "UNKNOWN",
     strategy: {
-      id: position.strategyId ?? position.id,
-      name: position.source === "BOT" ? "Signal Bot" : "Manual",
+      id: position.botId ?? position.strategyId ?? position.id,
+      name: position.bot?.name ?? (position.source === "BOT" ? "Signal Bot" : "Manual"),
       description:
-        position.source === "BOT"
+        position.bot?.description ??
+        (position.source === "BOT"
           ? "Automated trading strategy"
-          : "Manual trade",
+          : "Manual trade"),
     },
+    botId: position.botId ?? undefined,
+    botName: position.bot?.name ?? undefined,
+    accountType: position.accountType,
+    marginType: position.marginType ?? undefined,
     account: {
       id: position.portfolioId,
       name: position.portfolio?.exchanges?.[0]?.name || "Unknown Account",
       exchange: position.portfolio?.exchanges?.[0]
         ? {
-            id: position.portfolio.exchanges[0].id,
-            portfolioId: position.portfolioId,
-            name: position.portfolio.exchanges[0].name,
-            apiKey: position.portfolio.exchanges[0].apiKey,
-            apiSecret: position.portfolio.exchanges[0].apiSecret,
-            isActive: position.portfolio.exchanges[0].isActive,
-            positionMode: position.portfolio.exchanges[0].positionMode,
-            spotValue: position.portfolio.exchanges[0].spotValue || 0,
-            marginValue: position.portfolio.exchanges[0].marginValue || 0,
-            totalValue: position.portfolio.exchanges[0].totalValue || 0,
-            lastSyncedAt:
-              position.portfolio.exchanges[0].lastSyncedAt.toISOString(),
-            createdAt: position.portfolio.exchanges[0].createdAt.toISOString(),
-            updatedAt: position.portfolio.exchanges[0].updatedAt.toISOString(),
-          }
+          id: position.portfolio.exchanges[0].id,
+          portfolioId: position.portfolioId,
+          name: position.portfolio.exchanges[0].name,
+          apiKey: position.portfolio.exchanges[0].apiKey,
+          apiSecret: position.portfolio.exchanges[0].apiSecret,
+          isActive: position.portfolio.exchanges[0].isActive,
+          positionMode: position.portfolio.exchanges[0].positionMode,
+          spotValue: position.portfolio.exchanges[0].spotValue || 0,
+          marginValue: position.portfolio.exchanges[0].marginValue || 0,
+          totalValue: position.portfolio.exchanges[0].totalValue || 0,
+          lastSyncedAt:
+            position.portfolio.exchanges[0].lastSyncedAt.toISOString(),
+          createdAt: position.portfolio.exchanges[0].createdAt.toISOString(),
+          updatedAt: position.portfolio.exchanges[0].updatedAt.toISOString(),
+        }
         : {
-            id: "",
-            portfolioId: position.portfolioId,
-            name: "UNKNOWN",
-            apiKey: "",
-            apiSecret: "",
-            isActive: false,
-            positionMode: "One_Way" as const,
-            totalValue: 0,
-            spotValue: 0,
-            marginValue: 0,
-            lastSyncedAt: null,
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString(),
-          },
+          id: "",
+          portfolioId: position.portfolioId,
+          name: "UNKNOWN",
+          apiKey: "",
+          apiSecret: "",
+          isActive: false,
+          positionMode: "One_Way" as const,
+          totalValue: 0,
+          spotValue: 0,
+          marginValue: 0,
+          lastSyncedAt: null,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        },
       accountType: "SPOT",
     },
     orders: transformedOrders,
@@ -370,6 +385,7 @@ export async function getBotPositions(userId?: string): Promise<PositionData[]> 
             exchanges: true,
           },
         },
+        bot: true,
         orders: {
           orderBy: {
             createdAt: "desc",
@@ -412,6 +428,7 @@ export async function getManualPositions(userId?: string): Promise<PositionData[
             exchanges: true,
           },
         },
+        bot: true,
         orders: {
           orderBy: {
             createdAt: "desc",

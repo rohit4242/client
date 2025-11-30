@@ -170,6 +170,41 @@ async function closePositionAutomatically(
   try {
     console.log(`🔄 Auto-closing position ${position.symbol}...`);
 
+    // Atomically verify position is still OPEN using transaction
+    // This prevents race conditions with EXIT signals
+    const lockedPosition = await db.$transaction(async (tx) => {
+      const pos = await tx.position.findFirst({
+        where: {
+          id: position.id,
+          status: "OPEN",
+        },
+      });
+
+      if (!pos) {
+        return null;
+      }
+
+      // Double-check it's still OPEN
+      const verify = await tx.position.findFirst({
+        where: {
+          id: pos.id,
+          status: "OPEN",
+        },
+      });
+
+      return verify;
+    }, {
+      isolationLevel: 'Serializable',
+    });
+
+    if (!lockedPosition) {
+      console.log(`⚠️ Position ${position.id} already closed or being closed, skipping`);
+      return;
+    }
+
+    // Use the locked position data
+    position = lockedPosition;
+
     // Determine side for closing
     const closeSide = position.side === "LONG" ? "SELL" : "BUY";
     
@@ -333,6 +368,7 @@ async function closePositionAutomatically(
 
   } catch (error) {
     console.error(`Error closing position ${position.id}:`, error);
+    // Position remains OPEN on failure (no status change needed)
     throw error;
   }
 }

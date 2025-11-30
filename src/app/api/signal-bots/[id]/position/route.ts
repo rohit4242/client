@@ -350,7 +350,7 @@ export async function POST(
       side,
       availableBalance,
       currentPrice,
-      signalBot.positionPercent,
+      signalBot.tradeAmount,
       customQuantity
     );
 

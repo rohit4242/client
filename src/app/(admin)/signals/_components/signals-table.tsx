@@ -38,6 +38,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { EditSignalDialog } from "./edit-signal-dialog";
 import { DeleteSignalDialog } from "./delete-signal-dialog";
 import { Switch } from "@/components/ui/switch";
@@ -233,7 +239,16 @@ export function SignalsTable({ signals }: SignalsTableProps) {
                   </TableCell>
                   <TableCell>
                     {signal.error ? (
-                      <Badge variant="destructive">Error</Badge>
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger>
+                            <Badge variant="destructive" className="cursor-help">Error</Badge>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p className="max-w-xs">{signal.error}</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
                     ) : signal.processed ? (
                       <Badge variant="default">Processed</Badge>
                     ) : (

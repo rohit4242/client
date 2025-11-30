@@ -34,10 +34,10 @@ export function PositionRow({
 
   // Use live price hook to get real-time market price
   const { price: livePrice } = useLivePrice(position.symbol, selectedUser?.id);
-  
+
   // Priority: passed currentPrice > live price > position.currentPrice > entryPrice as fallback
   const price = currentPrice || livePrice || position.currentPrice || position.entryPrice;
-  
+
   // Use realized PnL for closed positions, unrealized for open positions
   const isClosedPosition = position.status === "CLOSED";
   const pnlValue = isClosedPosition ? position.pnlPercent : ((price - position.entryPrice) / position.entryPrice) * 100;
@@ -169,23 +169,28 @@ export function PositionRow({
                 {position.side}
               </Badge>
               <span className="font-medium">{position.symbol}</span>
+              {/* Account Type Badge */}
+              <Badge
+                variant="outline"
+                className={cn(
+                  "text-xs",
+                  position.accountType === "SPOT"
+                    ? "text-blue-600 bg-blue-50 border-blue-200"
+                    : "text-purple-600 bg-purple-50 border-purple-200"
+                )}
+              >
+                {position.accountType}
+                {position.marginType && ` (${position.marginType})`}
+              </Badge>
             </div>
             <div className="flex items-center gap-1 text-xs text-muted-foreground mt-1">
               <span>{position.account.exchange.name}</span>
-              <span className="text-xs">•</span>
-              <span className="truncate max-w-[100px]">
-                {position.strategy.id}
-              </span>
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-4 w-4 p-0 ml-1"
-                onClick={() =>
-                  copyToClipboard(position.strategy.id, "Strategy ID")
-                }
-              >
-                <Copy className="h-3 w-3" />
-              </Button>
+              {position.botName && (
+                <>
+                  <span className="text-xs">•</span>
+                  <span className="font-medium text-primary">{position.botName}</span>
+                </>
+              )}
             </div>
             <div className="text-xs text-muted-foreground">
               {formatDate(position.entryTime)}
@@ -253,8 +258,8 @@ export function PositionRow({
         </TableCell>
         <TableCell className="text-center">
           {getStatusBadge(position.status)}
-          <MarkPrice 
-            symbol={position.symbol} 
+          <MarkPrice
+            symbol={position.symbol}
             fallbackPrice={position.currentPrice || position.entryPrice}
             className="mt-1"
             userId={selectedUser?.id}
@@ -276,27 +281,46 @@ export function PositionRow({
             <div className="p-4 space-y-4">
               {/* Position Details */}
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 text-sm">
+                {position.botId && position.botName && (
+                  <div>
+                    <span className="font-medium text-muted-foreground">
+                      Bot Name:
+                    </span>
+                    <span className="ml-2 font-medium text-primary">{position.botName}</span>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-4 w-4 p-0 ml-1"
+                      onClick={() =>
+                        copyToClipboard(position.botId!, "Bot ID")
+                      }
+                    >
+                      <Copy className="h-3 w-3" />
+                    </Button>
+                  </div>
+                )}
                 <div>
                   <span className="font-medium text-muted-foreground">
-                    Profile Strategy ID:
+                    Account Type:
                   </span>
-                  <span className="ml-2">{position.strategy.id}</span>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-4 w-4 p-0 ml-1"
-                    onClick={() =>
-                      copyToClipboard(position.strategy.id, "Strategy ID")
-                    }
+                  <Badge
+                    variant="outline"
+                    className={cn(
+                      "ml-2 text-xs",
+                      position.accountType === "SPOT"
+                        ? "text-blue-600 bg-blue-50 border-blue-200"
+                        : "text-purple-600 bg-purple-50 border-purple-200"
+                    )}
                   >
-                    <Copy className="h-3 w-3" />
-                  </Button>
+                    {position.accountType}
+                    {position.marginType && ` (${position.marginType})`}
+                  </Badge>
                 </div>
                 <div>
                   <span className="font-medium text-muted-foreground">
-                    Account Name:
+                    Exchange:
                   </span>
-                  <span className="ml-2">{position.account.name}</span>
+                  <span className="ml-2">{position.account.exchange.name}</span>
                 </div>
                 <div>
                   <span className="font-medium text-muted-foreground">
@@ -304,10 +328,10 @@ export function PositionRow({
                   </span>
                   <span className="ml-2">
                     {position.entryPrice.toFixed(2)} /{" "}
-                    {isClosedPosition && position.exitPrice 
+                    {isClosedPosition && position.exitPrice
                       ? position.exitPrice.toFixed(2)
-                      : isClosedPosition 
-                        ? "Closed" 
+                      : isClosedPosition
+                        ? "Closed"
                         : "Open"}
                   </span>
                 </div>

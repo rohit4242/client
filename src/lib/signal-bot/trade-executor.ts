@@ -1,3 +1,25 @@
+/**
+ * @deprecated This file is DEPRECATED and should not be used for new code.
+ * 
+ * REASON: This executor creates database records WITHOUT actually executing
+ * trades on Binance. It generates fake order IDs and marks orders as "FILLED"
+ * without real exchange execution.
+ * 
+ * USE INSTEAD: src/lib/signal-bot/fast-executor.ts
+ * The fast-executor properly:
+ * 1. Validates LOT_SIZE and MIN_NOTIONAL constraints
+ * 2. Validates user balance before placing orders
+ * 3. Executes real orders on Binance FIRST
+ * 4. Creates database records only AFTER successful exchange execution
+ * 5. Handles race conditions with atomic transactions
+ * 6. Properly deducts commission from executed quantities
+ * 
+ * This file is kept for reference and backward compatibility with margin-trade-executor
+ * which still imports types from here. Consider migrating all imports and removing this file.
+ * 
+ * @see fast-executor.ts for the correct implementation
+ */
+
 import db from "@/db";
 import type { Bot, Signal } from "@prisma/client";
 import { validatePositionParams } from "./signal-validator";
@@ -32,6 +54,7 @@ export interface TradeExecutionContext {
 
 /**
  * Trade execution result
+ * @deprecated Use FastExecutionResult from fast-executor.ts instead
  */
 export interface TradeExecutionResult {
   success: boolean;
@@ -46,6 +69,9 @@ export interface TradeExecutionResult {
 /**
  * Execute ENTER_LONG action
  * Creates a new LONG position
+ * 
+ * @deprecated Use fastEnterLong from fast-executor.ts instead.
+ * This function does NOT execute on Binance for SPOT accounts.
  */
 export async function executeEnterLong(
   context: TradeExecutionContext
@@ -80,8 +106,8 @@ export async function executeEnterLong(
       };
     }
 
-    // Calculate position size based on portfolio percentage
-    // For SPOT bots, use spotValue from the exchange
+    // Calculate position size using fixed trade amount
+    // For SPOT bots, use spotValue from the exchange for validation
     // Fallback to totalValue if spotValue is not available (migration not run or exchange not synced)
     const portfolioValue = bot.exchange.spotValue || bot.exchange.totalValue || 0;
     
@@ -89,8 +115,15 @@ export async function executeEnterLong(
       throw new Error("Invalid portfolio value. Please sync your exchange.");
     }
 
-    // Base position value (without leverage)
-    const basePositionValue = (portfolioValue * bot.positionPercent) / 100;
+    // Use fixed trade amount - convert if in BASE currency
+    let basePositionValue: number;
+    if (bot.tradeAmountType === 'BASE') {
+      // tradeAmount is in base currency (e.g., BTC), convert to quote value
+      basePositionValue = (bot.tradeAmount || 0) * currentPrice;
+    } else {
+      // tradeAmount is in quote currency (e.g., USDT), use directly
+      basePositionValue = bot.tradeAmount || 0;
+    }
     
     // For spot trading, leverage is typically 1 (no actual leverage without margin)
     const leverage = 1; // Spot can't use leverage
@@ -100,7 +133,8 @@ export async function executeEnterLong(
     
     console.log(`Spot LONG position calculation:`, {
       portfolioValue,
-      positionPercent: bot.positionPercent,
+      tradeAmount: bot.tradeAmount,
+      tradeAmountType: bot.tradeAmountType,
       basePositionValue,
       leverage,
       quantity,
@@ -200,6 +234,9 @@ export async function executeEnterLong(
 /**
  * Execute EXIT_LONG action
  * Closes an existing LONG position
+ * 
+ * @deprecated Use fastExitLong from fast-executor.ts instead.
+ * This function does NOT execute on Binance for SPOT accounts.
  */
 export async function executeExitLong(
   context: TradeExecutionContext
@@ -318,6 +355,9 @@ export async function executeExitLong(
 /**
  * Execute ENTER_SHORT action
  * Creates a new SHORT position
+ * 
+ * @deprecated Use fastEnterShort from fast-executor.ts instead.
+ * This function does NOT execute on Binance for SPOT accounts.
  */
 export async function executeEnterShort(
   context: TradeExecutionContext
@@ -352,8 +392,8 @@ export async function executeEnterShort(
       };
     }
 
-    // Calculate position size based on portfolio percentage
-    // For SPOT bots, use spotValue from the exchange
+    // Calculate position size using fixed trade amount
+    // For SPOT bots, use spotValue from the exchange for validation
     // Fallback to totalValue if spotValue is not available (migration not run or exchange not synced)
     const portfolioValue = bot.exchange.spotValue || bot.exchange.totalValue || 0;
     
@@ -361,8 +401,15 @@ export async function executeEnterShort(
       throw new Error("Invalid portfolio value. Please sync your exchange.");
     }
 
-    // Base position value (without leverage)
-    const basePositionValue = (portfolioValue * bot.positionPercent) / 100;
+    // Use fixed trade amount - convert if in BASE currency
+    let basePositionValue: number;
+    if (bot.tradeAmountType === 'BASE') {
+      // tradeAmount is in base currency (e.g., BTC), convert to quote value
+      basePositionValue = (bot.tradeAmount || 0) * currentPrice;
+    } else {
+      // tradeAmount is in quote currency (e.g., USDT), use directly
+      basePositionValue = bot.tradeAmount || 0;
+    }
     
     // For spot trading, leverage is typically 1 (no actual leverage without margin)
     const leverage = 1; // Spot can't use leverage
@@ -372,7 +419,8 @@ export async function executeEnterShort(
     
     console.log(`Spot SHORT position calculation:`, {
       portfolioValue,
-      positionPercent: bot.positionPercent,
+      tradeAmount: bot.tradeAmount,
+      tradeAmountType: bot.tradeAmountType,
       basePositionValue,
       leverage,
       quantity,
@@ -472,6 +520,9 @@ export async function executeEnterShort(
 /**
  * Execute EXIT_SHORT action
  * Closes an existing SHORT position
+ * 
+ * @deprecated Use fastExitShort from fast-executor.ts instead.
+ * This function does NOT execute on Binance for SPOT accounts.
  */
 export async function executeExitShort(
   context: TradeExecutionContext

@@ -4,6 +4,11 @@ import { getMarginAccount, getMaxBorrowable, placeMarginOrder } from "@/lib/marg
 import { configurationRestAPI } from "@/types/binance";
 import type { TradeExecutionResult } from "./trade-executor";
 import { SideEffectType } from "@/types/margin";
+import { 
+  getSymbolConstraints, 
+  validateAndFormatOrderQuantity,
+  formatQuantityToLotSize,
+} from "./exchange-info-utils";
 
 /**
  * Margin trade execution context
@@ -220,8 +225,8 @@ export async function executeMarginEnterLong(
     // Extract assets
     const { baseAsset, quoteAsset } = extractAssets(signal.symbol);
 
-    // Calculate position size based on portfolio percentage
-    // For MARGIN bots, use marginValue from the exchange
+    // Calculate position size using fixed trade amount
+    // For MARGIN bots, use marginValue from the exchange for validation
     // Fallback to totalValue if marginValue is not available (migration not run or exchange not synced)
     const portfolioValue = bot.exchange.marginValue || bot.exchange.totalValue || 0;
     
@@ -229,9 +234,15 @@ export async function executeMarginEnterLong(
       throw new Error("Invalid portfolio value. Please sync your exchange.");
     }
 
-    // Calculate YOUR capital allocation (what you're willing to risk)
-    // This is EXACTLY positionPercent of portfolio - we'll use this much of your balance
-    const yourCapitalAllocation = (portfolioValue * bot.positionPercent) / 100;
+    // Use fixed trade amount - convert if in BASE currency
+    let yourCapitalAllocation: number;
+    if (bot.tradeAmountType === 'BASE') {
+      // tradeAmount is in base currency (e.g., BTC), convert to quote value
+      yourCapitalAllocation = (bot.tradeAmount || 0) * currentPrice;
+    } else {
+      // tradeAmount is in quote currency (e.g., USDT), use directly
+      yourCapitalAllocation = bot.tradeAmount || 0;
+    }
     
     // Apply leverage to get total position size
     const leverage = bot.leverage || 1;
@@ -243,7 +254,8 @@ export async function executeMarginEnterLong(
     
     console.log(`Position calculation:`, {
       portfolioValue,
-      positionPercent: bot.positionPercent,
+      tradeAmount: bot.tradeAmount,
+      tradeAmountType: bot.tradeAmountType,
       yourCapitalAllocation,
       leverage,
       totalPositionSize,
@@ -297,7 +309,20 @@ export async function executeMarginEnterLong(
     }
 
     // Calculate quantity to buy
-    const finalQuantity = totalPositionSize / currentPrice;
+    const rawQuantity = totalPositionSize / currentPrice;
+
+    // Validate and format quantity to meet LOT_SIZE and MIN_NOTIONAL requirements
+    const constraints = await getSymbolConstraints(config, signal.symbol);
+    let finalQuantity = rawQuantity;
+    
+    if (constraints) {
+      const validation = validateAndFormatOrderQuantity(rawQuantity, currentPrice, constraints);
+      if (!validation.valid) {
+        throw new Error(validation.error || "Order validation failed");
+      }
+      finalQuantity = validation.formattedQuantity;
+      console.log(`Quantity validated: ${rawQuantity.toFixed(8)} → ${finalQuantity.toFixed(8)}`);
+    }
 
     // Determine side effect type based on whether we need to borrow
     let sideEffectType: 'NO_SIDE_EFFECT' | 'MARGIN_BUY' | 'AUTO_REPAY' | 'AUTO_BORROW_REPAY';
@@ -587,8 +612,8 @@ export async function executeMarginEnterShort(
     // Extract assets
     const { baseAsset, quoteAsset } = extractAssets(signal.symbol);
 
-    // Calculate position size
-    // For MARGIN bots, use marginValue from the exchange
+    // Calculate position size using fixed trade amount
+    // For MARGIN bots, use marginValue from the exchange for validation
     // Fallback to totalValue if marginValue is not available (migration not run or exchange not synced)
     const portfolioValue = bot.exchange.marginValue || bot.exchange.totalValue || 0;
     
@@ -596,8 +621,15 @@ export async function executeMarginEnterShort(
       throw new Error("Invalid portfolio value. Please sync your exchange.");
     }
 
-    // Calculate YOUR capital allocation (what you're willing to risk)
-    const yourCapitalAllocation = (portfolioValue * bot.positionPercent) / 100;
+    // Use fixed trade amount - convert if in BASE currency
+    let yourCapitalAllocation: number;
+    if (bot.tradeAmountType === 'BASE') {
+      // tradeAmount is in base currency (e.g., BTC), convert to quote value
+      yourCapitalAllocation = (bot.tradeAmount || 0) * currentPrice;
+    } else {
+      // tradeAmount is in quote currency (e.g., USDT), use directly
+      yourCapitalAllocation = bot.tradeAmount || 0;
+    }
     
     // Apply leverage to get total position size
     const leverage = bot.leverage || 1;
@@ -614,7 +646,8 @@ export async function executeMarginEnterShort(
     
     console.log(`Short position calculation:`, {
       portfolioValue,
-      positionPercent: bot.positionPercent,
+      tradeAmount: bot.tradeAmount,
+      tradeAmountType: bot.tradeAmountType,
       yourCapitalAllocation,
       leverage,
       totalPositionSize,
@@ -670,8 +703,18 @@ export async function executeMarginEnterShort(
       console.log(`✅ Borrow validation passed - borrowing ${baseAssetToBorrow.toFixed(8)} ${baseAsset}`);
     }
 
-    // Final quantity to short
-    const finalQuantity = totalQuantityNeeded;
+    // Validate and format quantity to meet LOT_SIZE and MIN_NOTIONAL requirements
+    const constraints = await getSymbolConstraints(config, signal.symbol);
+    let finalQuantity = totalQuantityNeeded;
+    
+    if (constraints) {
+      const validation = validateAndFormatOrderQuantity(totalQuantityNeeded, currentPrice, constraints);
+      if (!validation.valid) {
+        throw new Error(validation.error || "Order validation failed");
+      }
+      finalQuantity = validation.formattedQuantity;
+      console.log(`SHORT Quantity validated: ${totalQuantityNeeded.toFixed(8)} → ${finalQuantity.toFixed(8)}`);
+    }
 
     // For short selling, we use MARGIN_BUY side effect to borrow base asset
     let sideEffectType: 'NO_SIDE_EFFECT' | 'MARGIN_BUY' | 'AUTO_REPAY' | 'AUTO_BORROW_REPAY';

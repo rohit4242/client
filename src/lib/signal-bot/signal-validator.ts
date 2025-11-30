@@ -1,5 +1,11 @@
 import { Action } from "@prisma/client";
-import type { Bot } from "@prisma/client";
+import type { Bot, Exchange, Portfolio, Signal } from "@prisma/client";
+import { getPriceBySymbol, tradingPairInfo } from "../trading-utils";
+import {
+  getSymbolConstraints,
+  validateAndFormatOrderQuantity,
+  validateBalance,
+} from "./exchange-info-utils";
 
 /**
  * Parse result interface
@@ -27,10 +33,10 @@ export interface ValidationResult {
 
 /**
  * Parse TradingView alert message
- * 
+ *
  * Expected format: "ACTION_EXCHANGE_SYMBOL_BOTNAME_TIMEFRAME_BOTID"
  * Example: "ENTER-LONG_BINANCE_BTCUSDT_BOT-NAME-TV8BuH_5M_afdfe842b36b842f4ab2a95"
- * 
+ *
  * Parsed as:
  * - Part 0: action (ENTER-LONG, EXIT-LONG, ENTER-SHORT, EXIT-SHORT)
  * - Part 1: exchange (BINANCE)
@@ -40,20 +46,20 @@ export interface ValidationResult {
  * - Part 5: botId (UUID or identifier)
  */
 export function parseTradingViewAlert(alertMessage: string): ParseResult {
-  if (!alertMessage || typeof alertMessage !== 'string') {
+  if (!alertMessage || typeof alertMessage !== "string") {
     return {
       success: false,
-      error: "Alert message is required and must be a string"
+      error: "Alert message is required and must be a string",
     };
   }
 
   // Split by underscore
   const parts = alertMessage.trim().split("_");
-  
+
   if (parts.length < 6) {
     return {
       success: false,
-      error: `Invalid alert format. Expected 6 parts separated by underscore, got ${parts.length}. Format: ACTION_EXCHANGE_SYMBOL_BOTNAME_TIMEFRAME_BOTID`
+      error: `Invalid alert format. Expected 6 parts separated by underscore, got ${parts.length}. Format: ACTION_EXCHANGE_SYMBOL_BOTNAME_TIMEFRAME_BOTID`,
     };
   }
 
@@ -67,42 +73,42 @@ export function parseTradingViewAlert(alertMessage: string): ParseResult {
   // Map action string to Prisma Action enum
   const actionMap: Record<string, Action> = {
     "ENTER-LONG": Action.ENTER_LONG,
-    "ENTERLONG": Action.ENTER_LONG,
-    "ENTER_LONG": Action.ENTER_LONG,
-    
+    ENTERLONG: Action.ENTER_LONG,
+    ENTER_LONG: Action.ENTER_LONG,
+
     "EXIT-LONG": Action.EXIT_LONG,
-    "EXITLONG": Action.EXIT_LONG,
-    "EXIT_LONG": Action.EXIT_LONG,
-    
+    EXITLONG: Action.EXIT_LONG,
+    EXIT_LONG: Action.EXIT_LONG,
+
     "ENTER-SHORT": Action.ENTER_SHORT,
-    "ENTERSHORT": Action.ENTER_SHORT,
-    "ENTER_SHORT": Action.ENTER_SHORT,
-    
+    ENTERSHORT: Action.ENTER_SHORT,
+    ENTER_SHORT: Action.ENTER_SHORT,
+
     "EXIT-SHORT": Action.EXIT_SHORT,
-    "EXITSHORT": Action.EXIT_SHORT,
-    "EXIT_SHORT": Action.EXIT_SHORT,
+    EXITSHORT: Action.EXIT_SHORT,
+    EXIT_SHORT: Action.EXIT_SHORT,
   };
 
   const action = actionMap[actionStr];
-  
+
   if (!action) {
     return {
       success: false,
-      error: `Invalid action: "${actionStr}". Supported actions: ENTER-LONG, EXIT-LONG, ENTER-SHORT, EXIT-SHORT`
+      error: `Invalid action: "${actionStr}". Supported actions: ENTER-LONG, EXIT-LONG, ENTER-SHORT, EXIT-SHORT`,
     };
   }
 
   if (!exchange) {
     return {
       success: false,
-      error: "Exchange is required in alert message (part 2)"
+      error: "Exchange is required in alert message (part 2)",
     };
   }
 
   if (!symbol) {
     return {
       success: false,
-      error: "Symbol is required in alert message (part 3)"
+      error: "Symbol is required in alert message (part 3)",
     };
   }
 
@@ -110,28 +116,28 @@ export function parseTradingViewAlert(alertMessage: string): ParseResult {
   if (!/^[A-Z0-9]+$/.test(symbol)) {
     return {
       success: false,
-      error: `Invalid symbol format: "${symbol}". Symbol must contain only uppercase letters and numbers`
+      error: `Invalid symbol format: "${symbol}". Symbol must contain only uppercase letters and numbers`,
     };
   }
 
   if (!botName) {
     return {
       success: false,
-      error: "Bot name is required in alert message (part 4)"
+      error: "Bot name is required in alert message (part 4)",
     };
   }
 
   if (!timeframe) {
     return {
       success: false,
-      error: "Timeframe is required in alert message (part 5)"
+      error: "Timeframe is required in alert message (part 5)",
     };
   }
 
   if (!botId) {
     return {
       success: false,
-      error: "Bot ID is required in alert message (part 6)"
+      error: "Bot ID is required in alert message (part 6)",
     };
   }
 
@@ -139,7 +145,7 @@ export function parseTradingViewAlert(alertMessage: string): ParseResult {
   if (botId.trim().length === 0) {
     return {
       success: false,
-      error: "Bot ID cannot be empty"
+      error: "Bot ID cannot be empty",
     };
   }
 
@@ -151,8 +157,8 @@ export function parseTradingViewAlert(alertMessage: string): ParseResult {
       symbol,
       botName,
       timeframe,
-      botId: botId.trim()
-    }
+      botId: botId.trim(),
+    },
   };
 }
 
@@ -174,7 +180,9 @@ export function validateWebhookPayload(
   // Check if symbol is in bot's allowed symbols
   if (bot.symbols.length > 0 && !bot.symbols.includes(symbol)) {
     errors.push(
-      `Symbol ${symbol} is not configured for this bot. Configured symbols: ${bot.symbols.join(', ')}`
+      `Symbol ${symbol} is not configured for this bot. Configured symbols: ${bot.symbols.join(
+        ", "
+      )}`
     );
   }
 
@@ -188,7 +196,7 @@ export function validateWebhookPayload(
     Action.ENTER_LONG,
     Action.EXIT_LONG,
     Action.ENTER_SHORT,
-    Action.EXIT_SHORT
+    Action.EXIT_SHORT,
   ];
 
   if (!validActions.includes(action)) {
@@ -197,7 +205,7 @@ export function validateWebhookPayload(
 
   return {
     success: errors.length === 0,
-    errors
+    errors,
   };
 }
 
@@ -209,7 +217,7 @@ export function validatePositionParams(params: {
   entryPrice: number;
   stopLoss?: number | null;
   takeProfit?: number | null;
-  side: 'LONG' | 'SHORT';
+  side: "LONG" | "SHORT";
 }): ValidationResult {
   const errors: string[] = [];
 
@@ -238,12 +246,12 @@ export function validatePositionParams(params: {
     }
 
     // For LONG: stop loss should be below entry price
-    if (params.side === 'LONG' && params.stopLoss >= params.entryPrice) {
+    if (params.side === "LONG" && params.stopLoss >= params.entryPrice) {
       errors.push("Stop loss must be below entry price for LONG positions");
     }
 
     // For SHORT: stop loss should be above entry price
-    if (params.side === 'SHORT' && params.stopLoss <= params.entryPrice) {
+    if (params.side === "SHORT" && params.stopLoss <= params.entryPrice) {
       errors.push("Stop loss must be above entry price for SHORT positions");
     }
   }
@@ -255,18 +263,94 @@ export function validatePositionParams(params: {
     }
 
     // For LONG: take profit should be above entry price
-    if (params.side === 'LONG' && params.takeProfit <= params.entryPrice) {
+    if (params.side === "LONG" && params.takeProfit <= params.entryPrice) {
       errors.push("Take profit must be above entry price for LONG positions");
     }
 
     // For SHORT: take profit should be below entry price
-    if (params.side === 'SHORT' && params.takeProfit >= params.entryPrice) {
+    if (params.side === "SHORT" && params.takeProfit >= params.entryPrice) {
       errors.push("Take profit must be below entry price for SHORT positions");
     }
   }
 
   return {
     success: errors.length === 0,
-    errors
+    errors,
+  };
+}
+
+export async function signalValidator(
+  bot: Bot,
+  signal: Signal,
+  exchange: Exchange,
+  portfolio: Portfolio
+) {
+  const errors: string[] = [];
+
+  const configurationRestAPI = {
+    apiKey: exchange.apiKey,
+    apiSecret: exchange.apiSecret,
+  };
+  const currentPrice = await getPriceBySymbol(
+    configurationRestAPI,
+    signal.symbol
+  );
+
+  const getSymbolConstraintsResult = await getSymbolConstraints(
+    configurationRestAPI,
+    signal.symbol
+  );
+  if (!getSymbolConstraintsResult) {
+    errors.push("Unable to get trading constraints for symbol");
+    return {
+      success: false,
+      errors,
+    };
+  }
+
+  const validateAndFormatOrderQuantityResult = validateAndFormatOrderQuantity(
+    bot.tradeAmount,
+    parseFloat(currentPrice.price),
+    getSymbolConstraintsResult
+  );
+  if (!validateAndFormatOrderQuantityResult.valid) {
+    errors.push("Invalid quantity or price");
+    return {
+      success: false,
+      errors: [
+        validateAndFormatOrderQuantityResult.error ||
+          "Invalid quantity or price",
+      ],
+    };
+  }
+
+  const validatedQuantity =
+    validateAndFormatOrderQuantityResult.formattedQuantity;
+  if (validatedQuantity <= 0) {
+    errors.push("Validated quantity must be greater than 0");
+    return {
+      success: false,
+      errors: [
+        validateAndFormatOrderQuantityResult.error ||
+          "Invalid quantity or price",
+      ],
+    };
+  }
+
+  const validateBalanceResult = validateBalance(
+    configurationRestAPI,
+    signal.symbol,
+    validatedQuantity
+  );
+
+  console.log("validatedQuantity: ", validatedQuantity);
+  console.log("validateBalanceResult: ", validateBalanceResult);
+
+  return {
+    success: true,
+    constraints: getSymbolConstraintsResult,
+    validatedQuantity,
+    validateBalanceResult,
+    validated: true,
   };
 }

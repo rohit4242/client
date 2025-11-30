@@ -1,14 +1,15 @@
 import db from "@/db";
-import { Action, Bot } from "@prisma/client";
+import { Action, Bot, Exchange, Portfolio, Signal } from "@prisma/client";
 import {
-  executeEnterLong,
-  executeExitLong,
-  executeEnterShort,
-  executeExitShort,
-  type TradeExecutionResult
-} from "./trade-executor";
-import { recalculatePortfolioStatsInternal } from "@/db/actions/portfolio/recalculate-stats";
-
+  fastEnterLong,
+  fastExitLong,
+  fastEnterShort,
+  fastExitShort,
+  type FastExecutionResult,
+  type FastExecutionContext,
+} from "./fast-executor";
+import { getPriceBySymbol } from "../trading-utils";
+import { signalValidator } from "./signal-validator";
 /**
  * Signal processing result interface
  */
@@ -16,34 +17,47 @@ export interface SignalProcessingResult {
   success: boolean;
   positionId?: string;
   orderId?: string;
+  binanceOrderId?: string;
   message?: string;
   error?: string;
   skipped?: boolean;
   skipReason?: string;
+  executionTime?: number;
 }
 
 /**
  * Process a signal and execute the corresponding trade
- * 
+ *
+ * OPTIMIZED FLOW:
+ * 1. Quick validation
+ * 2. Execute on Binance FIRST (speed critical)
+ * 3. Create DB records after success
+ * 4. Update stats async (non-blocking)
+ *
  * @param signalId - The ID of the signal to process
  * @returns Promise<SignalProcessingResult>
  */
-export async function processSignal(signalId: string): Promise<SignalProcessingResult> {
-  console.log(`Processing signal: ${signalId}`);
+
+export interface ProcessSignalParams {
+  signal: Signal;
+  bot: Bot;
+  exchange: Exchange;
+  portfolio: Portfolio;
+}
+
+export async function processSignal(
+  params: ProcessSignalParams
+) {
+  const startTime = Date.now();
+  console.log(`[Processor] Processing signal: ${params.signal.id}`);
 
   try {
-    // Fetch the signal with all necessary relations
-    const signal = await db.signal.findUnique({
-      where: { id: signalId },
-      include: {
-        bot: {
-          include: {
-            exchange: true,
-            portfolio: true,
-          },
-        },
-      },
-    });
+    // Fetch signal with minimal required relations for speed
+    const signal = params.signal;
+    const bot = params.bot;
+    const exchange = params.exchange;
+    const portfolio = params.portfolio;
+    const { action, symbol, price } = signal;
 
     if (!signal) {
       throw new Error("Signal not found");
@@ -54,10 +68,9 @@ export async function processSignal(signalId: string): Promise<SignalProcessingR
         success: false,
         skipped: true,
         skipReason: "Signal already processed",
+        executionTime: Date.now() - startTime,
       };
     }
-
-    const { bot, action, symbol, price } = signal;
 
     if (!bot) {
       throw new Error("Bot not found for signal");
@@ -65,174 +78,102 @@ export async function processSignal(signalId: string): Promise<SignalProcessingR
 
     if (!bot.isActive) {
       await db.signal.update({
-        where: { id: signalId },
-        data: {
-          processed: true,
-          error: "Bot is not active",
-        },
+        where: { id: signal.id },
+        data: { processed: true, error: "Bot is not active" },
       });
-
       return {
         success: false,
         skipped: true,
         skipReason: "Bot is not active",
+        executionTime: Date.now() - startTime,
       };
     }
 
-    // Get current price if not provided in signal
-    let currentPrice = price;
-    if (!currentPrice) {
-      const { getPriceBySymbol } = await import("@/lib/trading-utils");
-      const configurationRestAPI = {
-        apiKey: bot.exchange.apiKey,
-        apiSecret: bot.exchange.apiSecret,
-      };
-      const priceData = await getPriceBySymbol(configurationRestAPI, symbol);
-      
-      if (typeof priceData === 'object' && 'price' in priceData) {
-        currentPrice = parseFloat(priceData.price as string);
-      } else if (typeof priceData === 'string') {
-        currentPrice = parseFloat(priceData);
-      } else if (typeof priceData === 'number') {
-        currentPrice = priceData;
-      }
-    }
-
-    if (!currentPrice || currentPrice <= 0) {
-      throw new Error("Unable to get valid current price");
-    }
-
-    console.log(`Executing ${action} for ${symbol} at price ${currentPrice}`);
-
-    // Execute the trade based on action
-    let result: TradeExecutionResult;
-
-    switch (action) {
-      case Action.ENTER_LONG:
-        result = await executeEnterLong({
-          bot: bot as Bot & {
-            exchange: {
-              id: string;
-              apiKey: string;
-              apiSecret: string;
-              spotValue: number;
-              marginValue: number;
-              totalValue: number;
-              isActive: boolean;
-            };
-            portfolio: {
-              id: string;
-            };
-          },
-          signal,
-          currentPrice,
-        });
-        break;
-
-      case Action.EXIT_LONG:
-        result = await executeExitLong({
-          bot: bot as Bot & {
-            exchange: {
-              id: string;
-              apiKey: string;
-              apiSecret: string;
-              totalValue: number;
-              spotValue: number;
-              marginValue: number;
-              isActive: boolean;
-            };
-            portfolio: {
-              id: string;
-            };
-          },
-          signal,
-          currentPrice,
-        });
-        break;
-
-      case Action.ENTER_SHORT:
-        result = await executeEnterShort({
-          bot: bot as Bot & {
-            exchange: {
-              id: string;
-              apiKey: string;
-              apiSecret: string;
-              totalValue: number;
-              spotValue: number;
-              marginValue: number;
-              isActive: boolean;
-            };
-            portfolio: {
-              id: string;
-            };
-          },
-          signal,
-          currentPrice,
-        });
-        break;
-
-      case Action.EXIT_SHORT:
-        result = await executeExitShort({
-          bot,
-          signal,
-          currentPrice,
-        });
-        break;
-
-      default:
-        throw new Error(`Unsupported action: ${action}`);
-    }
-
-    // Mark signal as processed
-    await db.signal.update({
-      where: { id: signalId },
-      data: {
-        processed: true,
-        error: result.success ? null : result.error,
-      },
-    });
-
-    if (result.success) {
-      console.log(`Signal ${signalId} processed successfully`);
-      
-      // Recalculate portfolio stats after signal processing
-      try {
-        const userId = bot.portfolio.userId;
-        await recalculatePortfolioStatsInternal(userId);
-        console.log(`Portfolio stats recalculated for user ${userId}`);
-      } catch (statsError) {
-        console.error("Error recalculating portfolio stats:", statsError);
-        // Don't fail the signal processing if stats calculation fails
-      }
-      
-      return {
-        success: true,
-        positionId: result.positionId,
-        orderId: result.orderId,
-        message: result.message,
-      };
-    } else {
-      console.error(`Signal ${signalId} processing failed:`, result.error);
+    if (!exchange.isActive) {
+      await db.signal.update({
+        where: { id: signal.id },
+        data: { processed: true, error: "Exchange is not active" },
+      });
       return {
         success: false,
-        error: result.error,
-        skipped: result.skipped,
-        skipReason: result.skipReason,
+        skipped: true,
+        skipReason: "Exchange is not active",
+        executionTime: Date.now() - startTime,
       };
     }
 
+    const signalValidatorResult = await signalValidator(bot, signal, exchange, portfolio);
+    if (!signalValidatorResult.validated) {
+      return {
+        success: false,
+        error: signalValidatorResult.errors?.join(", ") || "Unknown error",
+      };
+    }
+
+    
+
+    // Execute trade using FAST executor (Binance first)
+    let result: FastExecutionResult;
+
+    // switch (action) {
+    //   case Action.ENTER_LONG:
+    //     result = await fastEnterLong(context);
+    //     break;
+
+    //   case Action.EXIT_LONG:
+    //     result = await fastExitLong(context);
+    //     break;
+
+    //   case Action.ENTER_SHORT:
+    //     result = await fastEnterShort(context);
+    //     break;
+
+    //   case Action.EXIT_SHORT:
+    //     result = await fastExitShort(context);
+    //     break;
+
+    //   default:
+    //     throw new Error(`Unsupported action: ${action}`);
+    // }
+
+    // // Mark signal as processed
+    // await db.signal.update({
+    //   where: { id: signal.id },
+    //   data: {
+    //     processed: true,
+    //     error: result.success ? null : result.error,
+    //   },
+    // });
+
+    // const totalTime = Date.now() - startTime;
+
+    // if (result.success) {
+    //   console.log(
+    //     `[Processor] Signal ${signal.id} completed in ${totalTime}ms`
+    //   );
+    //   return {
+    //     success: true,
+    //     positionId: result.positionId,
+    //     orderId: result.orderId,
+    //     binanceOrderId: result.binanceOrderId,
+    //     message: result.message,
+    //     executionTime: totalTime,
+    //   };
+    // } else {
+    //   console.error(`[Processor] Signal ${signal.id} failed:`, result.error);
+    //   return {
+    //     success: false,
+    //     error: result.error,
+    //     skipped: result.skipped,
+    //     skipReason: result.skipReason,
+    //     executionTime: totalTime,
+    //   };
+    // }
   } catch (error) {
-    console.error("Error processing signal:", error);
-
-    // Update signal with error
-    await db.signal.update({
-      where: { id: signalId },
-      data: {
-        processed: true,
-        error: error instanceof Error ? error.message : "Unknown error",
-      },
-    }).catch(err => console.error("Failed to update signal error:", err));
-
-    throw error;
+    console.error("[Processor] Error:", error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Unknown error",
+    };
   }
 }

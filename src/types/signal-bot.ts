@@ -7,11 +7,12 @@ export interface SignalBot {
   symbols: string[];
   isActive: boolean;
   
-  // Entry Settings - Simple
+  // Entry Settings
   orderType: OrderType;
   
-  // Amount per Trade - Simplified
-  portfolioPercent: number;
+  // Trading Amount (Fixed amount)
+  tradeAmount: number;
+  tradeAmountType: "QUOTE" | "BASE";
   leverage?: number | null;
   
   // Account Type - Spot or Margin
@@ -21,19 +22,13 @@ export interface SignalBot {
   autoRepay: boolean;
   maxBorrowPercent: number;
   
-  // Exit Strategies - Simple
+  // Risk Management
   stopLoss?: number | null;
   takeProfit?: number | null;
   
   // Webhook Configuration
   webhookUrl: string | null;
   webhookSecret: string | null;
-  
-  // Alert Messages - Simple (4 signals only)
-  enterLongMsg: string | null;
-  exitLongMsg: string | null;
-  enterShortMsg: string | null;
-  exitShortMsg: string | null;
   
   // Statistics
   totalTrades: number;
@@ -71,8 +66,9 @@ export interface CreateSignalBotData {
   // Entry Settings
   orderType: OrderType;
   
-  // Amount per Trade
-  portfolioPercent: number;
+  // Trading Amount (Fixed amount)
+  tradeAmount: number;
+  tradeAmountType?: "QUOTE" | "BASE";
   leverage?: number;
   
   // Account Type
@@ -82,15 +78,9 @@ export interface CreateSignalBotData {
   autoRepay?: boolean;
   maxBorrowPercent?: number;
   
-  // Exit Strategies
+  // Risk Management
   stopLoss?: number | null;
   takeProfit?: number | null;
-  
-  // Alert Messages
-  enterLongMsg?: string;
-  exitLongMsg?: string;
-  enterShortMsg?: string;
-  exitShortMsg?: string;
 }
 
 export interface UpdateSignalBotData extends Partial<CreateSignalBotData> {
@@ -111,8 +101,8 @@ export interface Signal {
   price: number | null;
   quantity?: number | null;
   message: string | null;
-  strategy: string | null;
   timeframe: string | null;
+  visibleToCustomer: boolean;
   processed: boolean;
   processedAt: Date | null;
   error: string | null;
@@ -138,7 +128,7 @@ export interface BotTrade {
   profit?: number | null;
   profitPercentage?: number | null;
   
-  // Simple Exit Strategies
+  // Risk Management
   stopLoss?: number | null;
   takeProfit?: number | null;
   
@@ -167,13 +157,27 @@ export interface TradingViewAlert {
   secret?: string;
 }
 
+export interface SignalBotWebhookPayload {
+  action: SignalAction;
+  symbol: string;
+  price?: number;
+  strategy?: string;
+  timeframe?: string;
+  message?: string;
+  time?: string;
+}
+
 // Signal processing result
 export interface SignalProcessingResult {
   success: boolean;
   signalId?: string;
   tradeId?: string;
+  positionId?: string;
+  orderId?: string;
+  binanceOrderId?: string;
   error?: string;
   message?: string;
+  executionTime?: number;
 }
 
 // Bot performance metrics
