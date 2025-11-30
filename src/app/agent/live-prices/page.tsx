@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { RefreshCw } from 'lucide-react';
 
 export default function LivePricesPage() {
-  const symbols = ['BTCUSDT', 'ETHUSDT', 'BNBUSDT', 'SOLUSDT', 'ADAUSDT', 'XRPUSDT', 'DOGEUSDT', 'DOTUSDT'];
+  const symbols = ['BTCUSDT', 'BTCFUSDT','ETHUSDT', 'ETHFUSDT', 'BNBUSDT', 'SOLUSDT', 'ADAUSDT', 'XRPUSDT', 'DOGEUSDT', 'DOTUSDT'];
   const { prices, isConnected, reconnect, lastConnected } = useCryptoPrice(symbols);
   const [isReconnecting, setIsReconnecting] = useState(false);
 

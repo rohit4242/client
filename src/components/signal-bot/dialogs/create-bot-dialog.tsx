@@ -184,7 +184,7 @@ export function CreateSignalBotDialog({ open, onOpenChange, onSuccess }: CreateS
 
   // Extract base and quote assets from symbol
   const extractAssets = (symbol: string) => {
-    const quoteAssets = ['USDT', 'BUSD', 'USDC'];
+    const quoteAssets = ['USDT','FUSDT', 'BUSD', 'USDC'];
     for (const quote of quoteAssets) {
       if (symbol.endsWith(quote)) {
         return { baseAsset: symbol.slice(0, -quote.length), quoteAsset: quote };

@@ -19,7 +19,7 @@ import { Badge } from "@/components/ui/badge"
 
 // Popular trading pairs for quick access
 const popularSymbols = [
-  "BTCUSDT", "ETHUSDT", "BNBUSDT", "ADAUSDT", "XRPUSDT", 
+  "BTCUSDT","BTCFUSDT", "ETHUSDT", "ETHFUSDT", "BNBUSDT", "ADAUSDT", "XRPUSDT", 
   "SOLUSDT", "DOTUSDT", "LINKUSDT", "LTCUSDT", "BCHUSDT"
 ]
 
