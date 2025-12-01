@@ -184,7 +184,7 @@ export function CreateSignalBotDialog({ open, onOpenChange, onSuccess }: CreateS
 
   // Extract base and quote assets from symbol
   const extractAssets = (symbol: string) => {
-    const quoteAssets = ['USDT','FDUSD', 'BUSD', 'USDC'];
+    const quoteAssets = ['USDT', 'FDUSD', 'BUSD', 'USDC'];
     for (const quote of quoteAssets) {
       if (symbol.endsWith(quote)) {
         return { baseAsset: symbol.slice(0, -quote.length), quoteAsset: quote };
@@ -239,10 +239,14 @@ export function CreateSignalBotDialog({ open, onOpenChange, onSuccess }: CreateS
       ? parseFloat(maxBorrowData.data.maxBorrowable)
       : 0;
 
-    // Check if balance is sufficient - always compare against USDT value
+    // For Spot: Must have full position value
+    // For Margin: Can use balance + borrow to cover position
     const hasSufficientBalance = activeValue >= usdtValue;
+    const totalBuyingPower = watchedAccountType === "MARGIN"
+      ? activeValue + maxBorrowable
+      : activeValue;
     const hasSufficientWithBorrow = watchedAccountType === "MARGIN"
-      ? (activeValue + maxBorrowable) >= leveragedValue
+      ? totalBuyingPower >= leveragedValue
       : hasSufficientBalance;
 
     return {
@@ -253,6 +257,7 @@ export function CreateSignalBotDialog({ open, onOpenChange, onSuccess }: CreateS
       leveragedValue,
       borrowAmount,
       maxBorrowable,
+      totalBuyingPower,
       currentBorrowed: maxBorrowData?.data?.currentBorrowed
         ? parseFloat(maxBorrowData.data.currentBorrowed)
         : 0,

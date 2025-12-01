@@ -254,10 +254,14 @@ export function EditSignalBotDialog({ bot, open, onOpenChange, onSuccess }: Edit
     const originalAccountType = bot.accountType || "SPOT";
     const accountTypeChanged = watchedAccountType !== originalAccountType;
 
-    // Check if balance is sufficient - always compare against USDT value
+    // For Spot: Must have full position value
+    // For Margin: Can use balance + borrow to cover position
     const hasSufficientBalance = activeValue >= usdtValue;
+    const totalBuyingPower = watchedAccountType === "MARGIN"
+      ? activeValue + maxBorrowable
+      : activeValue;
     const hasSufficientWithBorrow = watchedAccountType === "MARGIN"
-      ? (activeValue + maxBorrowable) >= leveragedValue
+      ? totalBuyingPower >= leveragedValue
       : hasSufficientBalance;
 
     return {
@@ -268,6 +272,7 @@ export function EditSignalBotDialog({ bot, open, onOpenChange, onSuccess }: Edit
       leveragedValue,
       borrowAmount,
       maxBorrowable,
+      totalBuyingPower,
       currentBorrowed: maxBorrowData?.data?.currentBorrowed
         ? parseFloat(maxBorrowData.data.currentBorrowed)
         : 0,

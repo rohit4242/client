@@ -94,12 +94,19 @@ export async function validateMarginSignal(
             return { success: false, error: `Failed to fetch trading constraints for ${signal.symbol}` };
         }
 
-        // 4. Calculate Target Quantity
+        // 4. Calculate Target Quantity with Leverage
         let targetBaseQty = 0;
+        const leverage = bot.leverage || 1;
+
         if (bot.tradeAmountType === "QUOTE") {
-            targetBaseQty = bot.tradeAmount / currentPrice;
+            // tradeAmount is "Your Capital" in USDT
+            // Total Position Value = Capital * Leverage
+            const totalNotional = bot.tradeAmount * leverage;
+            targetBaseQty = totalNotional / currentPrice;
         } else {
-            targetBaseQty = bot.tradeAmount;
+            // tradeAmount is "Your Capital" in BTC (Base Asset)
+            // Total Position Size = Capital (BTC) * Leverage
+            targetBaseQty = bot.tradeAmount * leverage;
         }
 
         // 5. Validate & Format Quantity
