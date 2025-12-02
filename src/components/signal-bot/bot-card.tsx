@@ -1,32 +1,34 @@
 "use client";
 
 import { useState } from "react";
-import { 
-  Bot, 
-  Settings, 
-  Trash2, 
+import {
+  Bot,
+  Settings,
+  Trash2,
   Link,
   TrendingUp,
   TrendingDown,
   Activity,
   DollarSign,
   Shield,
-  Target
+  Target,
+  MousePointerClick
 } from "lucide-react";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
-import { 
-  DropdownMenu, 
-  DropdownMenuContent, 
-  DropdownMenuItem, 
-  DropdownMenuTrigger 
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger
 } from "@/components/ui/dropdown-menu";
 import { SignalBot } from "@/types/signal-bot";
 import { EditSignalBotDialog } from "./dialogs/edit-bot-dialog";
 import { DeleteSignalBotDialog } from "./dialogs/delete-bot-dialog";
 import { WebhookInfoDialog } from "./dialogs/webhook-info-dialog";
+import { ManualSignalDialog } from "./dialogs/manual-signal-dialog";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import { useMutation } from "@tanstack/react-query";
 import axios, { AxiosError } from "axios";
@@ -41,6 +43,7 @@ export function SignalBotCard({ bot, onBotUpdated }: SignalBotCardProps) {
   const [showEditDialog, setShowEditDialog] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [showWebhookDialog, setShowWebhookDialog] = useState(false);
+  const [showManualSignalDialog, setShowManualSignalDialog] = useState(false);
 
   const toggleBotMutation = useMutation({
     mutationFn: async () => {
@@ -58,8 +61,8 @@ export function SignalBotCard({ bot, onBotUpdated }: SignalBotCardProps) {
     },
   });
 
-  const winRate = bot.totalTrades > 0 
-    ? (bot.winTrades / bot.totalTrades) * 100 
+  const winRate = bot.totalTrades > 0
+    ? (bot.winTrades / bot.totalTrades) * 100
     : 0;
 
   return (
@@ -79,8 +82,8 @@ export function SignalBotCard({ bot, onBotUpdated }: SignalBotCardProps) {
                   ))}
                   <span className="text-xs">•</span>
                   <span>
-                    {bot.tradeAmountType === "QUOTE" 
-                      ? `$${bot.tradeAmount?.toFixed(0) || 0}` 
+                    {bot.tradeAmountType === "QUOTE"
+                      ? `$${bot.tradeAmount?.toFixed(0) || 0}`
                       : `${bot.tradeAmount?.toFixed(6) || 0}`}
                   </span>
                   {bot.leverage && bot.leverage > 1 && (
@@ -115,13 +118,13 @@ export function SignalBotCard({ bot, onBotUpdated }: SignalBotCardProps) {
               <Badge variant={bot.isActive ? "default" : "secondary"}>
                 {bot.isActive ? "Active" : "Inactive"}
               </Badge>
-              <Badge 
-                variant="outline" 
+              <Badge
+                variant="outline"
                 className={bot.accountType === "MARGIN" ? "border-orange-500 text-orange-700 dark:text-orange-400" : "border-blue-500 text-blue-700 dark:text-blue-400"}
               >
                 {bot.accountType === "MARGIN" ? "Margin" : "Spot"}
               </Badge>
-              
+
               <Switch
                 checked={bot.isActive}
                 onCheckedChange={() => toggleBotMutation.mutate()}
@@ -143,7 +146,11 @@ export function SignalBotCard({ bot, onBotUpdated }: SignalBotCardProps) {
                     <Link className="h-4 w-4 mr-2" />
                     Webhook & Alerts
                   </DropdownMenuItem>
-                  <DropdownMenuItem 
+                  <DropdownMenuItem onClick={() => setShowManualSignalDialog(true)}>
+                    <MousePointerClick className="h-4 w-4 mr-2" />
+                    Manual Signal
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
                     onClick={() => setShowDeleteDialog(true)}
                     className="text-red-600"
                   >
@@ -187,30 +194,26 @@ export function SignalBotCard({ bot, onBotUpdated }: SignalBotCardProps) {
             </div>
 
             {/* Total P&L */}
-            <div className={`flex flex-col space-y-1 p-3 rounded-lg border ${
-              bot.totalPnl >= 0 
-                ? 'bg-emerald-50 dark:bg-emerald-950 border-emerald-200 dark:border-emerald-800' 
+            <div className={`flex flex-col space-y-1 p-3 rounded-lg border ${bot.totalPnl >= 0
+                ? 'bg-emerald-50 dark:bg-emerald-950 border-emerald-200 dark:border-emerald-800'
                 : 'bg-red-50 dark:bg-red-950 border-red-200 dark:border-red-800'
-            }`}>
+              }`}>
               <div className="flex items-center justify-between">
-                <DollarSign className={`h-4 w-4 ${
-                  bot.totalPnl >= 0 
-                    ? 'text-emerald-600 dark:text-emerald-400' 
+                <DollarSign className={`h-4 w-4 ${bot.totalPnl >= 0
+                    ? 'text-emerald-600 dark:text-emerald-400'
                     : 'text-red-600 dark:text-red-400'
-                }`} />
-                <p className={`text-lg font-bold ${
-                  bot.totalPnl >= 0 
-                    ? 'text-emerald-900 dark:text-emerald-100' 
+                  }`} />
+                <p className={`text-lg font-bold ${bot.totalPnl >= 0
+                    ? 'text-emerald-900 dark:text-emerald-100'
                     : 'text-red-900 dark:text-red-100'
-                }`}>
+                  }`}>
                   {formatCurrency(bot.totalPnl)}
                 </p>
               </div>
-              <p className={`text-xs font-medium ${
-                bot.totalPnl >= 0 
-                  ? 'text-emerald-700 dark:text-emerald-300' 
+              <p className={`text-xs font-medium ${bot.totalPnl >= 0
+                  ? 'text-emerald-700 dark:text-emerald-300'
                   : 'text-red-700 dark:text-red-300'
-              }`}>Total P&L</p>
+                }`}>Total P&L</p>
               {bot.accountType === "MARGIN" && bot.totalInterest > 0 && (
                 <p className="text-xs text-orange-600 dark:text-orange-400">
                   ${bot.totalInterest.toFixed(2)} interest
@@ -245,9 +248,9 @@ export function SignalBotCard({ bot, onBotUpdated }: SignalBotCardProps) {
                   </p>
                   <div className="flex items-center gap-3 text-xs text-purple-600 dark:text-purple-400">
                     <span>
-                      {bot.accountType === "SPOT" ? "Spot" : "Margin"} Balance: 
+                      {bot.accountType === "SPOT" ? "Spot" : "Margin"} Balance:
                       <span className="font-mono ml-1">
-                        {bot.accountType === "SPOT" 
+                        {bot.accountType === "SPOT"
                           ? formatCurrency(bot.exchange.spotValue || 0)
                           : formatCurrency(bot.exchange.marginValue || 0)
                         }
@@ -289,9 +292,9 @@ export function SignalBotCard({ bot, onBotUpdated }: SignalBotCardProps) {
                   </div>
                 )}
               </div>
-              <Button 
-                variant="outline" 
-                size="sm" 
+              <Button
+                variant="outline"
+                size="sm"
                 onClick={() => setShowWebhookDialog(true)}
                 className="text-xs"
               >
@@ -338,6 +341,12 @@ export function SignalBotCard({ bot, onBotUpdated }: SignalBotCardProps) {
         bot={bot}
         open={showWebhookDialog}
         onOpenChange={setShowWebhookDialog}
+      />
+
+      <ManualSignalDialog
+        bot={bot}
+        open={showManualSignalDialog}
+        onOpenChange={setShowManualSignalDialog}
       />
 
     </>

@@ -513,7 +513,7 @@ export function CreateSignalBotDialog({ open, onOpenChange, onSuccess }: CreateS
                         <FormField
                           control={form.control}
                           name="tradeAmount"
-                          render={({ field }) => (
+                          render={({ field: { value, ...fieldProps } }) => (
                             <FormItem>
                               <FormLabel className="text-xs">
                                 Amount in {watchedTradeAmountType === "QUOTE" ? quoteAsset : baseAsset}
@@ -521,12 +521,16 @@ export function CreateSignalBotDialog({ open, onOpenChange, onSuccess }: CreateS
                               <FormControl>
                                 <Input
                                   type="number"
-                                  min="0"
                                   step={watchedTradeAmountType === "QUOTE" ? "1" : "0.00001"}
                                   placeholder={watchedTradeAmountType === "QUOTE" ? "100" : "0.00001"}
                                   className="font-mono"
-                                  {...field}
-                                  onChange={(e) => field.onChange(Number(e.target.value))}
+                                  {...fieldProps}
+                                  onChange={(e) => {
+                                    const inputValue = e.target.value;
+                                    // Allow empty string to clear the field
+                                    fieldProps.onChange(inputValue === "" ? "" : Number(inputValue));
+                                  }}
+                                  value={value ?? ""}
                                 />
                               </FormControl>
                               <FormMessage />
@@ -997,17 +1001,19 @@ export function CreateSignalBotDialog({ open, onOpenChange, onSuccess }: CreateS
             </form>
           </Form>
         </DialogContent>
-      </Dialog>
+      </Dialog >
 
       {/* Position Confirmation Dialog */}
-      {createdBot && (
-        <PositionConfirmationDialog
-          bot={createdBot}
-          open={showPositionDialog}
-          onOpenChange={setShowPositionDialog}
-          onSuccess={handlePositionDialogComplete}
-        />
-      )}
+      {
+        createdBot && (
+          <PositionConfirmationDialog
+            bot={createdBot}
+            open={showPositionDialog}
+            onOpenChange={setShowPositionDialog}
+            onSuccess={handlePositionDialogComplete}
+          />
+        )
+      }
     </>
   );
 }

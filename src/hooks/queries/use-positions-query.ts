@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { Position } from "@prisma/client";
+import { PositionData } from "@/types/position";
 
 interface UsePositionsQueryOptions {
   /**
@@ -20,6 +20,10 @@ interface UsePositionsQueryOptions {
    * Filter positions by account type
    */
   accountType?: 'SPOT' | 'MARGIN';
+  /**
+   * User ID to fetch positions for (admin/agent viewing customer positions)
+   */
+  userId?: string;
 }
 
 /**
@@ -33,12 +37,13 @@ interface UsePositionsQueryOptions {
  * const { data: positions, isLoading, refetch } = usePositionsQuery({ status: 'OPEN' });
  */
 export function usePositionsQuery(options?: UsePositionsQueryOptions) {
-  return useQuery<Position[], Error>({
-    queryKey: ['positions', options?.status, options?.accountType],
+  return useQuery<PositionData[], Error>({
+    queryKey: ['positions', options?.status, options?.accountType, options?.userId],
     queryFn: async () => {
       const params = new URLSearchParams();
       if (options?.status) params.append('status', options.status);
       if (options?.accountType) params.append('accountType', options.accountType);
+      if (options?.userId) params.append('userId', options.userId);
 
       const response = await fetch(`/api/positions?${params.toString()}`);
 
@@ -47,7 +52,7 @@ export function usePositionsQuery(options?: UsePositionsQueryOptions) {
       }
 
       const data = await response.json();
-      return data.positions || [];
+      return data.data || [];
     },
     staleTime: options?.staleTime ?? 10000, // 10 seconds default
     refetchInterval: options?.refetchInterval ?? false,

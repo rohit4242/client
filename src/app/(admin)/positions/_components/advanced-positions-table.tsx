@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useMemo } from "react";
 import {
   Table,
   TableBody,
@@ -18,7 +18,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { TrendingDown, Loader2, XCircle } from "lucide-react";
+import { TrendingDown, Loader2, XCircle, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 import {
   AlertDialog,
@@ -38,6 +38,7 @@ import {
 } from "@/types/position";
 import { PositionRow } from "./position-row";
 import { useLivePrices } from "@/hooks/trading/use-live-price";
+import { usePositionsQuery } from "@/hooks/queries/use-positions-query";
 import axios from "axios";
 import { useSelectedUser } from "@/contexts/selected-user-context";
 
@@ -53,12 +54,23 @@ export function AdvancedPositionsTable({
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
   const [isClosingAll, setIsClosingAll] = useState(false);
   const [isForceClosing, setIsForceClosing] = useState(false);
-  const [positions, setPositions] = useState<PositionData[]>(
-    propPositions || []
-  );
-  const [loading, setLoading] = useState(false);
 
   const { selectedUser } = useSelectedUser();
+
+  // Use React Query for data fetching with auto-refresh capabilities
+  const {
+    data: queryPositions,
+    isLoading,
+    refetch,
+    isFetching
+  } = usePositionsQuery({
+    userId: selectedUser?.id,
+    staleTime: 5000, // 5 seconds - data becomes stale quickly
+    refetchInterval: false, // Manual refetch only
+  });
+
+  // Use prop positions if provided (for server-rendered initial data), otherwise use query data
+  const positions = propPositions || queryPositions || [];
 
   // Get unique symbols for live price fetching (memoized to prevent infinite re-renders)
   const symbols = useMemo(
@@ -66,52 +78,6 @@ export function AdvancedPositionsTable({
     [positions]
   );
   const { prices: livePrices } = useLivePrices(symbols, selectedUser?.id);
-
-  // Fetch positions from API (only if no props positions provided)
-  const fetchPositions = useCallback(async () => {
-    // If positions are provided via props, don't fetch from API
-    if (propPositions && propPositions.length > 0) {
-      return;
-    }
-
-    try {
-      setLoading(true);
-      const params = new URLSearchParams();
-
-      if (filters.status) params.append("status", filters.status);
-      if (filters.symbol) params.append("symbol", filters.symbol);
-      if (filters.exchange) params.append("exchange", filters.exchange);
-
-      const response = await axios.get(
-        `/api/positions?${params.toString()}&userId=${selectedUser?.id}`
-      );
-
-      if (response.data.success) {
-        setPositions(response.data.data || []);
-      } else {
-        toast.error("Failed to fetch positions");
-        setPositions([]); // Set empty array instead of mock data
-      }
-    } catch (error) {
-      console.error("Error fetching positions:", error);
-      toast.error("Failed to fetch positions");
-      setPositions([]); // Set empty array instead of mock data
-    } finally {
-      setLoading(false);
-    }
-  }, [filters, propPositions, selectedUser?.id]);
-
-  // Fetch positions on component mount and when filters change
-  useEffect(() => {
-    fetchPositions();
-  }, [fetchPositions]);
-
-  // Update positions when props change
-  useEffect(() => {
-    if (propPositions) {
-      setPositions(propPositions);
-    }
-  }, [propPositions]);
 
   const toggleRowExpansion = (positionId: string) => {
     const newExpanded = new Set(expandedRows);
@@ -126,6 +92,8 @@ export function AdvancedPositionsTable({
   const handlePositionAction = async (action: PositionAction) => {
     try {
       if (action.type === "CLOSE_POSITION") {
+        console.log(`Closing position ${action.payload.positionId}`);
+
         const response = await axios.post(
           `/api/positions/${action.payload.positionId}/close`,
           { ...action.payload, userId: selectedUser?.id }
@@ -136,26 +104,45 @@ export function AdvancedPositionsTable({
             response.data.message || "Position closed successfully"
           );
           // Refresh positions data
-          await fetchPositions();
+          await refetch();
         } else {
-          toast.error(response.data.error || "Failed to close position");
+          const error = response.data.error || "Failed to close position";
+          console.error("Close failed:", error, response.data);
+          toast.error(error);
+          throw new Error(error); // Throw to mark as failed in Promise.allSettled
         }
       } else {
         toast.info("Action functionality coming soon");
       }
     } catch (error) {
       console.error("Position action failed:", error);
-      toast.error("Failed to execute position action");
+      const errorMsg = axios.isAxiosError(error)
+        ? error.response?.data?.error || error.message
+        : "Failed to execute position action";
+      toast.error(errorMsg);
+      throw error; // Re-throw to propagate to Promise.allSettled
     }
   };
 
   const handleCloseAllPositions = async () => {
     setIsClosingAll(true);
+
     try {
+      // Fix: Check for both OPEN and ENTERED statuses
       const openPositions = filteredPositions.filter(
-        (p) => p.status === "ENTERED"
+        (p) => p.status === "OPEN" || p.status === "ENTERED"
       );
 
+      // Validate we have positions to close
+      if (openPositions.length === 0) {
+        toast.info("No open positions to close");
+        setIsClosingAll(false);
+        return;
+      }
+
+      console.log(`Attempting to close ${openPositions.length} positions`);
+
+      // Use Promise.allSettled to handle individual failures gracefully
       const closePromises = openPositions.map((position) =>
         handlePositionAction({
           type: "CLOSE_POSITION",
@@ -167,12 +154,26 @@ export function AdvancedPositionsTable({
         })
       );
 
-      await Promise.all(closePromises);
-      toast.success(`Closed ${openPositions.length} positions`);
+      const results = await Promise.allSettled(closePromises);
+
+      // Count successes and failures
+      const successful = results.filter(r => r.status === 'fulfilled').length;
+      const failed = results.filter(r => r.status === 'rejected').length;
+
+      // Show appropriate feedback based on results
+      if (successful > 0 && failed === 0) {
+        toast.success(`Successfully closed all ${successful} positions`);
+      } else if (successful > 0 && failed > 0) {
+        toast.warning(`Closed ${successful} positions, ${failed} failed`);
+      } else {
+        toast.error(`Failed to close ${failed} positions`);
+      }
+
       // Refresh positions data
-      await fetchPositions();
-    } catch {
-      toast.error("Failed to close all positions");
+      await refetch();
+    } catch (error) {
+      console.error("Error in handleCloseAllPositions:", error);
+      toast.error("Failed to close positions");
     } finally {
       setIsClosingAll(false);
     }
@@ -188,7 +189,7 @@ export function AdvancedPositionsTable({
       if (response.data.success) {
         toast.success(response.data.message);
         // Refresh positions data
-        await fetchPositions();
+        await refetch();
       } else {
         toast.error(response.data.error || "Failed to force close positions");
       }
@@ -303,6 +304,26 @@ export function AdvancedPositionsTable({
             <Button
               variant="outline"
               size="sm"
+              className="h-9 text-sm"
+              onClick={() => refetch()}
+              disabled={isFetching}
+            >
+              {isFetching ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Refreshing...
+                </>
+              ) : (
+                <>
+                  <RefreshCw className="mr-2 h-4 w-4" />
+                  Refresh
+                </>
+              )}
+            </Button>
+
+            <Button
+              variant="outline"
+              size="sm"
               className="h-9 text-sm text-red-600 hover:text-red-700"
               onClick={handleCloseAllPositions}
               disabled={isClosingAll}
@@ -379,7 +400,7 @@ export function AdvancedPositionsTable({
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {loading ? (
+                    {isLoading ? (
                       <tr>
                         <td colSpan={13} className="text-center py-8">
                           <Loader2 className="h-6 w-6 animate-spin mx-auto" />

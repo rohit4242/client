@@ -41,7 +41,7 @@ export async function closePosition(request: ClosePositionRequest) {
     // Calculate PnL
     const entryValue = existingPosition.entryValue;
     const exitValue = parseFloat(closeValue);
-    const pnl = existingPosition.side === "LONG" 
+    const pnl = existingPosition.side === "LONG"
       ? exitValue - entryValue  // Long: profit when exit > entry
       : entryValue - exitValue; // Short: profit when entry > exit
 
@@ -50,7 +50,7 @@ export async function closePosition(request: ClosePositionRequest) {
     // Map Binance status to our database enums
     const binanceStatus = request.binanceResponse.status;
     let orderStatus: "NEW" | "PENDING" | "FILLED" | "COMPLETED" | "CANCELED" | "REJECTED" | "PARTIALLY_FILLED";
-    let positionStatus: "OPEN" | "CLOSED" | "CANCELED" | "MARKET_CLOSED" | "FAILED";
+    let positionStatus: "OPEN" | "CLOSED" | "CANCELED" | "FAILED";
 
     switch (binanceStatus) {
       case "FILLED":
@@ -115,7 +115,7 @@ export async function closePosition(request: ClosePositionRequest) {
           where: { id: existingPosition.portfolioId },
           select: { userId: true },
         });
-        
+
         if (portfolio) {
           await recalculatePortfolioStatsInternal(portfolio.userId);
           console.log("Portfolio stats updated after position close");
