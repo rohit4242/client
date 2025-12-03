@@ -15,7 +15,7 @@ export async function GET(
     const session = await auth.api.getSession({
       headers: await headers(),
     });
-    
+
     if (!session?.user?.id) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
@@ -118,7 +118,7 @@ export async function PUT(
     const session = await auth.api.getSession({
       headers: await headers(),
     });
-    
+
     if (!session?.user?.id) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
@@ -136,14 +136,14 @@ export async function PUT(
     }
 
     const body = await request.json();
-    
+
     // Validate request body
     const validatedData = updateSignalBotSchema.safeParse(body);
     if (!validatedData.success) {
       return NextResponse.json(
-        { 
-          error: "Invalid request data", 
-          details: validatedData.error.issues 
+        {
+          error: "Invalid request data",
+          details: validatedData.error.issues
         },
         { status: 400 }
       );
@@ -261,6 +261,77 @@ export async function PUT(
   }
 }
 
+// PATCH /api/signal-bots/[id] - Toggle bot status
+export async function PATCH(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const { id } = await params;
+    const session = await auth.api.getSession({
+      headers: await headers(),
+    });
+
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    // Check if admin is using selected user
+    const selectedUser = await getSelectedUser();
+    const targetUserId = selectedUser?.id || session.user.id;
+
+    const portfolio = await db.portfolio.findFirst({
+      where: { userId: targetUserId },
+    });
+
+    if (!portfolio) {
+      return NextResponse.json({ error: "User account not found" }, { status: 404 });
+    }
+
+    const body = await request.json();
+
+    // Validate action
+    if (body.action !== "toggle") {
+      return NextResponse.json(
+        { error: "Invalid action. Expected 'toggle'" },
+        { status: 400 }
+      );
+    }
+
+    // Check if bot exists and belongs to user
+    const existingBot = await db.bot.findFirst({
+      where: {
+        id,
+        portfolioId: portfolio.id,
+      },
+    });
+
+    if (!existingBot) {
+      return NextResponse.json({ error: "Signal bot not found" }, { status: 404 });
+    }
+
+    // Toggle the bot status
+    const updatedBot = await db.bot.update({
+      where: { id },
+      data: {
+        isActive: !existingBot.isActive,
+      },
+    });
+
+    return NextResponse.json({
+      success: true,
+      message: `Bot ${updatedBot.isActive ? 'activated' : 'deactivated'} successfully`,
+      isActive: updatedBot.isActive,
+    });
+  } catch (error) {
+    console.error("Error toggling bot status:", error);
+    return NextResponse.json(
+      { error: "Failed to toggle bot status" },
+      { status: 500 }
+    );
+  }
+}
+
 // DELETE /api/signal-bots/[id] - Delete signal bot
 export async function DELETE(
   request: NextRequest,
@@ -271,7 +342,7 @@ export async function DELETE(
     const session = await auth.api.getSession({
       headers: await headers(),
     });
-    
+
     if (!session?.user?.id) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
@@ -310,9 +381,9 @@ export async function DELETE(
 
     if (openPositions.length > 0) {
       return NextResponse.json(
-        { 
+        {
           error: "Cannot delete bot with open positions. Please close all positions first.",
-          openPositions: openPositions.length 
+          openPositions: openPositions.length
         },
         { status: 400 }
       );
@@ -323,9 +394,9 @@ export async function DELETE(
       where: { id },
     });
 
-    return NextResponse.json({ 
-      success: true, 
-      message: "Signal bot deleted successfully" 
+    return NextResponse.json({
+      success: true,
+      message: "Signal bot deleted successfully"
     });
   } catch (error) {
     console.error("Error deleting signal bot:", error);
