@@ -40,8 +40,28 @@ export function PositionRow({
 
   // Use realized PnL for closed positions, unrealized for open positions
   const isClosedPosition = position.status === "CLOSED";
-  const pnlValue = isClosedPosition ? position.pnlPercent : ((price - position.entryPrice) / position.entryPrice) * 100;
-  const pnlAmount = isClosedPosition ? position.realizedPnl : (price - position.entryPrice) * position.quantity;
+
+  // Calculate unrealized P/L based on position side
+  // For LONG: profit when price goes UP (exit > entry)
+  // For SHORT: profit when price goes DOWN (entry > exit)
+  const calculateUnrealizedPnl = () => {
+    if (isClosedPosition) {
+      return { percent: position.pnlPercent, amount: position.realizedPnl };
+    }
+
+    const priceChange = price - position.entryPrice;
+    const isLong = position.side === "Long";
+    const pnlMultiplier = isLong ? 1 : -1;
+
+    const unrealizedAmount = priceChange * position.quantity * pnlMultiplier;
+    const unrealizedPercent = position.entryPrice > 0
+      ? (priceChange / position.entryPrice) * 100 * pnlMultiplier
+      : 0;
+
+    return { percent: unrealizedPercent, amount: unrealizedAmount };
+  };
+
+  const { percent: pnlValue, amount: pnlAmount } = calculateUnrealizedPnl();
 
   const copyToClipboard = (text: string, label: string) => {
     navigator.clipboard.writeText(text);

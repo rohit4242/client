@@ -30,11 +30,17 @@ export function SignalBotClient({ selectedUser }: SignalBotClientProps) {
       const response = await axios.get("/api/signal-bots");
       return response.data;
     },
+    refetchInterval: 30000, // Refresh every 30 seconds for real-time stats
+    staleTime: 10000, // Consider data stale after 10 seconds
   });
 
   const activeBots = signalBots.filter(bot => bot.isActive);
   const totalTrades = signalBots.reduce((sum, bot) => sum + bot.totalTrades, 0);
   const totalPnl = signalBots.reduce((sum, bot) => sum + bot.totalPnl, 0);
+
+  // Calculate proper aggregated win rate from actual wins/losses
+  const totalWins = signalBots.reduce((sum, bot) => sum + (bot.winTrades || 0), 0);
+  const winRate = totalTrades > 0 ? (totalWins / totalTrades) * 100 : 0;
 
   const handleBotCreated = async () => {
     setShowCreateDialog(false);
@@ -77,6 +83,7 @@ export function SignalBotClient({ selectedUser }: SignalBotClientProps) {
         activeBots={activeBots.length}
         totalTrades={totalTrades}
         totalPnl={totalPnl}
+        winRate={winRate}
       />
 
       <SignalBotList

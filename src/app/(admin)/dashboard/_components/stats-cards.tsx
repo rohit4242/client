@@ -2,7 +2,7 @@
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { TrendingUp, TrendingDown, Wallet, Activity, Calendar } from "lucide-react";
-import { DashboardStats, formatCurrency, formatPercentage } from "@/lib/mock-data";
+import { DashboardStats, formatCurrency, formatPercentage } from "./dashboard-client";
 
 interface StatsCardsProps {
   stats: DashboardStats | null;

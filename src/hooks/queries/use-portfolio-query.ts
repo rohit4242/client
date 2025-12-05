@@ -14,7 +14,7 @@ interface Portfolio {
 interface UsePortfolioQueryOptions {
   /**
    * Time in milliseconds before data is considered stale
-   * Default: 30000 (30 seconds)
+   * Default: 10000 (10 seconds)
    */
   staleTime?: number;
   /**
@@ -22,6 +22,11 @@ interface UsePortfolioQueryOptions {
    * Default: true
    */
   enabled?: boolean;
+  /**
+   * Interval for automatic refetching (in milliseconds)
+   * Default: 30000 (30 seconds)
+   */
+  refetchInterval?: number | false;
 }
 
 /**
@@ -47,8 +52,9 @@ export function usePortfolioQuery(options?: UsePortfolioQueryOptions) {
       const data = await response.json();
       return data.portfolio || null;
     },
-    staleTime: options?.staleTime ?? 30000, // 30 seconds default
+    staleTime: options?.staleTime ?? 10000, // 10 seconds - data becomes stale quickly
     enabled: options?.enabled ?? true,
+    refetchInterval: options?.refetchInterval ?? 30000, // Poll every 30 seconds by default
   });
 }
 

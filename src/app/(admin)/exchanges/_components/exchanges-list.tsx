@@ -60,7 +60,10 @@ export function ExchangesList({
       const response = await fetch(`/api/exchanges/${exchangeId}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ isActive: !currentStatus }),
+        body: JSON.stringify({
+          isActive: !currentStatus,
+          userId: selectedUser.id, // Pass selected user ID for admin/agent context
+        }),
       });
 
       if (response.ok) {
@@ -84,7 +87,8 @@ export function ExchangesList({
     if (!confirm("Are you sure you want to delete this exchange?")) return;
 
     try {
-      const response = await fetch(`/api/exchanges/${exchangeId}`, {
+      // Pass userId as query param for admin/agent context
+      const response = await fetch(`/api/exchanges/${exchangeId}?userId=${selectedUser.id}`, {
         method: "DELETE",
       });
 

@@ -81,6 +81,9 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
     const { id } = await params;
     const body = await request.json();
 
+    // Get userId from request body (for admin/agent) or fall back to session user
+    const targetUserId = body.userId || session.user.id;
+
     const validatedExchange = updateExchangeSchema.safeParse(body);
 
     if (!validatedExchange.success) {
@@ -90,11 +93,13 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
       );
     }
 
-    // Check if exchange exists and belongs to user
+    // Check if exchange exists and belongs to the target user
     const existingExchange = await db.exchange.findFirst({
       where: {
         id,
-        portfolioId: session.user.id,
+        portfolio: {
+          userId: targetUserId,
+        },
       },
     });
 
@@ -223,11 +228,17 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
 
     const { id } = await params;
 
-    // Check if exchange exists and belongs to user
+    // Try to get userId from query params (for admin/agent) or use request body
+    const url = new URL(request.url);
+    const targetUserId = url.searchParams.get('userId') || session.user.id;
+
+    // Check if exchange exists and belongs to the target user
     const existingExchange = await db.exchange.findFirst({
       where: {
         id,
-        portfolioId: session.user.id,
+        portfolio: {
+          userId: targetUserId,
+        },
       },
     });
 

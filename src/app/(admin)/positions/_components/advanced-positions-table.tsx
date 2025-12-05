@@ -142,31 +142,51 @@ export function AdvancedPositionsTable({
 
       console.log(`Attempting to close ${openPositions.length} positions`);
 
-      // Use Promise.allSettled to handle individual failures gracefully
-      const closePromises = openPositions.map((position) =>
-        handlePositionAction({
-          type: "CLOSE_POSITION",
-          payload: {
-            positionId: position.id,
-            closeType: "FULL",
-            slippage: 1.0,
-          },
-        })
-      );
+      let successful = 0;
+      let failed = 0;
+      const failedPositions: { symbol: string; error: string }[] = [];
 
-      const results = await Promise.allSettled(closePromises);
+      // Process sequentially with delay to avoid rate limiting
+      for (const position of openPositions) {
+        try {
+          await handlePositionAction({
+            type: "CLOSE_POSITION",
+            payload: {
+              positionId: position.id,
+              closeType: "FULL",
+              slippage: 1.0,
+            },
+          });
+          successful++;
 
-      // Count successes and failures
-      const successful = results.filter(r => r.status === 'fulfilled').length;
-      const failed = results.filter(r => r.status === 'rejected').length;
+          // Small delay between requests to avoid rate limiting (except for last one)
+          if (openPositions.indexOf(position) < openPositions.length - 1) {
+            await new Promise((resolve) => setTimeout(resolve, 300));
+          }
+        } catch (error) {
+          failed++;
+          failedPositions.push({
+            symbol: position.symbol,
+            error: error instanceof Error ? error.message : "Unknown error",
+          });
+        }
+      }
 
-      // Show appropriate feedback based on results
+      // Show detailed feedback based on results
       if (successful > 0 && failed === 0) {
         toast.success(`Successfully closed all ${successful} positions`);
       } else if (successful > 0 && failed > 0) {
-        toast.warning(`Closed ${successful} positions, ${failed} failed`);
+        toast.warning(`Closed ${successful} positions, ${failed} failed`, {
+          description: failedPositions
+            .map((p) => `${p.symbol}: ${p.error}`)
+            .join(", "),
+        });
       } else {
-        toast.error(`Failed to close ${failed} positions`);
+        toast.error(`Failed to close all ${failed} positions`, {
+          description: failedPositions
+            .map((p) => `${p.symbol}: ${p.error}`)
+            .join(", "),
+        });
       }
 
       // Refresh positions data

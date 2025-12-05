@@ -7,10 +7,10 @@ interface SignalBotStatsProps {
   activeBots: number;
   totalTrades: number;
   totalPnl: number;
+  winRate: number;
 }
 
-export function SignalBotStats({ totalBots, activeBots, totalTrades, totalPnl }: SignalBotStatsProps) {
-  const winRate = totalTrades > 0 ? ((totalPnl > 0 ? 1 : 0) * 100) : 0; // Simplified calculation
+export function SignalBotStats({ totalBots, activeBots, totalTrades, totalPnl, winRate }: SignalBotStatsProps) {
 
   return (
     <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
