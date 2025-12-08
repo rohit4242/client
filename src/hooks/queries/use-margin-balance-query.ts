@@ -42,15 +42,15 @@ interface UseMarginBalanceQueryOptions {
  * const { data: balance, isLoading, error } = useMarginBalanceQuery('USDT', exchange);
  */
 export function useMarginBalanceQuery(
-  asset: string | null,
+  asset: string | null | undefined,
   exchange: Exchange | null,
   options?: UseMarginBalanceQueryOptions
 ) {
-  return useQuery<MarginAssetBalance | null, Error>({
-    queryKey: ['marginBalance', asset, exchange?.id],
+  return useQuery<MarginAssetBalance | null | MarginAssetBalance[], Error>({
+    queryKey: ['marginBalance', asset || 'all', exchange?.id],
     queryFn: async () => {
-      console.log('[useMarginBalanceQuery] Fetching margin balance for asset:', asset);
-      
+      console.log('[useMarginBalanceQuery] Fetching margin balance for asset:', asset || 'all');
+
       if (!asset || !exchange) {
         console.log('[useMarginBalanceQuery] Missing asset or exchange:', { asset, hasExchange: !!exchange });
         return null;
@@ -74,14 +74,14 @@ export function useMarginBalanceQuery(
         throw new Error(error.error || 'Failed to fetch margin balance');
       }
 
-      const result: ApiSuccessResponse<MarginAssetBalance> = await response.json();
-      
+      const result: ApiSuccessResponse<MarginAssetBalance | MarginAssetBalance[]> = await response.json();
+
       console.log('[useMarginBalanceQuery] Got result:', result);
-      
+
       return result.data || null;
     },
     staleTime: options?.staleTime ?? 30000, // 30 seconds default
-    enabled: options?.enabled ?? (!!asset && !!exchange),
+    enabled: options?.enabled ?? (!!exchange),
     refetchInterval: options?.refetchInterval ?? false,
     retry: 2, // Retry failed requests twice
     refetchOnMount: true, // Always fetch fresh data on mount

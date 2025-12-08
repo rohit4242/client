@@ -7,7 +7,7 @@ import { Spot } from "@binance/spot";
 import { z } from "zod";
 
 const SpotBalanceRequestSchema = z.object({
-  asset: z.string().min(1, "Asset is required"),
+  asset: z.string().optional(),
   apiKey: z.string().min(1, "API key is required"),
   apiSecret: z.string().min(1, "API secret is required"),
 });
@@ -56,25 +56,36 @@ export async function POST(request: NextRequest) {
 
     const { balances } = await response.data();
 
-    // Find the requested asset
-    const assetBalance = balances?.find((balance) => balance.asset === asset);
+    console.log("Balances:", balances);
 
-    if (!assetBalance) {
-      // Return zero balance if asset not found
+    // Find the requested asset or return all non-zero balances
+    if (asset) {
+      const assetBalance = balances?.find((balance) => balance.asset === asset);
+
+      if (!assetBalance) {
+        // Return zero balance if asset not found
+        return NextResponse.json(
+          createSuccessResponse({
+            asset,
+            free: "0",
+            locked: "0",
+          }),
+          { status: 200 }
+        );
+      }
+
       return NextResponse.json(
-        createSuccessResponse({
-          asset,
-          free: "0",
-          locked: "0",
-        }),
+        createSuccessResponse(assetBalance),
+        { status: 200 }
+      );
+    } else {
+      // Return all non-zero balances
+      // The Binance SDK 'omitZeroBalances: true' option already handles filtering
+      return NextResponse.json(
+        createSuccessResponse(balances || []),
         { status: 200 }
       );
     }
-
-    return NextResponse.json(
-      createSuccessResponse(assetBalance),
-      { status: 200 }
-    );
   } catch (error) {
     return handleApiError(error);
   }

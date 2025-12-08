@@ -10,6 +10,8 @@ import { RecentSignals } from "./_components/recent-signals";
 import { PerformanceChart } from "./_components/performance-chart";
 import { PortfolioPerformanceChart } from "./_components/portfolio-performance-chart";
 import { DashboardHeader } from "./_components/dashboard-header";
+import { getExchanges } from "@/db/actions/exchange/get-exchanges";
+import { AccountBalances } from "@/components/trading/account-balances";
 
 export default async function CustomerDashboardPage() {
   const user = await getUserWithRole();
@@ -26,6 +28,9 @@ export default async function CustomerDashboardPage() {
     getPortfolioChartData("1M"), // Last 30 days
   ]);
 
+  const exchanges = await getExchanges();
+  const exchange = exchanges[0] || null;
+
   return (
     <div className="space-y-6">
       <DashboardHeader userName={user.name} stats={stats} />
@@ -33,12 +38,15 @@ export default async function CustomerDashboardPage() {
       {/* Stats Cards */}
       <StatsCards stats={stats} />
 
+      {/* Account Balances */}
+      <AccountBalances exchange={exchange} />
+
       {/* Main Content Grid */}
       <div className="grid gap-6 lg:grid-cols-3">
         {/* Left Column - Chart and Metrics */}
         <div className="lg:col-span-2 space-y-6">
-          <PortfolioPerformanceChart 
-            data={chartData} 
+          <PortfolioPerformanceChart
+            data={chartData}
             initialBalance={stats?.initialBalance || 0}
             currentBalance={stats?.currentBalance || 0}
           />

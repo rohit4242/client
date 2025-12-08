@@ -29,15 +29,15 @@ interface UseBalanceQueryOptions {
  * const { data: balance, isLoading, error } = useBalanceQuery('USDT', exchange);
  */
 export function useBalanceQuery(
-  asset: string | null,
+  asset: string | null | undefined,
   exchange: Exchange | null,
   options?: UseBalanceQueryOptions
 ) {
-  return useQuery<AssetBalance | null, Error>({
-    queryKey: ['balance', asset, exchange?.id],
+  return useQuery<AssetBalance | null | AssetBalance[], Error>({
+    queryKey: ['balance', asset || 'all', exchange?.id],
     queryFn: async () => {
-      console.log('[useBalanceQuery] Fetching balance for asset:', asset);
-      
+      console.log('[useBalanceQuery] Fetching balance for asset:', asset || 'all');
+
       if (!asset || !exchange) {
         console.log('[useBalanceQuery] Missing asset or exchange:', { asset, hasExchange: !!exchange });
         return null;
@@ -61,15 +61,14 @@ export function useBalanceQuery(
         throw new Error(error.error || 'Failed to fetch balance');
       }
 
-      const result: ApiSuccessResponse<AssetBalance> = await response.json();
-      
+      const result: ApiSuccessResponse<AssetBalance | AssetBalance[]> = await response.json();
+
       console.log('[useBalanceQuery] Got result:', result);
-      console.log('[useBalanceQuery] Returning asset:', result.data);
-      
+
       return result.data || null;
     },
     staleTime: options?.staleTime ?? 30000, // 30 seconds default
-    enabled: options?.enabled ?? (!!asset && !!exchange),
+    enabled: options?.enabled ?? (!!exchange),
     retry: 2, // Retry failed requests twice
     refetchOnMount: true, // Always fetch fresh data on mount
   });

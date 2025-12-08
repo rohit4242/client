@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
@@ -10,15 +11,18 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { 
-  MoreHorizontal, 
-  RefreshCw, 
-  Edit, 
-  Trash2, 
-  Copy
+import {
+  MoreHorizontal,
+  RefreshCw,
+  Edit,
+  Trash2,
+  Copy,
+  Wallet
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Exchange } from '@/types/exchange';
+import { AccountBalances } from '@/components/trading/account-balances';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 
 interface ExchangeCardProps {
   exchange: Exchange;
@@ -29,14 +33,16 @@ interface ExchangeCardProps {
   syncing?: string | null;
 }
 
-export function ExchangeCard({ 
-  exchange, 
-  onEdit, 
-  onDelete, 
-  onToggleActive, 
+export function ExchangeCard({
+  exchange,
+  onEdit,
+  onDelete,
+  onToggleActive,
   onSync,
-  syncing 
+  syncing
 }: ExchangeCardProps) {
+  const [showBalanceDialog, setShowBalanceDialog] = useState(false);
+
   const copyApiKey = (apiKey: string) => {
     navigator.clipboard.writeText(apiKey);
     toast.success("API key copied to clipboard");
@@ -115,7 +121,7 @@ export function ExchangeCard({
         <div className="flex items-center space-x-2">
           <Switch
             checked={exchange.isActive}
-            onCheckedChange={() => 
+            onCheckedChange={() =>
               onToggleActive(exchange.id, exchange.isActive)
             }
           />
@@ -131,10 +137,19 @@ export function ExchangeCard({
             size="sm"
             onClick={() => onSync(exchange.id)}
             disabled={syncing === exchange.id}
+            title="Sync Exchange"
           >
-            <RefreshCw 
-              className={`w-4 h-4 ${syncing === exchange.id ? 'animate-spin' : ''}`} 
+            <RefreshCw
+              className={`w-4 h-4 ${syncing === exchange.id ? 'animate-spin' : ''}`}
             />
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setShowBalanceDialog(true)}
+            title="View Balances"
+          >
+            <Wallet className="w-4 h-4" />
           </Button>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -158,6 +173,15 @@ export function ExchangeCard({
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
+
+          <Dialog open={showBalanceDialog} onOpenChange={setShowBalanceDialog}>
+            <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+              <DialogHeader>
+                <DialogTitle>Account Balances - {exchange.name}</DialogTitle>
+              </DialogHeader>
+              <AccountBalances exchange={exchange} />
+            </DialogContent>
+          </Dialog>
         </div>
       </TableCell>
     </TableRow>

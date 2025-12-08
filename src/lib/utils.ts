@@ -238,3 +238,10 @@ export function getDashboardUrlByRole(role: UserRole): string {
     return "/customer/dashboard";
   }
 }
+
+export function formatNumber(value: number, decimals: number = 8) {
+  return new Intl.NumberFormat("en-US", {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: decimals,
+  }).format(value);
+}
