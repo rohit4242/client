@@ -39,9 +39,9 @@ import { ToggleButtonGroup } from "@/components/trading/toggle-button-group";
 import { TradingInputMode } from "@/components/trading/trading-input-mode";
 import { LimitOrderFields } from "@/components/trading/limit-order-fields";
 import { extractBaseAsset } from "@/lib/utils";
-import { 
-  extractTradingConstraints, 
-  calculateMaxBuy, 
+import {
+  extractTradingConstraints,
+  calculateMaxBuy,
   getConstraintMessages
 } from "@/lib/trading-constraints";
 import { validateOrder, ValidationError } from "@/lib/order-validation";
@@ -73,7 +73,7 @@ export function SpotTradingForm({
   const [validationErrors, setValidationErrors] = useState<ValidationError[]>([]);
   const [validationWarnings, setValidationWarnings] = useState<string[]>([]);
   const [costBreakdown, setCostBreakdown] = useState<CostBreakdown | null>(null);
-  
+
   // NEW: React Query mutation for order creation
   const createOrderMutation = useCreateOrderMutation();
 
@@ -83,27 +83,31 @@ export function SpotTradingForm({
 
   // NEW: WebSocket price updates (no polling!)
   const { price: livePrice, isConnected, timestamp } = useLivePriceQuery(selectedAsset);
-  
+
   // Convert WebSocket price to expected format
   const price = useMemo(() => {
     if (!livePrice) return null;
-    return { 
+    return {
       symbol: selectedAsset,
-      price: livePrice, 
-      timestamp: timestamp || Date.now() 
+      price: livePrice,
+      timestamp: timestamp || Date.now()
     };
   }, [livePrice, selectedAsset, timestamp]);
 
   // NEW: React Query balance fetching with smart caching
-  const { data: baseBalance, isLoading: isLoadingBaseBalance } = useBalanceQuery(
+  const { data: rawBaseBalance, isLoading: isLoadingBaseBalance } = useBalanceQuery(
     baseAsset,
     selectedExchange
   );
 
-  const { data: quoteBalance, isLoading: isLoadingQuoteBalance } = useBalanceQuery(
+  const { data: rawQuoteBalance, isLoading: isLoadingQuoteBalance } = useBalanceQuery(
     quoteAsset,
     selectedExchange
   );
+
+  // Convert balances to format expected by validation (handle potential array return)
+  const baseBalance = (rawBaseBalance && !Array.isArray(rawBaseBalance)) ? rawBaseBalance : null;
+  const quoteBalance = (rawQuoteBalance && !Array.isArray(rawQuoteBalance)) ? rawQuoteBalance : null;
 
   // NEW: React Query symbol info with long cache (5 minutes)
   const { data: symbolInfo, isLoading: isLoadingSymbolInfo } = useSymbolInfoQuery(
@@ -117,15 +121,15 @@ export function SpotTradingForm({
   const isPending = createOrderMutation.isPending;
 
   // Extract trading constraints from symbol info
-  const tradingConstraints = useMemo(() => 
-    extractTradingConstraints(symbolInfo || null, selectedAsset), 
+  const tradingConstraints = useMemo(() =>
+    extractTradingConstraints(symbolInfo || null, selectedAsset),
     [symbolInfo, selectedAsset]
   );
 
   // Calculate max buy amounts
   const maxBuyInfo = useMemo(() => {
     if (!price?.price || !baseBalance || !quoteBalance) return null;
-    
+
     return calculateMaxBuy(
       parseFloat(quoteBalance.free || "0"),
       parseFloat(baseBalance.free || "0"),
@@ -137,7 +141,7 @@ export function SpotTradingForm({
   }, [price, baseBalance, quoteBalance, tradingConstraints, baseAsset, quoteAsset]);
 
   // Get constraint messages for UI
-  const constraintMessages = useMemo(() => 
+  const constraintMessages = useMemo(() =>
     getConstraintMessages(tradingConstraints, baseAsset, quoteAsset),
     [tradingConstraints, baseAsset, quoteAsset]
   );
@@ -193,14 +197,14 @@ export function SpotTradingForm({
   // Calculate cost breakdown in real-time
   const updateCostBreakdown = useCallback(() => {
     const formValues = form.getValues();
-    
+
     const cost = calculateOrderCost({
       orderData: formValues,
       currentPrice: price,
       baseAsset,
       quoteAsset,
     });
-    
+
     setCostBreakdown(cost);
   }, [form, price, baseAsset, quoteAsset]);
 
@@ -224,28 +228,28 @@ export function SpotTradingForm({
   // Form submission handler
   const onSubmit = async (data: TradingFormData) => {
     console.log("Order data: ", data);
-    
+
     // Clear previous validation errors
     setValidationErrors([]);
     setValidationWarnings([]);
-    
+
     // Validate order before submission
     const validationResult = validateOrder(data, {
       baseAsset,
       quoteAsset,
       constraints: tradingConstraints,
-      baseBalance: baseBalance || null,
-      quoteBalance: quoteBalance || null,
+      baseBalance,
+      quoteBalance,
       currentPrice: price,
     });
-    
+
     console.log("Validation result: ", validationResult);
-    
+
     if (!validationResult.isValid) {
       // Set validation errors to display to user
       setValidationErrors(validationResult.errors);
       setValidationWarnings(validationResult.warnings);
-      
+
       // Set form errors for specific fields
       validationResult.errors.forEach(error => {
         if (error.field !== "general") {
@@ -255,17 +259,17 @@ export function SpotTradingForm({
           });
         }
       });
-      
+
       console.log("Order validation failed:", validationResult.errors);
       return; // Don't submit if validation fails
     }
-    
+
     // Show warnings if any (but still allow submission)
     if (validationResult.warnings.length > 0) {
       setValidationWarnings(validationResult.warnings);
       console.log("Order warnings:", validationResult.warnings);
     }
-    
+
     // All validation passed, create order using NEW React Query mutation
     try {
       await createOrderMutation.mutateAsync({
@@ -279,7 +283,7 @@ export function SpotTradingForm({
       form.reset(getDefaultValues(orderType));
       setValidationErrors([]);
       setValidationWarnings([]);
-      
+
       // Mutation handles cache invalidation and toast notifications automatically
     } catch (error) {
       console.error("Order creation failed:", error);
@@ -332,12 +336,12 @@ export function SpotTradingForm({
             {selectedAsset && (
               <AssetInfoCard
                 symbol={selectedAsset}
-                balance={baseBalance || null}
+                balance={baseBalance}
                 price={price}
                 lastUpdate={price ? new Date(price.timestamp) : null}
                 isLoadingBalance={isLoadingBalance}
                 isLoadingPrice={isLoadingPrice}
-                onRefreshPrice={() => {}} // WebSocket auto-updates, no manual refresh needed
+                onRefreshPrice={() => { }} // WebSocket auto-updates, no manual refresh needed
                 selectedExchange={!!selectedExchange}
               />
             )}
@@ -486,7 +490,7 @@ export function SpotTradingForm({
                     {getFeePercentageDisplay(costBreakdown.tradingFeeRate)} fee
                   </span>
                 </div>
-                
+
                 <div className="space-y-2 text-sm">
                   {/* Quantity and Price */}
                   <div className="flex justify-between">
@@ -495,14 +499,14 @@ export function SpotTradingForm({
                     </span>
                     <span>{costBreakdown.quantity.toFixed(8)} {baseAsset}</span>
                   </div>
-                  
+
                   {costBreakdown.side === "BUY" && (
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">At price:</span>
                       <span>{costBreakdown.price.toFixed(2)} {quoteAsset}</span>
                     </div>
                   )}
-                  
+
                   {/* Subtotal */}
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">
@@ -510,19 +514,19 @@ export function SpotTradingForm({
                     </span>
                     <span>{costBreakdown.formattedSubtotal}</span>
                   </div>
-                  
+
                   {/* Trading Fee */}
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Trading fee:</span>
                     <span className="text-destructive">-{costBreakdown.formattedFee}</span>
                   </div>
-                  
+
                   {/* Fee explanation */}
                   <div className="text-xs text-muted-foreground">
                     {getExpectedFeeType(form.getValues(), price).description}
                   </div>
                 </div>
-                
+
                 {/* Total/Net Amount */}
                 <div className="pt-2 border-t border-border">
                   <div className="flex items-center justify-between">
@@ -533,7 +537,7 @@ export function SpotTradingForm({
                       {costBreakdown.formattedTotal}
                     </span>
                   </div>
-                  
+
                   {costBreakdown.side === "BUY" && (
                     <div className="flex justify-between text-xs text-muted-foreground mt-1">
                       <span>You will receive:</span>
@@ -543,7 +547,7 @@ export function SpotTradingForm({
                 </div>
               </div>
             )}
-            
+
             {/* No cost breakdown available */}
             {!costBreakdown && (
               <div className="space-y-2 py-3 border-t border-border">
@@ -565,11 +569,10 @@ export function SpotTradingForm({
             {/* Enhanced Submit Button */}
             <Button
               type="submit"
-              className={`w-full h-12 text-base font-semibold ${
-                form.watch("side") === "BUY"
+              className={`w-full h-12 text-base font-semibold ${form.watch("side") === "BUY"
                   ? "bg-teal-600 hover:bg-teal-700"
                   : "bg-rose-600 hover:bg-rose-700"
-              }`}
+                }`}
               disabled={!selectedExchange || isPending || isLoadingSymbolInfo}
             >
               {isPending ? (

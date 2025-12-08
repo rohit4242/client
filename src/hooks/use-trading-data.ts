@@ -24,16 +24,16 @@ interface TradingDataReturn {
     timestamp: number;
   } | null;
   isConnected: boolean;
-  
+
   // Balance data
   baseBalance: AssetBalance | MarginAssetBalance | null;
   quoteBalance: AssetBalance | MarginAssetBalance | null;
   isLoadingBalance: boolean;
-  
+
   // Symbol info
   symbolInfo: SpotRestAPI.ExchangeInfoResponse | null;
   isLoadingSymbolInfo: boolean;
-  
+
   // Assets
   baseAsset: string;
   quoteAsset: string;
@@ -76,14 +76,14 @@ export function useTradingData(
   options?: UseTradingDataOptions
 ): TradingDataReturn {
   const accountType = options?.accountType || 'spot';
-  
+
   // Extract base and quote assets
   const baseAsset = symbol ? extractBaseAsset(symbol) : '';
   const quoteAsset = symbol && baseAsset ? symbol.replace(baseAsset, '') : '';
 
   // WebSocket price (real-time, no polling!)
   const { price: livePrice, isConnected, timestamp } = useLivePriceQuery(symbol);
-  
+
   // Convert to expected format
   const price = useMemo(() => {
     if (!livePrice || !symbol) return null;
@@ -100,7 +100,7 @@ export function useTradingData(
     exchange,
     { enabled: accountType === 'spot' }
   );
-  
+
   const spotQuoteBalance = useBalanceQuery(
     quoteAsset,
     exchange,
@@ -119,14 +119,26 @@ export function useTradingData(
     { enabled: accountType === 'margin' }
   );
 
+  // Helper to safely extract single balance
+  const getSingleBalance = <T extends { asset: string }>(
+    data: T | T[] | null | undefined,
+    targetAsset: string
+  ): T | null => {
+    if (!data) return null;
+    if (Array.isArray(data)) {
+      return data.find((item) => item.asset === targetAsset) || null;
+    }
+    return data;
+  };
+
   // Select the appropriate balances based on account type
-  const baseBalance = accountType === 'spot' 
-    ? spotBaseBalance.data || null 
-    : marginBaseBalance.data || null;
-    
+  const baseBalance = accountType === 'spot'
+    ? getSingleBalance(spotBaseBalance.data, baseAsset)
+    : getSingleBalance(marginBaseBalance.data, baseAsset);
+
   const quoteBalance = accountType === 'spot'
-    ? spotQuoteBalance.data || null
-    : marginQuoteBalance.data || null;
+    ? getSingleBalance(spotQuoteBalance.data, quoteAsset)
+    : getSingleBalance(marginQuoteBalance.data, quoteAsset);
 
   const isLoadingBalance = accountType === 'spot'
     ? spotBaseBalance.isLoading || spotQuoteBalance.isLoading
