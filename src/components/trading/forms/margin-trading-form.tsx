@@ -40,9 +40,9 @@ import { ToggleButtonGroup } from "@/components/trading/toggle-button-group";
 import { TradingInputMode } from "@/components/trading/trading-input-mode";
 import { LimitOrderFields } from "@/components/trading/limit-order-fields";
 import { extractBaseAsset } from "@/lib/utils";
-import { 
-  extractTradingConstraints, 
-  calculateMaxBuy, 
+import {
+  extractTradingConstraints,
+  calculateMaxBuy,
   getConstraintMessages
 } from "@/lib/trading-constraints";
 import { validateOrder, ValidationError } from "@/lib/order-validation";
@@ -87,17 +87,17 @@ export function MarginTradingForm({
 
   // NEW: WebSocket price updates (no polling!)
   const { price: livePrice, isConnected, timestamp } = useLivePriceQuery(selectedAsset);
-  
+
   // Convert WebSocket price to expected format
   const price = useMemo(() => {
     if (!livePrice) return null;
-    return { 
+    return {
       symbol: selectedAsset,
-      price: livePrice, 
-      timestamp: timestamp || Date.now() 
+      price: livePrice,
+      timestamp: timestamp || Date.now()
     };
   }, [livePrice, selectedAsset, timestamp]);
-  
+
   // NEW: React Query margin balance fetching with smart caching
   const { data: marginBaseBalance, isLoading: isLoadingBaseBalance } = useMarginBalanceQuery(
     baseAsset,
@@ -110,13 +110,13 @@ export function MarginTradingForm({
   );
 
   // Convert margin balances to format expected by validation
-  const baseBalance = marginBaseBalance ? {
+  const baseBalance = (marginBaseBalance && !Array.isArray(marginBaseBalance)) ? {
     asset: marginBaseBalance.asset,
     free: marginBaseBalance.free,
     locked: marginBaseBalance.locked,
   } : null;
 
-  const quoteBalance = marginQuoteBalance ? {
+  const quoteBalance = (marginQuoteBalance && !Array.isArray(marginQuoteBalance)) ? {
     asset: marginQuoteBalance.asset,
     free: marginQuoteBalance.free,
     locked: marginQuoteBalance.locked,
@@ -133,16 +133,16 @@ export function MarginTradingForm({
   );
 
   // Extract trading constraints from symbol info
-  const tradingConstraints = useMemo(() => 
-    extractTradingConstraints(symbolInfo || null, selectedAsset), 
+  const tradingConstraints = useMemo(() =>
+    extractTradingConstraints(symbolInfo || null, selectedAsset),
     [symbolInfo, selectedAsset]
   );
 
- 
+
   // Calculate max buy amounts
   const maxBuyInfo = useMemo(() => {
     if (!price?.price || !baseBalance || !quoteBalance) return null;
-    
+
     return calculateMaxBuy(
       parseFloat(quoteBalance.free || "0"),
       parseFloat(baseBalance.free || "0"),
@@ -154,7 +154,7 @@ export function MarginTradingForm({
   }, [price, baseBalance, quoteBalance, tradingConstraints, baseAsset, quoteAsset]);
 
   // Get constraint messages for UI
-  const constraintMessages = useMemo(() => 
+  const constraintMessages = useMemo(() =>
     getConstraintMessages(tradingConstraints, baseAsset, quoteAsset),
     [tradingConstraints, baseAsset, quoteAsset]
   );
@@ -165,22 +165,22 @@ export function MarginTradingForm({
     defaultValues: getDefaultValues(orderType),
   });
 
-   // Fetch max borrowable amounts for margin validation
-   const currentOrderSide = form.watch("side") || "BUY";
-   const {
-     maxBorrowableQuote,
-     maxBorrowableBase,
-     isLoadingQuote,
-     isLoadingBase,
-   } = useMarginValidation({
-     quoteAsset,
-     baseAsset,
-     exchange: selectedExchange,
-     sideEffectType,
-     orderSide: currentOrderSide,
-     enabled: !!selectedExchange,
-   });
- 
+  // Fetch max borrowable amounts for margin validation
+  const currentOrderSide = form.watch("side") || "BUY";
+  const {
+    maxBorrowableQuote,
+    maxBorrowableBase,
+    isLoadingQuote,
+    isLoadingBase,
+  } = useMarginValidation({
+    quoteAsset,
+    baseAsset,
+    exchange: selectedExchange,
+    sideEffectType,
+    orderSide: currentOrderSide,
+    enabled: !!selectedExchange,
+  });
+
 
   // Memoized toggle options
   const sideOptions = useMemo(
@@ -227,14 +227,14 @@ export function MarginTradingForm({
   // Calculate cost breakdown in real-time
   const updateCostBreakdown = useCallback(() => {
     const formValues = form.getValues();
-    
+
     const cost = calculateOrderCost({
       orderData: formValues,
       currentPrice: price,
       baseAsset,
       quoteAsset,
     });
-    
+
     setCostBreakdown(cost);
   }, [form, price, baseAsset, quoteAsset]);
 
@@ -258,11 +258,11 @@ export function MarginTradingForm({
   // Form submission handler
   const onSubmit = async (data: TradingFormData) => {
     console.log("Order data: ", data);
-    
+
     // Clear previous validation errors
     setValidationErrors([]);
     setValidationWarnings([]);
-    
+
     // Validate order before submission with margin-specific context
     const validationResult = validateOrder(data, {
       baseAsset,
@@ -275,14 +275,14 @@ export function MarginTradingForm({
       maxBorrowableQuote: maxBorrowableQuote ?? undefined,
       maxBorrowableBase: maxBorrowableBase ?? undefined,
     });
-    
+
     console.log("Validation result: ", validationResult);
-    
+
     if (!validationResult.isValid) {
       // Set validation errors to display to user
       setValidationErrors(validationResult.errors);
       setValidationWarnings(validationResult.warnings);
-      
+
       // Set form errors for specific fields
       validationResult.errors.forEach(error => {
         if (error.field !== "general") {
@@ -292,17 +292,17 @@ export function MarginTradingForm({
           });
         }
       });
-      
+
       console.log("Order validation failed:", validationResult.errors);
       return; // Don't submit if validation fails
     }
-    
+
     // Show warnings if any (but still allow submission)
     if (validationResult.warnings.length > 0) {
       setValidationWarnings(validationResult.warnings);
       console.log("Order warnings:", validationResult.warnings);
     }
-    
+
     // Prepare order data with margin fields
     const orderData = {
       ...data,
@@ -323,12 +323,12 @@ export function MarginTradingForm({
       setValidationErrors([]);
       setValidationWarnings([]);
       setSideEffectType("NO_SIDE_EFFECT");
-      
+
       // Mutation handles cache invalidation and toast notifications automatically
     } catch (error) {
       console.error("Order creation failed:", error);
       const errorMessage = error instanceof Error ? error.message : 'Failed to create order';
-      
+
       setValidationErrors([{
         code: 'UNKNOWN_ERROR',
         field: 'unknown',
@@ -378,12 +378,12 @@ export function MarginTradingForm({
             {selectedAsset && (
               <MarginAssetInfoCard
                 symbol={selectedAsset}
-                balance={marginBaseBalance || null}
+                balance={(marginBaseBalance && !Array.isArray(marginBaseBalance)) ? marginBaseBalance : null}
                 price={price}
                 lastUpdate={lastUpdate}
                 isLoadingBalance={isLoadingBalance}
                 isLoadingPrice={isLoadingPrice}
-                onRefreshPrice={() => {}} // WebSocket auto-updates, no manual refresh needed
+                onRefreshPrice={() => { }} // WebSocket auto-updates, no manual refresh needed
                 selectedExchange={!!selectedExchange}
               />
             )}
@@ -447,7 +447,7 @@ export function MarginTradingForm({
                     <div className="flex flex-col items-start">
                       <span className="font-medium">Auto Borrow</span>
                       <span className="text-xs text-muted-foreground">
-                        {currentOrderSide === 'BUY' 
+                        {currentOrderSide === 'BUY'
                           ? `Borrow ${quoteAsset} if insufficient balance`
                           : `Borrow ${baseAsset} to sell (short)`
                         }
@@ -458,7 +458,7 @@ export function MarginTradingForm({
                     <div className="flex flex-col items-start">
                       <span className="font-medium">Auto Repay</span>
                       <span className="text-xs text-muted-foreground">
-                        {currentOrderSide === 'SELL' 
+                        {currentOrderSide === 'SELL'
                           ? 'Auto repay debt when selling'
                           : 'Applies to sell orders'
                         }
@@ -468,7 +468,7 @@ export function MarginTradingForm({
                 </SelectContent>
               </Select>
               <p className="text-xs text-muted-foreground">
-                {currentOrderSide === 'BUY' 
+                {currentOrderSide === 'BUY'
                   ? 'Choose how to handle borrowing for buying'
                   : 'Choose how to handle borrowing/repayment for selling'
                 }
@@ -478,7 +478,7 @@ export function MarginTradingForm({
             {/* Margin Warning */}
             <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-md">
               <p className="text-xs text-yellow-800">
-                <strong>Margin Trading Risk:</strong> You can lose more than your initial investment. 
+                <strong>Margin Trading Risk:</strong> You can lose more than your initial investment.
                 Monitor your margin level to avoid liquidation.
               </p>
             </div>
@@ -625,7 +625,7 @@ export function MarginTradingForm({
                     {getFeePercentageDisplay(costBreakdown.tradingFeeRate)} fee
                   </span>
                 </div>
-                
+
                 <div className="space-y-2 text-sm">
                   {/* Quantity and Price */}
                   <div className="flex justify-between">
@@ -634,14 +634,14 @@ export function MarginTradingForm({
                     </span>
                     <span>{costBreakdown.quantity.toFixed(8)} {baseAsset}</span>
                   </div>
-                  
+
                   {costBreakdown.side === "BUY" && (
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">At price:</span>
                       <span>{costBreakdown.price.toFixed(2)} {quoteAsset}</span>
                     </div>
                   )}
-                  
+
                   {/* Subtotal */}
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">
@@ -649,19 +649,19 @@ export function MarginTradingForm({
                     </span>
                     <span>{costBreakdown.formattedSubtotal}</span>
                   </div>
-                  
+
                   {/* Trading Fee */}
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Trading fee:</span>
                     <span className="text-destructive">-{costBreakdown.formattedFee}</span>
                   </div>
-                  
+
                   {/* Fee explanation */}
                   <div className="text-xs text-muted-foreground">
                     {getExpectedFeeType(form.getValues(), price).description}
                   </div>
                 </div>
-                
+
                 {/* Total/Net Amount */}
                 <div className="pt-2 border-t border-border">
                   <div className="flex items-center justify-between">
@@ -672,7 +672,7 @@ export function MarginTradingForm({
                       {costBreakdown.formattedTotal}
                     </span>
                   </div>
-                  
+
                   {costBreakdown.side === "BUY" && (
                     <div className="flex justify-between text-xs text-muted-foreground mt-1">
                       <span>You will receive:</span>
@@ -682,7 +682,7 @@ export function MarginTradingForm({
                 </div>
               </div>
             )}
-            
+
             {/* No cost breakdown available */}
             {!costBreakdown && (
               <div className="space-y-2 py-3 border-t border-border">
@@ -704,11 +704,10 @@ export function MarginTradingForm({
             {/* Enhanced Submit Button */}
             <Button
               type="submit"
-              className={`w-full h-12 text-base font-semibold ${
-                form.watch("side") === "BUY"
-                  ? "bg-teal-600 hover:bg-teal-700"
-                  : "bg-rose-600 hover:bg-rose-700"
-              }`}
+              className={`w-full h-12 text-base font-semibold ${form.watch("side") === "BUY"
+                ? "bg-teal-600 hover:bg-teal-700"
+                : "bg-rose-600 hover:bg-rose-700"
+                }`}
               disabled={!selectedExchange || isSubmitting || isLoadingSymbolInfo || (sideEffectType === 'MARGIN_BUY' && isLoadingQuote)}
             >
               {isSubmitting ? (
