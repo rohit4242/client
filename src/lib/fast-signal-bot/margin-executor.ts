@@ -3,6 +3,7 @@ import { Action, Bot, Signal } from "@prisma/client";
 import { MarginOrderParams, BinanceConfig, BinanceOrderResponse } from "../services/exchange/types";
 import { placeMarginOrder } from "../services/exchange/binance-margin";
 import { ValidationResult } from "./margin-validator";
+import { placeProtectiveOrders, cancelProtectiveOrders } from "../services/protective-orders-service";
 
 export interface ExecutionResult {
     success: boolean;
@@ -49,8 +50,8 @@ export async function executeMarginTrade(
         // 2. Execute on Binance
         const binanceData = await executeBinanceMarginOrder(config, params);
 
-        // 3. Handle DB Updates
-        const result = await handleMarginDbUpdates(bot, signal, binanceData, params);
+        // 3. Handle DB Updates (now includes placing protective orders)
+        const result = await handleMarginDbUpdates(config, bot, signal, binanceData, params);
 
         // 4. Update Stats Async
         updateStatsAsync(bot.id, bot.portfolio.userId);
@@ -143,6 +144,7 @@ export async function executeBinanceMarginOrder(
  * Handle Database Updates (Position & Order)
  */
 async function handleMarginDbUpdates(
+    config: BinanceConfig,
     bot: Bot,
     signal: Signal,
     binanceData: BinanceOrderResponse,
@@ -164,13 +166,13 @@ async function handleMarginDbUpdates(
 
     return await db.$transaction(async (tx) => {
         if (signal.action === Action.ENTER_LONG) {
-            return await handleMarginOpen(tx, bot, signal, params, executedPrice, executedQty, executedValue, binanceData.orderId.toString(), "LONG");
+            return await handleMarginOpen(tx, config, bot, signal, params, executedPrice, executedQty, executedValue, binanceData.orderId.toString(), "LONG");
         } else if (signal.action === Action.ENTER_SHORT) {
-            return await handleMarginOpen(tx, bot, signal, params, executedPrice, executedQty, executedValue, binanceData.orderId.toString(), "SHORT");
+            return await handleMarginOpen(tx, config, bot, signal, params, executedPrice, executedQty, executedValue, binanceData.orderId.toString(), "SHORT");
         } else if (signal.action === Action.EXIT_LONG) {
-            return await handleMarginClose(tx, bot, signal, params, executedPrice, executedQty, executedValue, binanceData.orderId.toString(), "LONG");
+            return await handleMarginClose(tx, config, bot, signal, params, executedPrice, executedQty, executedValue, binanceData.orderId.toString(), "LONG");
         } else { // EXIT_SHORT
-            return await handleMarginClose(tx, bot, signal, params, executedPrice, executedQty, executedValue, binanceData.orderId.toString(), "SHORT");
+            return await handleMarginClose(tx, config, bot, signal, params, executedPrice, executedQty, executedValue, binanceData.orderId.toString(), "SHORT");
         }
     });
 }
@@ -180,6 +182,7 @@ async function handleMarginDbUpdates(
  */
 async function handleMarginOpen(
     tx: any,
+    config: BinanceConfig,
     bot: Bot,
     signal: Signal,
     params: MarginOrderParams,
@@ -189,6 +192,19 @@ async function handleMarginOpen(
     binanceOrderId: string,
     positionSide: "LONG" | "SHORT"
 ) {
+    // Calculate SL/TP prices based on bot settings
+    const stopLossPrice = bot.stopLoss
+        ? (positionSide === "LONG"
+            ? executedPrice * (1 - bot.stopLoss / 100)
+            : executedPrice * (1 + bot.stopLoss / 100))
+        : null;
+    const takeProfitPrice = bot.takeProfit
+        ? (positionSide === "LONG"
+            ? executedPrice * (1 + bot.takeProfit / 100)
+            : executedPrice * (1 - bot.takeProfit / 100))
+        : null;
+
+    // Create position in database
     const newPosition = await tx.position.create({
         data: {
             portfolioId: bot.portfolioId,
@@ -203,10 +219,60 @@ async function handleMarginOpen(
             status: "OPEN",
             accountType: "MARGIN",
             source: "BOT",
-            stopLoss: bot.stopLoss ? (positionSide === "LONG" ? executedPrice * (1 - bot.stopLoss / 100) : executedPrice * (1 + bot.stopLoss / 100)) : null,
-            takeProfit: bot.takeProfit ? (positionSide === "LONG" ? executedPrice * (1 + bot.takeProfit / 100) : executedPrice * (1 - bot.takeProfit / 100)) : null,
+            stopLoss: stopLossPrice,
+            takeProfit: takeProfitPrice,
         },
     });
+
+    // Place protective orders on Binance (SL/TP)
+    let stopLossOrderId: string | undefined;
+    let takeProfitOrderId: string | undefined;
+    let stopLossStatus: string | undefined;
+    let takeProfitStatus: string | undefined;
+
+    if (stopLossPrice || takeProfitPrice) {
+        try {
+            console.log(`[FastMargin] Placing protective orders for position ${newPosition.id}`);
+
+            const protectiveResult = await placeProtectiveOrders({
+                config,
+                symbol: signal.symbol,
+                side: positionSide,
+                quantity: executedQty,
+                stopLossPrice,
+                takeProfitPrice,
+                accountType: "MARGIN",
+            });
+
+            stopLossOrderId = protectiveResult.stopLossOrderId;
+            takeProfitOrderId = protectiveResult.takeProfitOrderId;
+            stopLossStatus = stopLossOrderId ? "NEW" : undefined;
+            takeProfitStatus = takeProfitOrderId ? "NEW" : undefined;
+
+            if (protectiveResult.stopLossError) {
+                console.warn(`[FastMargin] SL order failed: ${protectiveResult.stopLossError}`);
+            }
+            if (protectiveResult.takeProfitError) {
+                console.warn(`[FastMargin] TP order failed: ${protectiveResult.takeProfitError}`);
+            }
+        } catch (error) {
+            console.error("[FastMargin] Failed to place protective orders:", error);
+            // Don't fail the whole trade - position is open, just without SL/TP orders
+        }
+    }
+
+    // Update position with protective order IDs
+    if (stopLossOrderId || takeProfitOrderId) {
+        await tx.position.update({
+            where: { id: newPosition.id },
+            data: {
+                stopLossOrderId,
+                takeProfitOrderId,
+                stopLossStatus,
+                takeProfitStatus,
+            },
+        });
+    }
 
     const newOrder = await tx.order.create({
         data: {
@@ -233,6 +299,7 @@ async function handleMarginOpen(
  */
 async function handleMarginClose(
     tx: any,
+    config: BinanceConfig,
     bot: Bot,
     signal: Signal,
     params: MarginOrderParams,
@@ -256,6 +323,21 @@ async function handleMarginClose(
     let positionId = "";
 
     if (existingPosition) {
+        // Cancel protective orders if they exist
+        if (existingPosition.stopLossOrderId || existingPosition.takeProfitOrderId) {
+            try {
+                console.log(`[FastMargin] Cancelling protective orders for position ${existingPosition.id}`);
+                await cancelProtectiveOrders(config, {
+                    symbol: signal.symbol,
+                    stopLossOrderId: existingPosition.stopLossOrderId,
+                    takeProfitOrderId: existingPosition.takeProfitOrderId,
+                });
+            } catch (error) {
+                console.error("[FastMargin] Failed to cancel protective orders:", error);
+                // Continue closing position anyway
+            }
+        }
+
         // Calculate PnL
         let pnl = 0;
         let pnlPercent = 0;
@@ -278,6 +360,9 @@ async function handleMarginClose(
                 closedAt: new Date(),
                 pnl: pnl,
                 pnlPercent: pnlPercent,
+                // Mark orders as canceled
+                stopLossStatus: existingPosition.stopLossOrderId ? "CANCELED" : null,
+                takeProfitStatus: existingPosition.takeProfitOrderId ? "CANCELED" : null,
             },
         });
         positionId = existingPosition.id;

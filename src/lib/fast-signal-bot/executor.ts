@@ -3,6 +3,8 @@ import { Action, Bot, Signal } from "@prisma/client";
 import { SpotOrderParams, BinanceConfig, BinanceOrderResponse } from "../services/exchange/types";
 import { placeSpotOrder } from "../services/exchange/binance-spot";
 import { ValidationResult } from "./validator";
+// NOTE: Spot trading on Binance doesn't support native SL/TP orders like margin does.
+// The SL/TP prices are stored in the position for potential monitoring-based execution.
 
 export interface ExecutionResult {
     success: boolean;
@@ -50,7 +52,7 @@ export async function executeSpotTrade(
         const binanceData = await executeBinanceOrder(config, params);
 
         // 3. Handle DB Updates
-        const result = await handleDbUpdates(bot, signal, binanceData, params);
+        const result = await handleDbUpdates(config, bot, signal, binanceData, params);
 
         // 4. Update Stats Async
         updateStatsAsync(bot.id, bot.portfolio.userId);
@@ -119,6 +121,7 @@ export async function executeBinanceOrder(
  * Handle Database Updates (Position & Order)
  */
 async function handleDbUpdates(
+    config: BinanceConfig,
     bot: Bot,
     signal: Signal,
     binanceData: BinanceOrderResponse,
@@ -142,7 +145,7 @@ async function handleDbUpdates(
 
     return await db.$transaction(async (tx) => {
         if (params.side === "BUY") {
-            return await handleSpotBuy(tx, bot, signal, params, executedPrice, executedQty, executedValue, binanceData.orderId.toString());
+            return await handleSpotBuy(tx, config, bot, signal, params, executedPrice, executedQty, executedValue, binanceData.orderId.toString());
         } else {
             return await handleSpotSell(tx, bot, signal, params, executedPrice, executedQty, executedValue, binanceData.orderId.toString());
         }
@@ -151,9 +154,12 @@ async function handleDbUpdates(
 
 /**
  * Handle Spot Buy (Open Position)
+ * NOTE: Spot trading doesn't support native SL/TP orders on Binance.
+ * SL/TP prices are stored for potential monitoring-based execution.
  */
 async function handleSpotBuy(
     tx: any,
+    config: BinanceConfig,
     bot: Bot,
     signal: Signal,
     params: SpotOrderParams,
@@ -162,6 +168,14 @@ async function handleSpotBuy(
     executedValue: number,
     binanceOrderId: string
 ) {
+    // Calculate SL/TP prices based on bot settings
+    const stopLossPrice = bot.stopLoss
+        ? executedPrice * (1 - bot.stopLoss / 100)
+        : null;
+    const takeProfitPrice = bot.takeProfit
+        ? executedPrice * (1 + bot.takeProfit / 100)
+        : null;
+
     const newPosition = await tx.position.create({
         data: {
             portfolioId: bot.portfolioId,
@@ -176,8 +190,10 @@ async function handleSpotBuy(
             status: "OPEN",
             accountType: "SPOT",
             source: "BOT",
-            stopLoss: bot.stopLoss ? executedPrice * (1 - bot.stopLoss / 100) : null,
-            takeProfit: bot.takeProfit ? executedPrice * (1 + bot.takeProfit / 100) : null,
+            stopLoss: stopLossPrice,
+            takeProfit: takeProfitPrice,
+            // Note: For spot, we don't have stopLossOrderId/takeProfitOrderId
+            // since Binance spot doesn't support native SL/TP conditional orders
         },
     });
 

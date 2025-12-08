@@ -18,6 +18,15 @@ export interface BaseOrderParams {
   type: 'MARKET' | 'LIMIT';
 }
 
+// Extended order types (includes conditional orders)
+export type ExtendedOrderType =
+  | 'MARKET'
+  | 'LIMIT'
+  | 'STOP_LOSS'
+  | 'STOP_LOSS_LIMIT'
+  | 'TAKE_PROFIT'
+  | 'TAKE_PROFIT_LIMIT';
+
 // Spot order parameters
 export interface SpotOrderParams extends BaseOrderParams {
   quantity?: string;
@@ -31,6 +40,18 @@ export interface MarginOrderParams extends BaseOrderParams {
   quantity?: string;
   quoteOrderQty?: string;
   price?: string;
+  timeInForce?: 'GTC' | 'IOC' | 'FOK';
+  sideEffectType?: 'NO_SIDE_EFFECT' | 'MARGIN_BUY' | 'AUTO_REPAY';
+}
+
+// Conditional order parameters (for SL/TP orders)
+export interface ConditionalOrderParams {
+  symbol: string;
+  side: 'BUY' | 'SELL';
+  type: ExtendedOrderType;
+  quantity: string;
+  stopPrice: string;           // Trigger price for SL/TP
+  price?: string;              // Limit price (for STOP_LOSS_LIMIT, TAKE_PROFIT_LIMIT)
   timeInForce?: 'GTC' | 'IOC' | 'FOK';
   sideEffectType?: 'NO_SIDE_EFFECT' | 'MARGIN_BUY' | 'AUTO_REPAY';
 }

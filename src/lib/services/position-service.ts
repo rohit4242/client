@@ -4,8 +4,9 @@
  */
 
 import db from "@/db";
-import { BinanceOrderResponse } from "./exchange/types";
+import { BinanceOrderResponse, BinanceConfig } from "./exchange/types";
 import { Source } from "@prisma/client";
+import { cancelProtectiveOrders } from "./protective-orders-service";
 
 export interface CreatePositionParams {
   portfolioId: string;
@@ -145,7 +146,6 @@ export async function updatePositionWithExecution(
       | "OPEN"
       | "CLOSED"
       | "CANCELED"
-      | "MARKET_CLOSED"
       | "FAILED";
 
     switch (binanceStatus) {
@@ -274,7 +274,6 @@ export async function closePosition(
       | "OPEN"
       | "CLOSED"
       | "CANCELED"
-      | "MARKET_CLOSED"
       | "FAILED";
 
     switch (binanceStatus) {
@@ -330,6 +329,9 @@ export async function closePosition(
         pnl: pnl,
         pnlPercent: pnlPercent,
         closedAt: positionStatus === "CLOSED" ? new Date() : null,
+        // Mark SL/TP orders as cancelled since position is now closed
+        stopLossStatus: existingPosition.stopLossOrderId ? "CANCELED" : null,
+        takeProfitStatus: existingPosition.takeProfitOrderId ? "CANCELED" : null,
       },
     });
 
@@ -342,6 +344,70 @@ export async function closePosition(
     };
   } catch (error) {
     console.error("[Position Service] Error closing position:", error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Failed to close position",
+    };
+  }
+}
+
+/**
+ * Close a position with protective order cancellation
+ * This should be called when manually closing a position to cancel any pending SL/TP orders
+ * 
+ * @param config - Binance API configuration
+ * @param positionId - Position database ID
+ * @param binanceResponse - Binance close order response
+ * @returns Close result with P&L
+ */
+export async function closePositionWithProtection(
+  config: BinanceConfig,
+  positionId: string,
+  binanceResponse: BinanceOrderResponse
+): Promise<{
+  success: boolean;
+  pnl?: number;
+  pnlPercent?: number;
+  protectiveOrdersCancelled?: boolean;
+  error?: string;
+}> {
+  try {
+    // Get the existing position
+    const existingPosition = await db.position.findUnique({
+      where: { id: positionId },
+    });
+
+    if (!existingPosition) {
+      return { success: false, error: "Position not found" };
+    }
+
+    // Cancel any pending protective orders on Binance
+    let protectiveOrdersCancelled = false;
+    if (existingPosition.stopLossOrderId || existingPosition.takeProfitOrderId) {
+      console.log("[Position Service] Cancelling protective orders for position:", positionId);
+
+      const cancelResult = await cancelProtectiveOrders(config, {
+        symbol: existingPosition.symbol,
+        stopLossOrderId: existingPosition.stopLossOrderId,
+        takeProfitOrderId: existingPosition.takeProfitOrderId,
+      });
+
+      protectiveOrdersCancelled = cancelResult.slCancelled && cancelResult.tpCancelled;
+
+      if (cancelResult.errors && cancelResult.errors.length > 0) {
+        console.warn("[Position Service] Some protective orders failed to cancel:", cancelResult.errors);
+      }
+    }
+
+    // Close the position using the standard closePosition function
+    const closeResult = await closePosition(positionId, binanceResponse);
+
+    return {
+      ...closeResult,
+      protectiveOrdersCancelled,
+    };
+  } catch (error) {
+    console.error("[Position Service] Error closing position with protection:", error);
     return {
       success: false,
       error: error instanceof Error ? error.message : "Failed to close position",
@@ -367,4 +433,3 @@ export async function deletePosition(
     // Don't throw, just log - this is cleanup
   }
 }
-

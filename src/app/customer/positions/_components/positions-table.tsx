@@ -14,6 +14,8 @@ import {
 import { TrendingUp, TrendingDown } from "lucide-react";
 import { useState } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useCryptoPrice } from "@/hooks/trading/use-crypto-price";
+import { useMemo } from "react";
 
 interface PositionsTableProps {
   positions: RecentPosition[];
@@ -63,6 +65,17 @@ export function PositionsTable({ positions }: PositionsTableProps) {
   const openPositions = positions.filter((p) => p.status === "OPEN").length;
   const closedPositions = positions.filter((p) => p.status === "CLOSED").length;
 
+  // Get unique symbols for active positions to subscribe to
+  const activeSymbols = useMemo(() => {
+    return Array.from(new Set(
+      positions
+        .filter(p => p.status === "OPEN")
+        .map(p => p.symbol)
+    ));
+  }, [positions]);
+
+  const { prices, isConnected } = useCryptoPrice(activeSymbols);
+
   return (
     <Card>
       <CardHeader>
@@ -97,79 +110,112 @@ export function PositionsTable({ positions }: PositionsTableProps) {
                   <TableHeader>
                     <TableRow>
                       <TableHead>Symbol</TableHead>
-                      <TableHead>Side</TableHead>
                       <TableHead>Type</TableHead>
                       <TableHead className="text-right">Entry Price</TableHead>
-                      <TableHead className="text-right">Quantity</TableHead>
                       <TableHead className="text-right">Current Price</TableHead>
-                      <TableHead className="text-right">P&L</TableHead>
+                      <TableHead className="text-right">P&L (Est.)</TableHead>
+                      <TableHead className="text-right">SL / TP</TableHead>
                       <TableHead>Status</TableHead>
-                      <TableHead>Source</TableHead>
                       <TableHead>Created</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {filteredPositions.map((position) => (
-                      <TableRow key={position.id}>
-                        <TableCell className="font-semibold">
-                          {position.symbol}
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex items-center gap-2">
-                            {position.side === "LONG" ? (
-                              <TrendingUp className="h-4 w-4 text-green-500" />
-                            ) : (
-                              <TrendingDown className="h-4 w-4 text-red-500" />
-                            )}
-                            <span
-                              className={
-                                position.side === "LONG"
-                                  ? "text-green-500"
-                                  : "text-red-500"
-                              }
-                            >
-                              {position.side}
-                            </span>
-                          </div>
-                        </TableCell>
-                        <TableCell>{position.type}</TableCell>
-                        <TableCell className="text-right">
-                          {formatCurrency(position.entryPrice)}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          {position.quantity}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          {position.currentPrice
-                            ? formatCurrency(position.currentPrice)
-                            : "-"}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <div
-                            className={`font-semibold ${
-                              position.pnl >= 0 ? "text-green-500" : "text-red-500"
-                            }`}
-                          >
-                            {formatCurrency(position.pnl)}
-                            <div className="text-xs">
-                              ({position.pnlPercent >= 0 ? "+" : ""}
-                              {position.pnlPercent.toFixed(2)}%)
+                    {filteredPositions.map((position) => {
+                      // Logic for live price and PnL
+                      const livePriceData = prices[position.symbol];
+                      const currentPrice = livePriceData
+                        ? parseFloat(livePriceData.price)
+                        : (position.currentPrice || position.entryPrice);
+
+                      // Calculate PnL if open, otherwise use stored PnL
+                      let displayPnl = position.pnl;
+                      let displayPnlPercent = position.pnlPercent;
+
+                      if (position.status === "OPEN" && currentPrice > 0) {
+                        const entryVal = position.entryPrice * position.quantity;
+                        const currentVal = currentPrice * position.quantity;
+
+                        if (position.side === "LONG") {
+                          displayPnl = currentVal - entryVal;
+                        } else {
+                          displayPnl = entryVal - currentVal;
+                        }
+
+                        displayPnlPercent = (displayPnl / entryVal) * 100;
+                      }
+
+                      return (
+                        <TableRow key={position.id}>
+                          <TableCell>
+                            <div className="flex flex-col">
+                              <span className="font-semibold">{position.symbol}</span>
+                              <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                                <span className={position.side === "LONG" ? "text-green-500" : "text-red-500"}>
+                                  {position.side}
+                                </span>
+                                <span>•</span>
+                                <span>{position.accountType}</span>
+                              </div>
                             </div>
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant={getStatusColor(position.status)}>
-                            {position.status}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant="outline">{position.source}</Badge>
-                        </TableCell>
-                        <TableCell className="text-sm text-muted-foreground">
-                          {formatDate(position.createdAt)}
-                        </TableCell>
-                      </TableRow>
-                    ))}
+                          </TableCell>
+                          <TableCell>{position.type}</TableCell>
+                          <TableCell className="text-right">
+                            <div className="flex flex-col">
+                              <span>{formatCurrency(position.entryPrice)}</span>
+                              <span className="text-xs text-muted-foreground">{position.quantity} units</span>
+                            </div>
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <span className={isConnected && prices[position.symbol] ? "text-blue-500" : ""}>
+                              {formatCurrency(currentPrice)}
+                            </span>
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <div
+                              className={`font-semibold ${displayPnl >= 0 ? "text-green-500" : "text-red-500"
+                                }`}
+                            >
+                              {formatCurrency(displayPnl)}
+                              <div className="text-xs">
+                                ({displayPnlPercent >= 0 ? "+" : ""}
+                                {displayPnlPercent.toFixed(2)}%)
+                              </div>
+                            </div>
+                          </TableCell>
+                          <TableCell className="text-right text-xs">
+                            <div className="flex flex-col gap-1 items-end">
+                              {position.stopLoss ? (
+                                <div className="flex gap-1 items-center">
+                                  <span className="text-muted-foreground">SL:</span>
+                                  <span>{formatCurrency(position.stopLoss)}</span>
+                                  {position.stopLossStatus && (
+                                    <Badge variant="outline" className="h-4 px-1 text-[10px]">{position.stopLossStatus}</Badge>
+                                  )}
+                                </div>
+                              ) : <span className="text-muted-foreground">-</span>}
+
+                              {position.takeProfit ? (
+                                <div className="flex gap-1 items-center">
+                                  <span className="text-muted-foreground">TP:</span>
+                                  <span>{formatCurrency(position.takeProfit)}</span>
+                                  {position.takeProfitStatus && (
+                                    <Badge variant="outline" className="h-4 px-1 text-[10px]">{position.takeProfitStatus}</Badge>
+                                  )}
+                                </div>
+                              ) : <span className="text-muted-foreground">-</span>}
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant={getStatusColor(position.status)}>
+                              {position.status}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="text-sm text-muted-foreground">
+                            {formatDate(position.createdAt)}
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
                   </TableBody>
                 </Table>
               </div>

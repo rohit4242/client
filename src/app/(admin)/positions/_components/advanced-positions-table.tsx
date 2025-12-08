@@ -95,8 +95,8 @@ export function AdvancedPositionsTable({
         console.log(`Closing position ${action.payload.positionId}`);
 
         const response = await axios.post(
-          `/api/positions/${action.payload.positionId}/close`,
-          { ...action.payload, userId: selectedUser?.id }
+          `/api/positions/${action.payload.positionId}/market-close`,
+          { userId: selectedUser?.id }
         );
 
         if (response.data.success) {

@@ -17,6 +17,12 @@ export interface RecentPosition {
   source: string;
   createdAt: string;
   updatedAt: string;
+  // New fields
+  stopLoss: number | null;
+  takeProfit: number | null;
+  stopLossStatus: string | null;
+  takeProfitStatus: string | null;
+  accountType: string;
 }
 
 export async function getRecentPositions(limit: number = 10): Promise<RecentPosition[]> {
@@ -63,6 +69,11 @@ export async function getRecentPositions(limit: number = 10): Promise<RecentPosi
       source: position.source,
       createdAt: position.createdAt.toISOString(),
       updatedAt: position.updatedAt.toISOString(),
+      stopLoss: position.stopLoss,
+      takeProfit: position.takeProfit,
+      stopLossStatus: position.stopLossStatus,
+      takeProfitStatus: position.takeProfitStatus,
+      accountType: position.accountType,
     }));
   } catch (error) {
     console.error("Error fetching recent positions:", error);

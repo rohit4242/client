@@ -124,14 +124,14 @@ model Portfolio {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  user              User                @relation(fields: [userId], references: [id], onDelete: Cascade)
-  exchanges         Exchange[]
-  positions         Position[]
-  orders            Order[]
-  bots              Bot[]
-  marginAccounts    MarginAccount[] // Portfolio can have multiple margin accounts
-  transactions      Transaction[] // Track all deposits/withdrawals
-  balanceSnapshots  BalanceSnapshot[] // Historical balance tracking
+  user             User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  exchanges        Exchange[]
+  positions        Position[]
+  orders           Order[]
+  bots             Bot[]
+  marginAccounts   MarginAccount[] // Portfolio can have multiple margin accounts
+  transactions     Transaction[] // Track all deposits/withdrawals
+  balanceSnapshots BalanceSnapshot[] // Historical balance tracking
 
   @@map("portfolio")
 }
@@ -148,9 +148,9 @@ model Exchange {
   positionMode PositionMode @default(Hedge)
 
   // Portfolio values by account type
-  spotValue Float @default(0)     // Value of spot account assets in USD
-  marginValue Float @default(0)   // Net value of margin account in USD
-  totalValue Float @default(0)    // Total value (spotValue + marginValue) - kept for backward compatibility
+  spotValue   Float @default(0) // Value of spot account assets in USD
+  marginValue Float @default(0) // Net value of margin account in USD
+  totalValue  Float @default(0) // Total value (spotValue + marginValue) - kept for backward compatibility
 
   // Sync tracking
   lastSyncedAt DateTime @default(now())
@@ -179,8 +179,8 @@ model MarginAccount {
   symbol String? // NULL for cross margin, required for isolated margin
 
   // Account status
-  isActive       Boolean @default(true)
-  tradeEnabled   Boolean @default(true)
+  isActive        Boolean @default(true)
+  tradeEnabled    Boolean @default(true)
   transferEnabled Boolean @default(true)
 
   // Financial metrics
@@ -188,24 +188,24 @@ model MarginAccount {
   totalLiability     Float @default(0) // Total borrowed amount in BTC
   totalNetAssetValue Float @default(0) // Net asset value (asset - liability)
   marginLevel        Float @default(0) // Current margin level (asset/liability)
-  
+
   // Risk metrics
   marginRatio      Float @default(0) // Maintenance margin ratio
   indexPrice       Float @default(0) // Current index price for isolated margin
   liquidationPrice Float @default(0) // Liquidation price for isolated margin
-  
+
   // Accrued interest
-  totalInterestAccrued Float @default(0) // Total interest owed
+  totalInterestAccrued Float    @default(0) // Total interest owed
   lastInterestUpdate   DateTime @default(now())
 
   // Risk status
-  riskLevel   RiskLevel @default(SAFE) // SAFE, WARNING, DANGER
+  riskLevel RiskLevel @default(SAFE) // SAFE, WARNING, DANGER
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  portfolio        Portfolio          @relation(fields: [portfolioId], references: [id], onDelete: Cascade)
-  borrowedAssets   BorrowedAsset[] // Multiple borrowed assets
+  portfolio      Portfolio       @relation(fields: [portfolioId], references: [id], onDelete: Cascade)
+  borrowedAssets BorrowedAsset[] // Multiple borrowed assets
 
   @@unique([portfolioId, marginType, symbol]) // One margin account per type/symbol combo
   @@map("margin_account")
@@ -216,13 +216,13 @@ model BorrowedAsset {
   marginAccountId String
 
   // Asset details
-  asset        String // e.g., "USDT", "BTC", "ETH"
-  borrowed     Float  @default(0) // Total borrowed amount
-  free         Float  @default(0) // Available balance (owned)
-  interest     Float  @default(0) // Accrued interest
-  locked       Float  @default(0) // Locked in orders
-  netAsset     Float  @default(0) // Net asset (free + locked - borrowed - interest)
-  
+  asset    String // e.g., "USDT", "BTC", "ETH"
+  borrowed Float  @default(0) // Total borrowed amount
+  free     Float  @default(0) // Available balance (owned)
+  interest Float  @default(0) // Accrued interest
+  locked   Float  @default(0) // Locked in orders
+  netAsset Float  @default(0) // Net asset (free + locked - borrowed - interest)
+
   // Interest tracking
   interestRate      Float    @default(0) // Current daily interest rate
   totalInterestPaid Float    @default(0) // Total interest paid
@@ -234,7 +234,7 @@ model BorrowedAsset {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  marginAccount MarginAccount @relation(fields: [marginAccountId], references: [id], onDelete: Cascade)
+  marginAccount MarginAccount   @relation(fields: [marginAccountId], references: [id], onDelete: Cascade)
   borrowHistory BorrowHistory[] // History of borrow/repay actions
   repayHistory  RepayHistory[] // Separate repay history
 
@@ -248,14 +248,14 @@ model BorrowHistory {
   borrowedAssetId String
 
   // Transaction details
-  txId            String   @unique // Transaction ID from exchange
-  amount          Float // Amount borrowed
-  asset           String // Asset borrowed
-  timestamp       DateTime @default(now())
-  
+  txId      String   @unique // Transaction ID from exchange
+  amount    Float // Amount borrowed
+  asset     String // Asset borrowed
+  timestamp DateTime @default(now())
+
   // Status
-  status          BorrowRepayStatus @default(SUCCESS) // SUCCESS, FAILED, PENDING
-  errorMessage    String? // Error message if failed
+  status       BorrowRepayStatus @default(SUCCESS) // SUCCESS, FAILED, PENDING
+  errorMessage String? // Error message if failed
 
   borrowedAsset BorrowedAsset @relation(fields: [borrowedAssetId], references: [id], onDelete: Cascade)
 
@@ -268,16 +268,16 @@ model RepayHistory {
   borrowedAssetId String
 
   // Transaction details
-  txId            String   @unique // Transaction ID from exchange
-  amount          Float // Amount repaid
-  principal       Float // Principal amount repaid
-  interest        Float // Interest amount paid
-  asset           String // Asset repaid
-  timestamp       DateTime @default(now())
+  txId      String   @unique // Transaction ID from exchange
+  amount    Float // Amount repaid
+  principal Float // Principal amount repaid
+  interest  Float // Interest amount paid
+  asset     String // Asset repaid
+  timestamp DateTime @default(now())
 
   // Status
-  status          BorrowRepayStatus @default(SUCCESS) // SUCCESS, FAILED, PENDING
-  errorMessage    String? // Error message if failed
+  status       BorrowRepayStatus @default(SUCCESS) // SUCCESS, FAILED, PENDING
+  errorMessage String? // Error message if failed
 
   borrowedAsset BorrowedAsset @relation(fields: [borrowedAssetId], references: [id], onDelete: Cascade)
 
@@ -315,20 +315,23 @@ model Position {
   pnl        Float  @default(0)
   pnlPercent Float  @default(0)
 
-  // Risk management
+  // Risk management - Price levels
   stopLoss   Float?
   takeProfit Float?
+
+  // Risk management - Binance Order IDs (for SL/TP orders placed on exchange)
+  stopLossOrderId   String? // Binance order ID for stop loss order
+  takeProfitOrderId String? // Binance order ID for take profit order
+  stopLossStatus    String? // Order status: NEW, FILLED, CANCELED, EXPIRED
+  takeProfitStatus  String? // Order status: NEW, FILLED, CANCELED, EXPIRED
 
   // Margin trading fields (only for margin positions)
   borrowedAmount Float   @default(0) // Total amount borrowed for this position
   borrowedAsset  String? // Asset borrowed (e.g., "USDT")
   leverage       Float   @default(1) // Leverage used (1 for spot)
-  
+
   // Margin-specific side effects
   sideEffectType SideEffectType @default(NO_SIDE_EFFECT) // NO_SIDE_EFFECT, MARGIN_BUY, AUTO_REPAY
-  
-  // Interest tracking for this position
-  interestPaid   Float @default(0) // Total interest paid for this position
 
   // Metadata
   source     Source  @default(MANUAL) // MANUAL, BOT
@@ -336,14 +339,14 @@ model Position {
   strategyId String? // Unique strategy identifier
 
   // Timestamps
-  openedAt  DateTime @default(now())
+  openedAt  DateTime  @default(now())
   closedAt  DateTime?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
 
-  portfolio    Portfolio     @relation(fields: [portfolioId], references: [id], onDelete: Cascade)
-  bot          Bot?          @relation(fields: [botId], references: [id], onDelete: SetNull)
-  orders       Order[] // Position has many orders
+  portfolio Portfolio @relation(fields: [portfolioId], references: [id], onDelete: Cascade)
+  bot       Bot?      @relation(fields: [botId], references: [id], onDelete: SetNull)
+  orders    Order[] // Position has many orders
 
   @@index([portfolioId, status])
   @@index([botId])
@@ -361,29 +364,29 @@ model Order {
   marginType  MarginType? // NULL for spot, CROSS or ISOLATED for margin
 
   // Order identification
-  orderId   String // External order ID from exchange
+  orderId       String // External order ID from exchange
   clientOrderId String? // Client order ID for tracking
-  symbol    String
-  type      OrderType      @default(ENTRY) // ENTRY, EXIT, STOP_LOSS, TAKE_PROFIT
-  side      OrderSide      @default(BUY) // BUY, SELL
-  orderType OrderOrderType @default(MARKET) // MARKET, LIMIT, STOP_LOSS, STOP_LOSS_LIMIT, TAKE_PROFIT, TAKE_PROFIT_LIMIT
+  symbol        String
+  type          OrderType      @default(ENTRY) // ENTRY, EXIT, STOP_LOSS, TAKE_PROFIT
+  side          OrderSide      @default(BUY) // BUY, SELL
+  orderType     OrderOrderType @default(MARKET) // MARKET, LIMIT, STOP_LOSS, STOP_LOSS_LIMIT, TAKE_PROFIT, TAKE_PROFIT_LIMIT
 
   // Order details
   price    Float // Order price
   quantity Float // Order quantity
   value    Float // Total value (price * quantity)
-  
+
   // For quote orders (buy with specific USD amount)
   quoteOrderQty Float? // Amount in quote asset (e.g., USDT)
 
   // Execution details
-  executedQty   Float @default(0) // Quantity filled
-  cummulativeQuoteQty Float @default(0) // Total quote quantity filled
-  avgPrice      Float? // Average execution price
+  executedQty         Float  @default(0) // Quantity filled
+  cummulativeQuoteQty Float  @default(0) // Total quote quantity filled
+  avgPrice            Float? // Average execution price
 
   // Margin-specific fields
   sideEffectType SideEffectType @default(NO_SIDE_EFFECT) // NO_SIDE_EFFECT, MARGIN_BUY, AUTO_REPAY
-  
+
   // Time in force (for limit orders)
   timeInForce TimeInForce? // GTC, IOC, FOK
 
@@ -392,8 +395,8 @@ model Order {
   fillPercent Float       @default(0) // Fill percentage (0-100)
 
   // P&L for this specific order
-  pnl        Float @default(0)
-  commission Float @default(0) // Trading commission
+  pnl             Float   @default(0)
+  commission      Float   @default(0) // Trading commission
   commissionAsset String? // Asset used for commission
 
   // Details if invalid order like insufficient balance, etc.
@@ -428,29 +431,29 @@ model Bot {
   isActive    Boolean @default(true)
 
   // Trading settings
-  symbols         String[]    @default([]) // ["BTCUSDT", "ETHUSDT"]
-  tradeAmount     Float       @default(100) // Fixed trade amount
-  tradeAmountType String      @default("QUOTE") // QUOTE (USDT) or BASE (BTC)
-  orderType       String      @default("Market") // Market, Limit
-  
+  symbols         String[] @default([]) // ["BTCUSDT", "ETHUSDT"]
+  tradeAmount     Float    @default(100) // Fixed trade amount
+  tradeAmountType String   @default("QUOTE") // QUOTE (USDT) or BASE (BTC)
+  orderType       String   @default("Market") // Market, Limit
+
   // Account type settings
-  accountType    AccountType    @default(SPOT) // SPOT or MARGIN
-  marginType     MarginType?    // NULL for spot, CROSS or ISOLATED for margin
-  leverage       Float          @default(1) // Leverage multiplier (1 for spot)
-  
+  accountType AccountType @default(SPOT) // SPOT or MARGIN
+  marginType  MarginType? // NULL for spot, CROSS or ISOLATED for margin
+  leverage    Float       @default(1) // Leverage multiplier (1 for spot)
+
   // Margin-specific settings
-  sideEffectType SideEffectType @default(NO_SIDE_EFFECT) // Default side effect type for margin orders
-  autoRepay      Boolean        @default(false) // Auto repay debt when closing positions
-  maxBorrowPercent Float        @default(50) // Max % of collateral to borrow
+  sideEffectType   SideEffectType @default(NO_SIDE_EFFECT) // Default side effect type for margin orders
+  autoRepay        Boolean        @default(false) // Auto repay debt when closing positions
+  maxBorrowPercent Float          @default(50) // Max % of collateral to borrow
 
   // Risk management
   stopLoss   Float? // % stop loss
   takeProfit Float? // % take profit
-  
+
   // Daily/position limits
-  maxDailyTrades    Int?   // Max trades per day
-  maxOpenPositions  Int?   // Max simultaneous open positions
-  maxPositionSize   Float? // Max position size in quote asset
+  maxDailyTrades   Int? // Max trades per day
+  maxOpenPositions Int? // Max simultaneous open positions
+  maxPositionSize  Float? // Max position size in quote asset
 
   // Custom alert messages
   enterLongMsg  String? // Custom enter long message
@@ -459,24 +462,24 @@ model Bot {
   exitShortMsg  String? // Custom exit short message
 
   // Webhook
-  webhookSecret String @default(uuid())
+  webhookSecret String  @default(uuid())
   webhookUrl    String? // Optional custom webhook URL
 
   // Statistics
-  totalTrades    Int   @default(0)
-  winTrades      Int   @default(0)
-  lossTrades     Int   @default(0)
-  totalPnl       Float @default(0)
-  totalVolume    Float @default(0) // Total trading volume
-  
+  totalTrades Int   @default(0)
+  winTrades   Int   @default(0)
+  lossTrades  Int   @default(0)
+  totalPnl    Float @default(0)
+  totalVolume Float @default(0) // Total trading volume
+
   // Margin-specific stats
-  totalBorrowed  Float @default(0) // Total borrowed across all trades
-  totalInterest  Float @default(0) // Total interest paid
+  totalBorrowed Float @default(0) // Total borrowed across all trades
+  totalInterest Float @default(0) // Total interest paid
 
   // Performance tracking
-  lastTradeAt    DateTime?
-  bestTradeReturn Float @default(0)
-  worstTradeReturn Float @default(0)
+  lastTradeAt      DateTime?
+  bestTradeReturn  Float     @default(0)
+  worstTradeReturn Float     @default(0)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -502,17 +505,17 @@ model Signal {
   message String?
 
   // Processing status
-  processed       Boolean  @default(false)
-  processedAt     DateTime?
-  error           String?
-  visibleToCustomer Boolean @default(true) // Controls if customer can see this signal
-  
+  processed         Boolean   @default(false)
+  processedAt       DateTime?
+  error             String?
+  visibleToCustomer Boolean   @default(true) // Controls if customer can see this signal
+
   // Result tracking
-  positionId      String? // Associated position created from this signal
-  ordersFilled    Int @default(0) // Number of orders filled from this signal
-  
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  positionId   String? // Associated position created from this signal
+  ordersFilled Int     @default(0) // Number of orders filled from this signal
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   bot Bot @relation(fields: [botId], references: [id], onDelete: Cascade)
 
@@ -536,22 +539,22 @@ model Transaction {
   asset       String // Asset (e.g., "USDT", "BTC")
   amount      Float // Amount
   accountType AccountType @default(SPOT) // SPOT or MARGIN
-  
+
   // Transaction ID from exchange
-  txId        String? @unique
-  
+  txId String? @unique
+
   // Balance impact
   balanceBefore Float
   balanceAfter  Float
 
   // Status
-  status      TransactionStatus @default(COMPLETED) // PENDING, COMPLETED, FAILED
+  status       TransactionStatus @default(COMPLETED) // PENDING, COMPLETED, FAILED
   errorMessage String?
 
   // Additional details
-  notes       String?
-  timestamp   DateTime @default(now())
-  
+  notes     String?
+  timestamp DateTime @default(now())
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -569,22 +572,22 @@ model BalanceSnapshot {
   timestamp DateTime @default(now())
 
   // Spot balances
-  spotBalance        Float @default(0)
-  spotAvailable      Float @default(0)
-  spotInOrders       Float @default(0)
+  spotBalance   Float @default(0)
+  spotAvailable Float @default(0)
+  spotInOrders  Float @default(0)
 
   // Margin balances
-  marginBalance      Float @default(0)
-  marginAvailable    Float @default(0)
-  marginBorrowed     Float @default(0)
-  marginInterest     Float @default(0)
-  marginNetAsset     Float @default(0)
-  marginLevel        Float @default(0)
+  marginBalance   Float @default(0)
+  marginAvailable Float @default(0)
+  marginBorrowed  Float @default(0)
+  marginInterest  Float @default(0)
+  marginNetAsset  Float @default(0)
+  marginLevel     Float @default(0)
 
   // Total portfolio value
-  totalValue         Float @default(0)
-  totalPnl           Float @default(0)
-  
+  totalValue Float @default(0)
+  totalPnl   Float @default(0)
+
   // Performance metrics
   dailyReturn        Float @default(0)
   totalReturnPercent Float @default(0)
