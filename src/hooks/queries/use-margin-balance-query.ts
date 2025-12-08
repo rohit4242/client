@@ -51,8 +51,8 @@ export function useMarginBalanceQuery(
     queryFn: async () => {
       console.log('[useMarginBalanceQuery] Fetching margin balance for asset:', asset || 'all');
 
-      if (!asset || !exchange) {
-        console.log('[useMarginBalanceQuery] Missing asset or exchange:', { asset, hasExchange: !!exchange });
+      if (!exchange) {
+        console.log('[useMarginBalanceQuery] Missing exchange');
         return null;
       }
 
@@ -63,7 +63,7 @@ export function useMarginBalanceQuery(
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          asset,
+          ...(asset && { asset }),
           apiKey: exchange.apiKey,
           apiSecret: exchange.apiSecret,
         }),
@@ -77,6 +77,7 @@ export function useMarginBalanceQuery(
       const result: ApiSuccessResponse<MarginAssetBalance | MarginAssetBalance[]> = await response.json();
 
       console.log('[useMarginBalanceQuery] Got result:', result);
+      console.log('[useMarginBalanceQuery] Returning data:', result.data);
 
       return result.data || null;
     },

@@ -7,7 +7,7 @@ import { Spot } from "@binance/spot";
 import { z } from "zod";
 
 const SpotBalanceRequestSchema = z.object({
-  asset: z.string().optional(),
+  asset: z.string().nullish(),
   apiKey: z.string().min(1, "API key is required"),
   apiSecret: z.string().min(1, "API secret is required"),
 });
@@ -56,7 +56,6 @@ export async function POST(request: NextRequest) {
 
     const { balances } = await response.data();
 
-    console.log("Balances:", balances);
 
     // Find the requested asset or return all non-zero balances
     if (asset) {

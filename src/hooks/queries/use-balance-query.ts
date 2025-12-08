@@ -38,8 +38,8 @@ export function useBalanceQuery(
     queryFn: async () => {
       console.log('[useBalanceQuery] Fetching balance for asset:', asset || 'all');
 
-      if (!asset || !exchange) {
-        console.log('[useBalanceQuery] Missing asset or exchange:', { asset, hasExchange: !!exchange });
+      if (!exchange) {
+        console.log('[useBalanceQuery] Missing exchange');
         return null;
       }
 
@@ -64,6 +64,7 @@ export function useBalanceQuery(
       const result: ApiSuccessResponse<AssetBalance | AssetBalance[]> = await response.json();
 
       console.log('[useBalanceQuery] Got result:', result);
+      console.log('[useBalanceQuery] Returning data:', result.data);
 
       return result.data || null;
     },
