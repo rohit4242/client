@@ -50,7 +50,7 @@ import { toast } from "sonner";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import axios from "axios";
 import { UserWithAgent } from "@/db/actions/admin/get-all-users";
-import { SignalBot } from "@/types/signal-bot";
+import { useBotsQuery, type BotWithExchange } from "@/features/signal-bot";
 import { CreateSignalDialog } from "../../signal-bot/_components/dialogs/create-signal-dialog";
 import { EditUserSignalDialog } from "../../signal-bot/_components/dialogs/edit-user-signal-dialog";
 import { DeleteUserSignalDialog } from "../../signal-bot/_components/dialogs/delete-user-signal-dialog";
@@ -85,14 +85,11 @@ export function UserSignalsManager({ selectedUser }: UserSignalsManagerProps) {
   });
 
   // Fetch bots for the selected user
-  const { data: bots = [] } = useQuery<SignalBot[]>({
-    queryKey: ["signal-bots", selectedUser.id],
-    queryFn: async () => {
-      const response = await axios.get("/api/signal-bots");
-      return response.data;
-    },
+  const { data: botsData } = useBotsQuery({
+    userId: selectedUser.id,
     enabled: !!selectedUser.id && selectedUser.hasPortfolio,
   });
+  const bots = botsData?.bots || [];
 
   // Filter signals
   const filteredSignals = signals.filter((signal) => {
@@ -154,7 +151,7 @@ export function UserSignalsManager({ selectedUser }: UserSignalsManagerProps) {
       );
 
       await Promise.all(promises);
-      
+
       toast.success(`Updated ${selectedSignals.size} signal${selectedSignals.size > 1 ? 's' : ''} visibility`);
       setSelectedSignals(new Set());
       queryClient.invalidateQueries({ queryKey: ["user-signals", selectedUser.id] });
@@ -184,7 +181,7 @@ export function UserSignalsManager({ selectedUser }: UserSignalsManagerProps) {
       );
 
       await Promise.all(promises);
-      
+
       toast.success(
         `Marked ${selectedSignals.size} signal${selectedSignals.size > 1 ? 's' : ''} as ${processed ? 'processed' : 'pending'}`
       );
@@ -308,8 +305,8 @@ export function UserSignalsManager({ selectedUser }: UserSignalsManagerProps) {
         </div>
         {selectedUser.role === "CUSTOMER" && (
           <div className="flex gap-3">
-            <Button 
-              variant="outline" 
+            <Button
+              variant="outline"
               onClick={handleExportCSV}
               className="border-slate-200 text-slate-700 hover:bg-slate-50 hover:border-slate-300 cursor-pointer rounded-xl px-4 py-2 font-medium shadow-sm transition-all duration-200"
               disabled={filteredSignals.length === 0 || bulkActionLoading !== null}
@@ -317,8 +314,8 @@ export function UserSignalsManager({ selectedUser }: UserSignalsManagerProps) {
               <Download className="mr-2 size-4" />
               Export CSV
             </Button>
-            <Button 
-              variant="outline" 
+            <Button
+              variant="outline"
               onClick={() => setShowUploadCsvDialog(true)}
               className="border-teal-200 bg-teal-50 text-teal-700 hover:bg-teal-100 hover:border-teal-300 cursor-pointer rounded-xl px-4 py-2 font-medium shadow-sm transition-all duration-200"
               disabled={bulkActionLoading !== null}
@@ -326,7 +323,7 @@ export function UserSignalsManager({ selectedUser }: UserSignalsManagerProps) {
               <Upload className="mr-2 size-4" />
               Upload CSV
             </Button>
-            <Button 
+            <Button
               onClick={() => setShowCreateDialog(true)}
               className="bg-gradient-to-r from-teal-600 to-cyan-600 hover:from-teal-700 hover:to-cyan-700 text-white cursor-pointer rounded-xl px-5 py-2 font-semibold shadow-md hover:shadow-lg transition-all duration-200"
               disabled={bulkActionLoading !== null}
@@ -431,8 +428,8 @@ export function UserSignalsManager({ selectedUser }: UserSignalsManagerProps) {
                   `${selectedSignals.size} signal${selectedSignals.size > 1 ? 's' : ''} selected`
                 )}
               </span>
-              <Button 
-                variant="outline" 
+              <Button
+                variant="outline"
                 size="sm"
                 onClick={() => setSelectedSignals(new Set())}
                 className="border-teal-300 bg-white text-teal-700 hover:bg-teal-100 hover:border-teal-400 cursor-pointer rounded-lg font-medium shadow-sm transition-all duration-200"
@@ -442,12 +439,12 @@ export function UserSignalsManager({ selectedUser }: UserSignalsManagerProps) {
               </Button>
             </div>
           </div>
-          
+
           <div className="flex flex-wrap gap-3">
             <div className="flex items-center gap-3">
               <span className="text-sm font-semibold text-slate-700">Visibility:</span>
-              <Button 
-                variant="outline" 
+              <Button
+                variant="outline"
                 size="sm"
                 onClick={() => handleBulkVisibilityUpdate(true)}
                 className="border-teal-300 bg-white text-teal-700 hover:bg-teal-600 hover:text-white hover:border-teal-600 cursor-pointer disabled:cursor-not-allowed disabled:opacity-50 rounded-lg font-medium shadow-sm transition-all duration-200"
@@ -460,8 +457,8 @@ export function UserSignalsManager({ selectedUser }: UserSignalsManagerProps) {
                 )}
                 Make Visible
               </Button>
-              <Button 
-                variant="outline" 
+              <Button
+                variant="outline"
                 size="sm"
                 onClick={() => handleBulkVisibilityUpdate(false)}
                 className="border-slate-300 bg-white text-slate-700 hover:bg-slate-600 hover:text-white hover:border-slate-600 cursor-pointer disabled:cursor-not-allowed disabled:opacity-50 rounded-lg font-medium shadow-sm transition-all duration-200"
@@ -480,8 +477,8 @@ export function UserSignalsManager({ selectedUser }: UserSignalsManagerProps) {
 
             <div className="flex items-center gap-3">
               <span className="text-sm font-semibold text-slate-700">Status:</span>
-              <Button 
-                variant="outline" 
+              <Button
+                variant="outline"
                 size="sm"
                 onClick={() => handleBulkProcessedUpdate(true)}
                 className="border-teal-300 bg-white text-teal-700 hover:bg-teal-600 hover:text-white hover:border-teal-600 cursor-pointer disabled:cursor-not-allowed disabled:opacity-50 rounded-lg font-medium shadow-sm transition-all duration-200"
@@ -494,8 +491,8 @@ export function UserSignalsManager({ selectedUser }: UserSignalsManagerProps) {
                 )}
                 Mark Processed
               </Button>
-              <Button 
-                variant="outline" 
+              <Button
+                variant="outline"
                 size="sm"
                 onClick={() => handleBulkProcessedUpdate(false)}
                 className="border-orange-300 bg-white text-orange-700 hover:bg-orange-600 hover:text-white hover:border-orange-600 cursor-pointer disabled:cursor-not-allowed disabled:opacity-50 rounded-lg font-medium shadow-sm transition-all duration-200"
@@ -549,7 +546,7 @@ export function UserSignalsManager({ selectedUser }: UserSignalsManagerProps) {
               filteredSignals.map((signal) => {
                 const isUpdating = updatingSignalId === signal.id;
                 return (
-                  <TableRow 
+                  <TableRow
                     key={signal.id}
                     className={`border-b border-slate-100 transition-all duration-200 ${selectedSignals.has(signal.id) ? "bg-gradient-to-r from-teal-50 to-cyan-50" : "hover:bg-slate-50"} ${isUpdating ? "opacity-60" : ""}`}
                   >
@@ -599,8 +596,8 @@ export function UserSignalsManager({ selectedUser }: UserSignalsManagerProps) {
                     <TableCell className="text-right py-4">
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                          <Button 
-                            variant="ghost" 
+                          <Button
+                            variant="ghost"
                             size="icon"
                             className="hover:bg-teal-50 hover:text-teal-700 rounded-lg transition-colors cursor-pointer"
                             disabled={bulkActionLoading !== null || isUpdating}
@@ -682,4 +679,3 @@ export function UserSignalsManager({ selectedUser }: UserSignalsManagerProps) {
     </div>
   );
 }
-

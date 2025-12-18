@@ -1,48 +1,23 @@
 "use client";
 
-import { useState, useEffect } from 'react';
-import { Exchange } from '@/types/exchange';
+import { useExchangesQuery } from '@/features/exchange';
 import { ExchangeHeader } from './exchange-header';
 import { ExchangesList } from './exchanges-list';
 import { EmptyState } from './empty-state';
-import { UserWithAgent } from '@/db/actions/admin/get-all-users';
-import { getExchangesForUser } from '@/db/actions/admin/get-exchanges-for-user';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Card } from '@/components/ui/card';
 
-interface ExchangesClientProps {
-  selectedUser: UserWithAgent;
-}
+export function ExchangesClient() {
+  const { data, isLoading } = useExchangesQuery();
+  const exchanges = data?.exchanges ?? [];
 
-export function ExchangesClient({ selectedUser }: ExchangesClientProps) {
-  const [exchanges, setExchanges] = useState<Exchange[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    async function loadExchanges() {
-      setLoading(true);
-      const data = await getExchangesForUser(selectedUser.id);
-      setExchanges(data);
-      setLoading(false);
-    }
-    loadExchanges();
-  }, [selectedUser.id]);
-
-  const handleExchangeAdded = (newExchange: Exchange) => {
-    setExchanges(prev => [newExchange, ...prev]);
-  };
-
-  const handleExchangesChange = (updatedExchanges: Exchange[]) => {
-    setExchanges(updatedExchanges);
-  };
-
-  if (loading) {
+  if (isLoading) {
     return (
       <div className="space-y-6">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Exchange Accounts</h1>
           <p className="text-muted-foreground">
-            Managing exchanges for {selectedUser.name}
+            Manage your exchange connections
           </p>
         </div>
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
@@ -60,24 +35,19 @@ export function ExchangesClient({ selectedUser }: ExchangesClientProps) {
 
   return (
     <div className="space-y-6">
-      <ExchangeHeader 
-        onExchangeAdded={handleExchangeAdded}
-        selectedUser={selectedUser}
-      />
-      
+      <ExchangeHeader />
+
       {exchanges.length === 0 ? (
-        <EmptyState 
+        <EmptyState
           onConnectExchange={() => {
             // Trigger the dialog in the header
             const addButton = document.querySelector('[data-testid="add-exchange-btn"]') as HTMLButtonElement;
             addButton?.click();
-          }} 
+          }}
         />
       ) : (
-        <ExchangesList 
+        <ExchangesList
           exchanges={exchanges}
-          onExchangesChange={handleExchangesChange}
-          selectedUser={selectedUser}
         />
       )}
     </div>

@@ -23,15 +23,16 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { toast } from "sonner";
-import { Exchange } from '@/types/exchange';
-import { createExchange } from "@/db/actions/exchange/create-exchange";
-import { updateExchange } from "@/db/actions/exchange/update-exchange";
+import {
+  useCreateExchangeMutation,
+  useUpdateExchangeMutation,
+  type ExchangeClient
+} from "@/features/exchange";
 
 interface ConnectExchangeDialogProps {
-  exchange?: Exchange | null;
-  onSuccess: (exchange: Exchange) => void;
+  exchange?: ExchangeClient | null;
+  onSuccess?: () => void;
   onClose: () => void;
-  userId?: string;
 }
 
 const formSchema = z.object({
@@ -47,10 +48,12 @@ export function ConnectExchangeDialog({
   exchange,
   onSuccess,
   onClose,
-  userId,
 }: ConnectExchangeDialogProps) {
-  const [loading, setLoading] = useState(false);
   const [showApiSecret, setShowApiSecret] = useState(false);
+
+  // React Query mutations
+  const createMutation = useCreateExchangeMutation();
+  const updateMutation = useUpdateExchangeMutation();
 
   const form = useForm<FormData>({
     resolver: zodResolver(formSchema),
@@ -71,56 +74,44 @@ export function ConnectExchangeDialog({
     toast.success("IP addresses copied to clipboard");
   };
 
-  const onSubmit = async (data: FormData) => {
-    setLoading(true);
-    try {
-      let response;
-      
-      if (exchange) {
-        // Update existing exchange
-        response = await updateExchange(exchange.id, {
+  const onSubmit = (data: FormData) => {
+    if (exchange) {
+      // Update existing exchange
+      updateMutation.mutate(
+        {
+          id: exchange.id,
           name: data.name,
           apiKey: data.apiKey,
           apiSecret: data.apiSecret,
           positionMode: data.positionMode,
-        });
-      } else {
-        // Create new exchange
-        response = await createExchange({
-          name: data.name,
-          apiKey: data.apiKey,
-          apiSecret: data.apiSecret,
-          positionMode: data.positionMode,
-        }, userId);
-      }
-      
-      console.log("Exchange operation response:", response);
-      
-      if (response && !response.error) {
-        toast.success(
-          exchange 
-            ? "Exchange updated successfully!" 
-            : "Exchange connected successfully!"
-        );
-        onSuccess(response);
-        onClose();
-      } else {
-        // Show the specific error message from the API
-        const errorMessage = response?.error || 
-          `Failed to ${exchange ? 'update' : 'save'} exchange`;
-        console.log("Showing error toast:", errorMessage);
-        toast.error(errorMessage);
-        console.log("Exchange operation failed:", response);
-      }
-    } catch (error) {
-      console.error("Error with exchange operation", error);
-      toast.error(
-        error instanceof Error 
-          ? error.message 
-          : `Error ${exchange ? 'updating' : 'saving'} exchange`
+        },
+        {
+          onSuccess: (result) => {
+            if (result.success) {
+              onSuccess?.();
+              onClose();
+            }
+          },
+        }
       );
-    } finally {
-      setLoading(false);
+    } else {
+      // Create new exchange
+      createMutation.mutate(
+        {
+          name: data.name,
+          apiKey: data.apiKey,
+          apiSecret: data.apiSecret,
+          positionMode: data.positionMode,
+        },
+        {
+          onSuccess: (result) => {
+            if (result.success) {
+              onSuccess?.();
+              onClose();
+            }
+          },
+        }
+      );
     }
   };
 
@@ -299,14 +290,14 @@ export function ConnectExchangeDialog({
                 )}
                 <Button
                   type="submit"
-                  disabled={loading}
+                  disabled={createMutation.isPending || updateMutation.isPending}
                   className="bg-blue-600 hover:bg-blue-700"
                 >
-                  {loading
+                  {createMutation.isPending || updateMutation.isPending
                     ? "Connecting..."
                     : exchange
-                    ? "Update Exchange"
-                    : "Connect an exchange"}
+                      ? "Update Exchange"
+                      : "Connect an exchange"}
                 </Button>
               </div>
             </div>

@@ -8,14 +8,14 @@ import { SignalBot } from "@/types/signal-bot";
  */
 export function getBotPortfolioValue(bot: SignalBot): number {
   if (!bot.exchange) return 0;
-  
+
   if (bot.accountType === 'SPOT') {
-    return bot.exchange.spotValue || bot.exchange.totalValue 
-      ? parseFloat((bot.exchange.totalValue ?? 0).toString()) 
+    return bot.exchange.spotValue || bot.exchange.totalValue
+      ? parseFloat((bot.exchange.totalValue ?? 0).toString())
       : 0;
   } else {
-    return bot.exchange.marginValue || bot.exchange.totalValue 
-      ? parseFloat((bot.exchange.totalValue ?? 0).toString()) 
+    return bot.exchange.marginValue || bot.exchange.totalValue
+      ? parseFloat((bot.exchange.totalValue ?? 0).toString())
       : 0;
   }
 }
@@ -28,7 +28,7 @@ export function getBotPortfolioValue(bot: SignalBot): number {
 export function formatBotPortfolioDisplay(bot: SignalBot): string {
   const value = getBotPortfolioValue(bot);
   const type = bot.accountType === 'SPOT' ? 'Spot' : 'Margin';
-  
+
   return `${type} Balance: $${value.toLocaleString('en-US', {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2
@@ -54,19 +54,19 @@ export function calculateBotPositionSize(bot: SignalBot, currentPrice: number): 
   const tradeAmount = bot.tradeAmount || 0;
   const tradeAmountType = bot.tradeAmountType || "QUOTE";
   const leverage = bot.leverage || 1;
-  
+
   // Calculate position value based on amount type
   // If BASE currency, convert to quote value using current price
-  const positionValue = tradeAmountType === "BASE" 
-    ? tradeAmount * currentPrice 
+  const positionValue = tradeAmountType === "BASE"
+    ? tradeAmount * currentPrice
     : tradeAmount;
-  
+
   // Total position size with leverage
   const totalPositionSize = positionValue * leverage;
-  
+
   // Quantity of asset
   const quantity = currentPrice > 0 ? positionValue / currentPrice : 0;
-  
+
   return {
     portfolioValue,
     tradeAmount,

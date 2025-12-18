@@ -12,7 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Copy, ExternalLink } from "lucide-react";
 import { toast } from "sonner";
-import { PositionOrder, OrderStatus, OrderType } from "@/types/position";
+import { PositionOrder, OrderStatus, OrderType } from "@/features/position";
 import { cn, formatDate } from "@/lib/utils";
 
 interface OrderHistoryProps {
@@ -36,11 +36,12 @@ export function OrderHistory({ orders, loading = false }: OrderHistoryProps) {
       EXPIRED: { color: "bg-gray-100 text-gray-800 border-gray-200", label: "EXPIRED" },
       FILLED: { color: "bg-green-100 text-green-800 border-green-200", label: "FILLED" },
       PENDING: { color: "bg-yellow-100 text-yellow-800 border-yellow-200", label: "PENDING" },
+      OPEN: { color: "bg-blue-100 text-blue-800 border-blue-200", label: "OPEN" },
       MARKET_CLOSED: { color: "bg-purple-100 text-purple-800 border-purple-200", label: "MARKET_CLOSED" }
     };
-    
+
     const config = statusConfig[status] || statusConfig.NEW;
-    
+
     return (
       <Badge variant="outline" className={`text-xs ${config.color}`}>
         {config.label}
@@ -57,17 +58,17 @@ export function OrderHistory({ orders, loading = false }: OrderHistoryProps) {
       STOP: { color: "text-red-600 bg-red-50 border-red-200" },
       STOP_LIMIT: { color: "text-red-600 bg-red-50 border-red-200" }
     };
-    
+
     const config = typeConfig[type as keyof typeof typeConfig] || typeConfig.MARKET;
-    
+
     return (
       <div className="flex flex-col gap-1">
         <Badge variant="outline" className={`text-xs ${config.color}`}>
           {type}
         </Badge>
         {side && (
-          <Badge 
-            variant="outline" 
+          <Badge
+            variant="outline"
             className={cn(
               "text-xs",
               side === "BUY" ? "text-green-600 bg-green-50 border-green-200" : "text-red-600 bg-red-50 border-red-200"
@@ -147,21 +148,28 @@ export function OrderHistory({ orders, loading = false }: OrderHistoryProps) {
                 {getTypeBadge(order.type, order.side)}
               </TableCell>
               <TableCell className="text-right font-mono">
-                {order.price > 0 ? `$${order.price.toFixed(4)}` : "-"}
+                {(order.price ?? 0) > 0 ? (
+                  `$${(order.price ?? 0).toFixed(4)}`
+                ) : (order.averagePrice ?? 0) > 0 ? (
+                  <div className="flex flex-col items-end">
+                    <span>${(order.averagePrice ?? 0).toFixed(4)}</span>
+                    <span className="text-[10px] text-muted-foreground uppercase font-bold">Avg</span>
+                  </div>
+                ) : "-"}
               </TableCell>
               <TableCell className="text-right font-mono">
-                {order.amount > 0 ? order.amount.toFixed(6) : "0"}
+                {(order.amount ?? 0) > 0 ? (order.amount ?? 0).toFixed(6) : "0"}
               </TableCell>
               <TableCell className="text-right font-mono">
                 <div className="flex flex-col items-end">
-                  <span>{order.filled.toFixed(6)}</span>
+                  <span>{(order.filled ?? 0).toFixed(6)}</span>
                   <span className="text-xs text-muted-foreground">
-                    {order.fill.toFixed(1)}%
+                    {(order.fill ?? 0).toFixed(1)}%
                   </span>
                 </div>
               </TableCell>
               <TableCell className="text-right font-mono">
-                {order.remaining.toFixed(6)}
+                {(order.remaining ?? 0).toFixed(6)}
               </TableCell>
               <TableCell className="font-mono text-sm">
                 {formatDate(order.createdAt)}

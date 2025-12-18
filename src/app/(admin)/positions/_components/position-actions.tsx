@@ -27,73 +27,66 @@ import {
   Loader2
 } from "lucide-react";
 import { toast } from "sonner";
-import { PositionData, PositionAction } from "@/types/position";
-import axios from "axios";
+import type { PositionWithRelations } from "@/features/position";
+import { PositionAction } from "@/features/position";
+import { useClosePositionMutation } from "@/features/position";
 
 interface PositionActionsProps {
-  position: PositionData;
+  position: PositionWithRelations;
   onAction: (action: PositionAction) => Promise<void>;
   disabled?: boolean;
 }
 
 export function PositionActions({ position, onAction, disabled = false }: PositionActionsProps) {
-  const [isClosing, setIsClosing] = useState(false);
   const [showCloseDialog, setShowCloseDialog] = useState(false);
+
+  // Use the managed mutation instead of manual axios
+  const closeMutation = useClosePositionMutation();
 
   // Check if position is closed
   const isClosedPosition = position.status === "CLOSED";
 
-
   const handleClosePosition = async () => {
-    setIsClosing(true);
     try {
-      const response = await axios.post(
-        `/api/positions/${position.id}/market-close`,
-        {} // No userId needed since auth check was removed
-      );
+      await closeMutation.mutateAsync({ positionId: position.id });
 
-      if (response.data.success) {
-        toast.success(
-          response.data.message || `Position ${position.symbol} closed successfully`
-        );
-        setShowCloseDialog(false);
+      toast.success(`Position ${position.symbol} closed successfully`);
+      setShowCloseDialog(false);
 
-        // Trigger parent refresh
-        await onAction({
-          type: "CLOSE_POSITION",
-          payload: {
-            positionId: position.id,
-            closeType: "FULL" as const,
-            slippage: 1.0,
-          }
-        });
-      } else {
-        toast.error(response.data.error || "Failed to close position");
-      }
+      // Trigger parent refresh/callback
+      await onAction({
+        type: "CLOSE_POSITION",
+        payload: {
+          positionId: position.id,
+          closeType: "FULL" as const,
+          slippage: 1.0,
+        }
+      });
     } catch (error: any) {
       console.error("Error closing position:", error);
-      const errorMessage = error.response?.data?.error || error.response?.data?.details || "Failed to close position. Please try again.";
-      toast.error(errorMessage);
-    } finally {
-      setIsClosing(false);
+      // Mutation handles common error toasts, but we can add specific ones if needed
     }
   };
 
+  const isClosing = closeMutation.isPending;
+
   const getCloseOrderType = () => {
     // Determine the opposite order type for market close
-    return position.side === "Long" ? "SELL" : "BUY";
+    return position.side === "LONG" ? "SELL" : "BUY";
   };
 
   const getEstimatedCloseValue = () => {
-    const closeValue = position.currentPrice * position.quantity;
-    const pnl = position.side === "Long"
-      ? (position.currentPrice - position.entryPrice) * position.quantity
-      : (position.entryPrice - position.currentPrice) * position.quantity;
+    const currentPrice = position.currentPrice || position.entryPrice;
+    const closeValue = currentPrice * position.quantity;
+    const pnl = position.side === "LONG"
+      ? (currentPrice - position.entryPrice) * position.quantity
+      : (position.entryPrice - currentPrice) * position.quantity;
 
-    return { closeValue, pnl };
+    return { closeValue, pnl, currentPrice };
   };
 
-  const { closeValue, pnl } = getEstimatedCloseValue();
+  const { closeValue, pnl, currentPrice } = getEstimatedCloseValue();
+  const sideDisplay = position.side === "LONG" ? "Long" : "Short";
 
   return (
     <TooltipProvider>
@@ -129,7 +122,7 @@ export function PositionActions({ position, onAction, disabled = false }: Positi
                 <AlertDialogDescription asChild>
                   <div className="space-y-3">
                     <p>
-                      Are you sure you want to close this {position.side.toLowerCase()} position?
+                      Are you sure you want to close this {sideDisplay.toLowerCase()} position?
                       This will execute a market {getCloseOrderType()} order.
                     </p>
 
@@ -140,7 +133,7 @@ export function PositionActions({ position, onAction, disabled = false }: Positi
                       </div>
                       <div className="flex justify-between">
                         <span className="text-muted-foreground">Current Price:</span>
-                        <span className="font-mono">${position.currentPrice.toFixed(4)}</span>
+                        <span className="font-mono">${currentPrice.toFixed(4)}</span>
                       </div>
                       <div className="flex justify-between">
                         <span className="text-muted-foreground">Estimated Close Value:</span>

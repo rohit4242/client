@@ -11,6 +11,10 @@ import axios from "axios";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 
+import { DateRange } from "react-day-picker";
+import { useState } from "react";
+import { addDays, subDays } from "date-fns";
+
 // Real dashboard stats type based on portfolio data
 export interface DashboardStats {
     totalPortfolioValue: number;
@@ -19,6 +23,10 @@ export interface DashboardStats {
     todayPnL: number;
     todayPnLPercent: number;
     openPositions: number;
+    winRate?: number;
+    periodPnl?: number;
+    periodPnlPercent?: number;
+    unrealizedPnL?: number;
 }
 
 // Helper functions for formatting
@@ -37,14 +45,22 @@ export const formatPercentage = (value: number) => {
 
 export function DashboardClient() {
     const { selectedUser } = useSelectedUser();
+    const [date, setDate] = useState<DateRange | undefined>({
+        from: subDays(new Date(), 30),
+        to: new Date(),
+    });
 
     // Fetch real portfolio stats for selected user
     const { data: stats, isLoading: statsLoading } = useQuery<DashboardStats | null>({
-        queryKey: ["admin-dashboard-stats", selectedUser?.id],
+        queryKey: ["admin-dashboard-stats", selectedUser?.id, date?.from, date?.to],
         queryFn: async () => {
             if (!selectedUser?.id) return null;
 
-            const response = await axios.get(`/api/admin/users/${selectedUser.id}/portfolio-stats`);
+            const params = new URLSearchParams();
+            if (date?.from) params.append("from", date.from.toISOString());
+            if (date?.to) params.append("to", date.to.toISOString());
+
+            const response = await axios.get(`/api/admin/users/${selectedUser.id}/portfolio-stats?${params.toString()}`);
             const data = response.data;
 
             if (!data.success) return null;
@@ -58,6 +74,10 @@ export function DashboardClient() {
                     ? (data.stats.dailyPnl / data.stats.initialBalance) * 100
                     : 0,
                 openPositions: data.stats?.activeTrades || 0,
+                winRate: data.stats?.winRate || 0,
+                periodPnl: data.stats?.periodPnl,
+                periodPnlPercent: data.stats?.periodPnlPercent,
+                unrealizedPnL: data.stats?.unrealizedPnL || 0,
             };
         },
         enabled: !!selectedUser?.id,
@@ -81,7 +101,7 @@ export function DashboardClient() {
     if (statsLoading) {
         return (
             <div className="space-y-6">
-                <DashboardHeader userName={selectedUser.name} />
+                <DashboardHeader userName={selectedUser.name} date={date} setDate={setDate} />
                 <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-4">
                     {[1, 2, 3, 4].map((i) => (
                         <Card key={i} className="overflow-hidden">
@@ -101,17 +121,17 @@ export function DashboardClient() {
 
     return (
         <div className="space-y-6">
-            <DashboardHeader userName={selectedUser.name} />
+            <DashboardHeader userName={selectedUser.name} date={date} setDate={setDate} />
 
-            <StatsCards stats={stats ?? null} />
+            <StatsCards stats={stats ?? null} date={date} />
 
             <div className="grid gap-6 lg:grid-cols-3">
                 <div className="lg:col-span-2 space-y-6">
-                    <PortfolioChart />
+                    <PortfolioChart userId={selectedUser.id} date={date} />
                 </div>
                 <div className="space-y-6">
                     <SignalBotWidget />
-                    <RecentOrders />
+                    <RecentOrders userId={selectedUser.id} />
                 </div>
             </div>
         </div>

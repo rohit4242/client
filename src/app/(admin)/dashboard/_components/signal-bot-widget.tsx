@@ -1,29 +1,24 @@
 "use client";
 
-import { useQuery } from "@tanstack/react-query";
-import axios from "axios";
 import { Bot, TrendingUp, Activity, AlertCircle } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { SignalBot } from "@/types/signal-bot";
+import { useBotsQuery, type BotWithExchange } from "@/features/signal-bot";
 import { formatCurrency } from "@/lib/utils";
 import Link from "next/link";
 
 export function SignalBotWidget() {
   const {
-    data: signalBots = [],
+    data: botsData,
     isLoading,
     error,
-  } = useQuery<SignalBot[]>({
-    queryKey: ["signal-bots-dashboard"],
-    queryFn: async () => {
-      const response = await axios.get("/api/signal-bots");
-      return response.data;
-    },
+  } = useBotsQuery({
     refetchInterval: 30000, // Refresh every 30 seconds
   });
+
+  const signalBots = botsData?.bots || [];
 
   if (isLoading) {
     return (
@@ -77,10 +72,10 @@ export function SignalBotWidget() {
   const activeBots = signalBots.filter(bot => bot.isActive);
   const totalTrades = signalBots.reduce((sum, bot) => sum + bot.totalTrades, 0);
   const totalPnl = signalBots.reduce((sum, bot) => sum + bot.totalPnl, 0);
-  
+
   // Get top performing bot
-  const topBot = signalBots.reduce((best, bot) => 
-    bot.totalPnl > (best?.totalPnl || -Infinity) ? bot : best, 
+  const topBot = signalBots.reduce((best, bot) =>
+    bot.totalPnl > (best?.totalPnl || -Infinity) ? bot : best,
     signalBots[0]
   );
 

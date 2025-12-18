@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
-import { getPositions } from "@/db/actions/position/get-positions";
-import { PositionStatus } from "@/types/position";
+import { getPositions } from "@/features/position/actions/get-positions";
+import { PositionStatus } from "@prisma/client";
 
 export async function GET(request: NextRequest) {
   try {
@@ -28,13 +28,12 @@ export async function GET(request: NextRequest) {
       ...(limit && { limit: parseInt(limit) }),
     };
 
-    console.log("userId", userId);
-    const positions = await getPositions({ ...filters, userId: userId || session.user.id });
+    const { positions, total } = await getPositions({ ...filters, userId: userId || session.user.id });
 
     return NextResponse.json({
       success: true,
       data: positions,
-      count: positions.length,
+      count: total,
     });
   } catch (error) {
     console.error("Error fetching positions:", error);

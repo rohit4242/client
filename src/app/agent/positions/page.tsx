@@ -2,22 +2,22 @@ import { Suspense } from "react";
 import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
-import { getPositions } from "@/db/actions/position/get-positions";
-import { AdvancedPositionsTable } from "@/app/(admin)/positions/_components/advanced-positions-table";
+import { getPositions } from "@/features/position/actions/get-positions";
+import { PositionsTable } from "@/app/(admin)/positions/_components/positions-table";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { AlertTriangle} from "lucide-react";
+import { AlertTriangle } from "lucide-react";
 import { getSelectedUser } from "@/lib/selected-user-server";
 
 async function RealPositionsContent() {
 
-   const selectedUser = await getSelectedUser();
+  const selectedUser = await getSelectedUser();
 
-   console.log("selectedUser", selectedUser);
+  console.log("selectedUser", selectedUser);
 
   try {
-    const positions = await getPositions({ userId: selectedUser?.id });
-    
+    const { positions } = await getPositions({ userId: selectedUser?.id });
+
     if (positions.length === 0) {
       return (
         <Alert>
@@ -28,8 +28,8 @@ async function RealPositionsContent() {
         </Alert>
       );
     }
-    
-    return <AdvancedPositionsTable positions={positions} />;
+
+    return <PositionsTable positions={positions} />;
   } catch (error) {
     console.error("Error loading positions:", error);
     return (

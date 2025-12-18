@@ -5,21 +5,13 @@ import { Button } from '@/components/ui/button';
 import { Dialog, DialogTrigger } from '@/components/ui/dialog';
 import { Plus } from 'lucide-react';
 import { ConnectExchangeDialog } from './connect-exchange-dialog';
-import { Exchange } from '@/types/exchange';
-import { UserWithAgent } from '@/db/actions/admin/get-all-users';
 import { useSelectedUser } from '@/contexts/selected-user-context';
 
-interface ExchangeHeaderProps {
-  onExchangeAdded: (exchange: Exchange) => void;
-  selectedUser: UserWithAgent;
-}
-
-export function ExchangeHeader({ onExchangeAdded, selectedUser }: ExchangeHeaderProps) {
+export function ExchangeHeader() {
   const [showConnectDialog, setShowConnectDialog] = useState(false);
-  const { refreshSelectedUser } = useSelectedUser();
+  const { selectedUser, refreshSelectedUser } = useSelectedUser();
 
-  const handleExchangeAdded = async (exchange: Exchange) => {
-    onExchangeAdded(exchange);
+  const handleExchangeAdded = async () => {
     setShowConnectDialog(false);
     // Refresh selected user data to update portfolio status
     await refreshSelectedUser();
@@ -30,7 +22,7 @@ export function ExchangeHeader({ onExchangeAdded, selectedUser }: ExchangeHeader
       <div>
         <h1 className="text-3xl font-bold">Exchange Accounts</h1>
         <p className="text-muted-foreground mt-1">
-          Managing exchanges for {selectedUser.name} ({selectedUser.email})
+          Managing exchanges for {selectedUser?.name} ({selectedUser?.email})
         </p>
       </div>
       <Dialog open={showConnectDialog} onOpenChange={setShowConnectDialog}>
@@ -40,10 +32,9 @@ export function ExchangeHeader({ onExchangeAdded, selectedUser }: ExchangeHeader
             Add Exchange
           </Button>
         </DialogTrigger>
-        <ConnectExchangeDialog 
+        <ConnectExchangeDialog
           onSuccess={handleExchangeAdded}
           onClose={() => setShowConnectDialog(false)}
-          userId={selectedUser.id}
         />
       </Dialog>
     </div>

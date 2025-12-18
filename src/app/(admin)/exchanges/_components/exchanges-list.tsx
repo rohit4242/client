@@ -12,123 +12,58 @@ import {
 } from "@/components/ui/table";
 import { Dialog } from "@/components/ui/dialog";
 import { RefreshCw } from "lucide-react";
-import { toast } from "sonner";
-import { Exchange } from "@/types/exchange";
 import { ExchangeCard } from "./exchange-card";
 import { ConnectExchangeDialog } from "./connect-exchange-dialog";
-import axios from "axios";
-import { UserWithAgent } from "@/db/actions/admin/get-all-users";
+import {
+  useSyncExchangeMutation,
+  useUpdateExchangeMutation,
+  useDeleteExchangeMutation,
+  type ExchangeClient,
+} from "@/features/exchange";
 
 interface ExchangesListProps {
-  exchanges: Exchange[];
-  onExchangesChange: (exchanges: Exchange[]) => void;
-  selectedUser: UserWithAgent;
+  exchanges: ExchangeClient[];
 }
 
 export function ExchangesList({
   exchanges,
-  onExchangesChange,
-  selectedUser,
 }: ExchangesListProps) {
-  const [syncing, setSyncing] = useState<string | null>(null);
-  const [editingExchange, setEditingExchange] = useState<Exchange | null>(null);
+  const [editingExchange, setEditingExchange] = useState<ExchangeClient | null>(null);
   const [showEditDialog, setShowEditDialog] = useState(false);
 
-  const handleSync = async (exchangeId: string) => {
-    setSyncing(exchangeId);
-    try {
-      const response = await axios.get(`/api/exchanges/${exchangeId}`);
-      const data = response.data;
-      const updatedExchanges = exchanges.map((ex) =>
-        ex.id === exchangeId ? data : ex
-      );
-      onExchangesChange(updatedExchanges);
-      toast.success("Exchange synced successfully");
-    } catch (error) {
-      console.error("Error syncing exchange:", error);
-      toast.error("Error syncing exchange");
-    } finally {
-      setSyncing(null);
-    }
+  // React Query mutations
+  const syncMutation = useSyncExchangeMutation();
+  const updateMutation = useUpdateExchangeMutation();
+  const deleteMutation = useDeleteExchangeMutation();
+
+  const handleSync = (exchangeId: string) => {
+    syncMutation.mutate({ id: exchangeId });
   };
 
-  const handleToggleActive = async (
+  const handleToggleActive = (
     exchangeId: string,
     currentStatus: boolean
   ) => {
-    try {
-      const response = await fetch(`/api/exchanges/${exchangeId}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          isActive: !currentStatus,
-          userId: selectedUser.id, // Pass selected user ID for admin/agent context
-        }),
-      });
-
-      if (response.ok) {
-        const updatedExchange = await response.json();
-        const updatedExchanges = exchanges.map((ex) =>
-          ex.id === exchangeId ? updatedExchange : ex
-        );
-        onExchangesChange(updatedExchanges);
-        toast.success(`Exchange ${!currentStatus ? "enabled" : "disabled"}`);
-      } else {
-        const errorData = await response.json();
-        toast.error(errorData.error || "Failed to update exchange status");
-      }
-    } catch (error) {
-      console.error("Error updating exchange:", error);
-      toast.error("Error updating exchange");
-    }
+    updateMutation.mutate({
+      id: exchangeId,
+      isActive: !currentStatus,
+    });
   };
 
-  const handleDelete = async (exchangeId: string) => {
+  const handleDelete = (exchangeId: string) => {
     if (!confirm("Are you sure you want to delete this exchange?")) return;
 
-    try {
-      // Pass userId as query param for admin/agent context
-      const response = await fetch(`/api/exchanges/${exchangeId}?userId=${selectedUser.id}`, {
-        method: "DELETE",
-      });
-
-      if (response.ok) {
-        const updatedExchanges = exchanges.filter((ex) => ex.id !== exchangeId);
-        onExchangesChange(updatedExchanges);
-        toast.success("Exchange deleted successfully");
-      } else {
-        const errorData = await response.json();
-        toast.error(errorData.error || "Failed to delete exchange");
-      }
-    } catch (error) {
-      console.error("Error deleting exchange:", error);
-      toast.error("Error deleting exchange");
-    }
+    deleteMutation.mutate({ id: exchangeId });
   };
 
-  const handleEdit = (exchange: Exchange) => {
+  const handleEdit = (exchange: ExchangeClient) => {
     setEditingExchange(exchange);
     setShowEditDialog(true);
   };
 
-  const handleExchangeUpdated = (updatedExchange: Exchange) => {
-    const updatedExchanges = exchanges.map((ex) =>
-      ex.id === updatedExchange.id ? updatedExchange : ex
-    );
-    onExchangesChange(updatedExchanges);
+  const handleExchangeUpdated = () => {
     setShowEditDialog(false);
     setEditingExchange(null);
-  };
-
-  const fetchExchanges = async () => {
-    try {
-      const response = await axios.get("/api/exchanges");
-      const data = response.data;
-      onExchangesChange(data);
-      setSyncing(null);
-    } catch (error) {
-      console.error("Error fetching exchanges:", error);
-    }
   };
 
   return (
@@ -137,20 +72,6 @@ export function ExchangesList({
         <CardHeader>
           <CardTitle className="flex items-center justify-between">
             <span>Connected Exchanges ({exchanges.length})</span>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => {
-                setSyncing("all");
-                fetchExchanges();
-              }}
-              disabled={syncing === "all"}
-            >
-              <RefreshCw
-                className={`w-4 h-4 ${syncing === "all" ? "animate-spin" : ""}`}
-              />{" "}
-              Refresh All
-            </Button>
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -175,7 +96,6 @@ export function ExchangesList({
                   onDelete={handleDelete}
                   onToggleActive={handleToggleActive}
                   onSync={handleSync}
-                  syncing={syncing}
                 />
               ))}
             </TableBody>
@@ -191,7 +111,6 @@ export function ExchangesList({
             setShowEditDialog(false);
             setEditingExchange(null);
           }}
-          userId={selectedUser.id}
         />
       </Dialog>
     </>

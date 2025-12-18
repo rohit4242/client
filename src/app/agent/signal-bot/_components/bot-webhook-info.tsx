@@ -16,20 +16,20 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { 
-  Copy, 
-  Globe, 
-  Key, 
-  Settings, 
+import {
+  Copy,
+  Globe,
+  Key,
+  Settings,
   BarChart3,
   Eye,
   EyeOff
 } from "lucide-react";
 
-import { SignalBot } from "@/types/signal-bot";
+import { type BotWithExchange } from "@/features/signal-bot";
 
 interface BotWebhookInfoProps {
-  bot: SignalBot;
+  bot: BotWithExchange;
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }
@@ -55,7 +55,7 @@ export function BotWebhookInfo({ bot, open, onOpenChange }: BotWebhookInfoProps)
     }
   };
 
-  const webhookPayload = webhookInfo?.formats?.json?.example 
+  const webhookPayload = webhookInfo?.formats?.json?.example
     ? JSON.stringify(webhookInfo?.formats?.json?.example, null, 2)
     : "";
 
@@ -106,7 +106,7 @@ export function BotWebhookInfo({ bot, open, onOpenChange }: BotWebhookInfoProps)
                   <div>
                     <span className="text-muted-foreground">Trade Amount:</span>
                     <span className="ml-2 font-medium">
-                      {bot.tradeAmountType === "QUOTE" 
+                      {bot.tradeAmountType === "QUOTE"
                         ? `$${bot.tradeAmount?.toFixed(2) || 0}`
                         : `${bot.tradeAmount?.toFixed(6) || 0}`}
                     </span>
@@ -141,7 +141,7 @@ export function BotWebhookInfo({ bot, open, onOpenChange }: BotWebhookInfoProps)
                       size="sm"
                       variant="outline"
                       onClick={() => copyToClipboard(
-                        webhookInfo?.webhookEndpoint || bot.webhookUrl || "", 
+                        webhookInfo?.webhookEndpoint || bot.webhookUrl || "",
                         "Webhook URL"
                       )}
                     >
@@ -278,7 +278,7 @@ export function BotWebhookInfo({ bot, open, onOpenChange }: BotWebhookInfoProps)
                       <p className="text-muted-foreground">Open your chart, right-click and select &quot;Add Alert&quot;</p>
                     </div>
                   </div>
-                  
+
                   <div className="flex items-start space-x-3">
                     <div className="w-6 h-6 bg-primary text-primary-foreground rounded-full flex items-center justify-center text-xs font-bold">2</div>
                     <div>
@@ -286,7 +286,7 @@ export function BotWebhookInfo({ bot, open, onOpenChange }: BotWebhookInfoProps)
                       <p className="text-muted-foreground">In the Notifications tab, check &quot;Webhook URL&quot; and paste the webhook URL above</p>
                     </div>
                   </div>
-                  
+
                   <div className="flex items-start space-x-3">
                     <div className="w-6 h-6 bg-primary text-primary-foreground rounded-full flex items-center justify-center text-xs font-bold">3</div>
                     <div>
@@ -294,7 +294,7 @@ export function BotWebhookInfo({ bot, open, onOpenChange }: BotWebhookInfoProps)
                       <p className="text-muted-foreground">Copy the JSON payload above into the &quot;Message&quot; field</p>
                     </div>
                   </div>
-                  
+
                   <div className="flex items-start space-x-3">
                     <div className="w-6 h-6 bg-primary text-primary-foreground rounded-full flex items-center justify-center text-xs font-bold">4</div>
                     <div>
@@ -306,7 +306,7 @@ export function BotWebhookInfo({ bot, open, onOpenChange }: BotWebhookInfoProps)
 
                 <div className="bg-blue-50 dark:bg-blue-950 p-4 rounded-lg">
                   <p className="text-sm text-blue-900 dark:text-blue-100">
-                    <strong>💡 Pro Tip:</strong> You can use TradingView&apos;s placeholder variables like {`{{close}}`} for price, 
+                    <strong>💡 Pro Tip:</strong> You can use TradingView&apos;s placeholder variables like {`{{close}}`} for price,
                     {` {{volume}}`} for volume, etc. in your webhook message to pass dynamic values.
                   </p>
                 </div>

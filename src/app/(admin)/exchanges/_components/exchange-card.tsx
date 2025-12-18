@@ -20,17 +20,16 @@ import {
   Wallet
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { Exchange } from '@/types/exchange';
+import { type ExchangeClient } from '@/features/exchange';
 import { AccountBalances } from '@/components/trading/account-balances';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 
 interface ExchangeCardProps {
-  exchange: Exchange;
-  onEdit: (exchange: Exchange) => void;
+  exchange: ExchangeClient;
+  onEdit: (exchange: ExchangeClient) => void;
   onDelete: (id: string) => void;
   onToggleActive: (id: string, isActive: boolean) => void;
   onSync: (id: string) => void;
-  syncing?: string | null;
 }
 
 export function ExchangeCard({
@@ -39,7 +38,6 @@ export function ExchangeCard({
   onDelete,
   onToggleActive,
   onSync,
-  syncing
 }: ExchangeCardProps) {
   const [showBalanceDialog, setShowBalanceDialog] = useState(false);
 
@@ -136,12 +134,9 @@ export function ExchangeCard({
             variant="outline"
             size="sm"
             onClick={() => onSync(exchange.id)}
-            disabled={syncing === exchange.id}
             title="Sync Exchange"
           >
-            <RefreshCw
-              className={`w-4 h-4 ${syncing === exchange.id ? 'animate-spin' : ''}`}
-            />
+            <RefreshCw className="w-4 h-4" />
           </Button>
           <Button
             variant="outline"

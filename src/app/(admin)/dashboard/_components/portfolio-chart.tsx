@@ -1,14 +1,45 @@
-"use client";
-
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { generatePortfolioData, formatCurrency } from "@/lib/mock-data";
+import { formatCurrency } from "@/lib/mock-data";
 import { AreaChart, Area, XAxis, YAxis, ResponsiveContainer, CartesianGrid, Tooltip } from "recharts";
 import { TrendingUp, TrendingDown } from "lucide-react";
-import { useMemo } from "react";
+import { DateRange } from "react-day-picker";
+import { useQuery } from "@tanstack/react-query";
+import axios from "axios";
 
-export function PortfolioChart() {
-  const portfolioData = useMemo(() => generatePortfolioData(), []);
-  
+interface PortfolioChartProps {
+  userId?: string;
+  date?: DateRange;
+}
+
+interface ChartDataPoint {
+  date: string;
+  value: number;
+  profit: number;
+}
+
+export function PortfolioChart({ userId, date }: PortfolioChartProps) {
+  const { data: rawPortfolioData = [], isLoading } = useQuery<ChartDataPoint[]>({
+    queryKey: ["admin-user-portfolio-history", userId, date?.from, date?.to],
+    queryFn: async () => {
+      if (!userId) return [];
+
+      const params = new URLSearchParams();
+      if (date?.from) params.append("from", date.from.toISOString());
+      if (date?.to) params.append("to", date.to.toISOString());
+
+      const response = await axios.get(`/api/admin/users/${userId}/portfolio-history?${params.toString()}`);
+      if (response.data.success) {
+        return response.data.history;
+      }
+      return [];
+    },
+    enabled: !!userId,
+  });
+
+  const portfolioData = rawPortfolioData.length > 0 ? rawPortfolioData : [
+    { date: new Date().toISOString(), value: 0, profit: 0 }
+  ];
+
   // Calculate performance metrics
   const startValue = portfolioData[0]?.value || 0;
   const endValue = portfolioData[portfolioData.length - 1]?.value || 0;
@@ -30,11 +61,25 @@ export function PortfolioChart() {
     value: point.value,
     profit: point.profit,
     // Format date for display
-    displayDate: new Date(point.date).toLocaleDateString('en-US', { 
-      month: 'short', 
-      day: 'numeric' 
+    displayDate: new Date(point.date).toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric'
     }),
   }));
+
+  if (isLoading) {
+    return (
+      <Card className="flex flex-col h-full">
+        <CardHeader className="flex-shrink-0">
+          <CardTitle>Portfolio Performance</CardTitle>
+          <CardDescription>Loading chart data...</CardDescription>
+        </CardHeader>
+        <CardContent className="flex-1 flex items-center justify-center">
+          <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-r-transparent" />
+        </CardContent>
+      </Card>
+    );
+  }
 
   return (
     <Card className="flex flex-col h-full">
@@ -53,13 +98,13 @@ export function PortfolioChart() {
           </div>
         </CardTitle>
         <CardDescription>
-          Portfolio value over the last 30 days • {isPositive ? '+' : ''}{formatCurrency(totalReturn)} total return
+          Portfolio value over the period • {isPositive ? '+' : ''}{formatCurrency(totalReturn)} total return
         </CardDescription>
       </CardHeader>
       <CardContent className="flex-1 p-0">
         <div className="h-full w-full px-6 pb-4" style={{ minHeight: '280px' }}>
           <ResponsiveContainer width="100%" height="100%">
-            <AreaChart 
+            <AreaChart
               data={chartData}
               margin={{ top: 10, right: 10, left: 10, bottom: 10 }}
             >
@@ -69,14 +114,14 @@ export function PortfolioChart() {
                   <stop offset="100%" stopColor="#3b82f6" stopOpacity={0.05} />
                 </linearGradient>
               </defs>
-              <CartesianGrid 
-                strokeDasharray="3 3" 
-                stroke="hsl(var(--border))" 
-                opacity={0.2} 
+              <CartesianGrid
+                strokeDasharray="3 3"
+                stroke="hsl(var(--border))"
+                opacity={0.2}
                 horizontal={true}
                 vertical={false}
               />
-              <XAxis 
+              <XAxis
                 dataKey="displayDate"
                 tickLine={false}
                 axisLine={false}
@@ -84,7 +129,7 @@ export function PortfolioChart() {
                 interval="preserveStartEnd"
                 height={20}
               />
-              <YAxis 
+              <YAxis
                 domain={[yAxisMin, yAxisMax]}
                 tickLine={false}
                 axisLine={false}
@@ -95,7 +140,7 @@ export function PortfolioChart() {
               <Tooltip
                 content={({ active, payload, label }) => {
                   if (!active || !payload || !payload.length) return null;
-                  
+
                   return (
                     <div className="bg-background border border-border rounded-lg shadow-lg p-2 text-xs">
                       <p className="font-medium mb-1">{label}</p>

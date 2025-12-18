@@ -2,43 +2,41 @@
 
 import { useState, } from "react";
 import { SignalBotList } from "./signal-bot-list";
-import { CreateSignalBotDialog } from "@/components/signal-bot/dialogs/create-bot-dialog";
 import { SignalBotHeader } from "./signal-bot-header";
+import { CreateBotDialog } from "@/app/(admin)/signal-bot/_components/dialogs/create-bot-dialog";
 import { SignalBotStats } from "./signal-bot-stats";
 import { EmptyState } from "./empty-state";
-import { useQuery } from "@tanstack/react-query";
-import axios from "axios";
-import { SignalBot } from "@/types/signal-bot";
-import { Customer } from "@/db/actions/admin/get-customers";
+import { SignalBotLoading } from "./signal-bot-loading";
+import {
+  useBotsQuery,
+  useBotsStatsQuery,
+  type BotWithExchange
+} from "@/features/signal-bot";
 
 interface SignalBotClientProps {
-  selectedUser: Customer;
+  selectedUser: any;
 }
 
 export function SignalBotClient({ selectedUser }: SignalBotClientProps) {
   const [showCreateDialog, setShowCreateDialog] = useState(false);
 
   const {
-    data: signalBots = [],
-    isLoading,
+    data: botsData,
+    isLoading: isBotsLoading,
     refetch,
-  } = useQuery<SignalBot[]>({
-    queryKey: ["signal-bots", selectedUser.id],
-    queryFn: async () => {
-      const response = await axios.get("/api/signal-bots");
-      return response.data;
-    },
-    refetchInterval: 30000, // Refresh every 30 seconds for real-time stats
-    staleTime: 10000, // Consider data stale after 10 seconds
+  } = useBotsQuery({
+    userId: selectedUser.id,
   });
 
-  const activeBots = signalBots.filter(bot => bot.isActive);
-  const totalTrades = signalBots.reduce((sum, bot) => sum + bot.totalTrades, 0);
-  const totalPnl = signalBots.reduce((sum, bot) => sum + bot.totalPnl, 0);
+  const {
+    data: statsData,
+    isLoading: isStatsLoading,
+  } = useBotsStatsQuery({
+    userId: selectedUser.id,
+  });
 
-  // Calculate proper aggregated win rate from actual wins/losses
-  const totalWins = signalBots.reduce((sum, bot) => sum + (bot.winTrades || 0), 0);
-  const winRate = totalTrades > 0 ? (totalWins / totalTrades) * 100 : 0;
+  const signalBots = botsData?.bots || [];
+  const isLoading = isBotsLoading || isStatsLoading;
 
   const handleBotCreated = () => {
     setShowCreateDialog(false);
@@ -50,47 +48,46 @@ export function SignalBotClient({ selectedUser }: SignalBotClientProps) {
   };
 
   if (isLoading) {
-    return <div>Loading signal bots...</div>;
+    return <SignalBotLoading />;
   }
 
   if (signalBots.length === 0) {
     return (
       <>
         <EmptyState onCreateBot={() => setShowCreateDialog(true)} />
-        <CreateSignalBotDialog
+        <CreateBotDialog
           open={showCreateDialog}
           onOpenChange={setShowCreateDialog}
           onSuccess={handleBotCreated}
+          userId={selectedUser.id}
         />
       </>
     );
   }
 
+  const activeBotsCount = signalBots.filter(b => b.isActive).length;
+
   return (
     <div className="space-y-6">
       <SignalBotHeader
         totalBots={signalBots.length}
-        activeBots={activeBots.length}
+        activeBots={activeBotsCount}
         onCreateBot={() => setShowCreateDialog(true)}
       />
 
-      <SignalBotStats
-        totalBots={signalBots.length}
-        activeBots={activeBots.length}
-        totalTrades={totalTrades}
-        totalPnl={totalPnl}
-        winRate={winRate}
-      />
+      <SignalBotStats stats={statsData?.data} />
 
       <SignalBotList
         signalBots={signalBots}
         onBotUpdated={handleBotUpdated}
       />
 
-      <CreateSignalBotDialog
+      {/* Create Bot Dialog - Integrated as backup */}
+      <CreateBotDialog
         open={showCreateDialog}
         onOpenChange={setShowCreateDialog}
         onSuccess={handleBotCreated}
+        userId={selectedUser.id}
       />
     </div>
   );

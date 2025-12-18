@@ -28,7 +28,6 @@ import { SignalBot } from "@/types/signal-bot";
 import { EditSignalBotDialog } from "./dialogs/edit-bot-dialog";
 import { DeleteSignalBotDialog } from "./dialogs/delete-bot-dialog";
 import { WebhookInfoDialog } from "./dialogs/webhook-info-dialog";
-import { ManualSignalDialog } from "./dialogs/manual-signal-dialog";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import { useMutation } from "@tanstack/react-query";
 import axios, { AxiosError } from "axios";
@@ -342,13 +341,6 @@ export function SignalBotCard({ bot, onBotUpdated }: SignalBotCardProps) {
         open={showWebhookDialog}
         onOpenChange={setShowWebhookDialog}
       />
-
-      <ManualSignalDialog
-        bot={bot}
-        open={showManualSignalDialog}
-        onOpenChange={setShowManualSignalDialog}
-      />
-
     </>
   );
 }

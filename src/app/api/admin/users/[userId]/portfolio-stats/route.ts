@@ -14,7 +14,7 @@ interface RouteParams {
  */
 export async function GET(
     request: NextRequest,
-    { params }: RouteParams
+    params: RouteParams
 ) {
     try {
         const admin = await isAdmin();
@@ -27,7 +27,7 @@ export async function GET(
             );
         }
 
-        const { userId } = await params;
+        const { userId } = await params.params;
 
         if (!userId) {
             return NextResponse.json(
@@ -36,31 +36,25 @@ export async function GET(
             );
         }
 
-        // Get user's portfolio with stats
+        // Parse query params for date filtering
+        const searchParams = request.nextUrl.searchParams;
+        const fromDate = searchParams.get("from");
+        const toDate = searchParams.get("to");
+
+        let dateFilter = {};
+        if (fromDate && toDate) {
+            dateFilter = {
+                closedAt: {
+                    gte: new Date(fromDate),
+                    lte: new Date(toDate),
+                },
+            };
+        }
+
+        // Get user's portfolio
         const portfolio = await db.portfolio.findFirst({
             where: {
                 userId,
-            },
-            select: {
-                id: true,
-                totalPnl: true,
-                totalPnlPercent: true,
-                totalWins: true,
-                totalLosses: true,
-                winRate: true,
-                currentBalance: true,
-                initialBalance: true,
-                totalTrades: true,
-                activeTrades: true,
-                dailyPnl: true,
-                weeklyPnl: true,
-                monthlyPnl: true,
-                avgWinAmount: true,
-                avgLossAmount: true,
-                largestWin: true,
-                largestLoss: true,
-                profitFactor: true,
-                lastCalculatedAt: true,
             },
         });
 
@@ -71,29 +65,65 @@ export async function GET(
             );
         }
 
+        let periodStats = {};
+
+        // If date filter is active, calculate stats from closed positions
+        if (fromDate && toDate) {
+            const closedPositions = await db.position.findMany({
+                where: {
+                    portfolioId: portfolio.id,
+                    status: "CLOSED",
+                    ...dateFilter,
+                },
+                select: {
+                    pnl: true,
+                    pnlPercent: true,
+                },
+            });
+
+            // Calculate Period PnL
+            const periodPnl = closedPositions.reduce((sum, pos) => sum + (pos.pnl || 0), 0);
+
+            // Calculate Win Rate for period
+            const totalClosed = closedPositions.length;
+            const wins = closedPositions.filter(p => (p.pnl || 0) > 0).length;
+            const winRate = totalClosed > 0 ? (wins / totalClosed) * 100 : 0;
+
+            // Calculate active trades (always current)
+            const activeTrades = await db.position.count({
+                where: {
+                    portfolioId: portfolio.id,
+                    status: "OPEN",
+                },
+            });
+
+            // Calculate Period PnL Percent (Use a simple sum of percents or relative to balance)
+            // Sum of pnlPercent is one way, but inaccurate.
+            // Better: Period PnL / Current Balance * 100 (Simplified ROI)
+            // combine the spot and margin balance to get the total balance
+            const currentBalance = portfolio.spotBalance + portfolio.marginBalance || 1; // avoid divide by zero
+            const periodPnlPercent = (periodPnl / currentBalance) * 100;
+
+            periodStats = {
+                // Include standard stats first
+                ...portfolio,
+                // Overwrite with calculated period stats
+                periodPnl,
+                periodPnlPercent,
+                winRate,
+                activeTrades,
+                currentBalance,
+            };
+        } else {
+            // Use pre-calculated portfolio stats
+            periodStats = { ...portfolio };
+        }
+
         return NextResponse.json({
             success: true,
-            stats: {
-                totalPnl: portfolio.totalPnl,
-                totalPnlPercent: portfolio.totalPnlPercent,
-                totalWins: portfolio.totalWins,
-                totalLosses: portfolio.totalLosses,
-                winRate: portfolio.winRate,
-                currentBalance: portfolio.currentBalance,
-                initialBalance: portfolio.initialBalance,
-                totalTrades: portfolio.totalTrades,
-                activeTrades: portfolio.activeTrades,
-                dailyPnl: portfolio.dailyPnl,
-                weeklyPnl: portfolio.weeklyPnl,
-                monthlyPnl: portfolio.monthlyPnl,
-                avgWinAmount: portfolio.avgWinAmount,
-                avgLossAmount: portfolio.avgLossAmount,
-                largestWin: portfolio.largestWin,
-                largestLoss: portfolio.largestLoss,
-                profitFactor: portfolio.profitFactor,
-                lastCalculatedAt: portfolio.lastCalculatedAt?.toISOString(),
-            },
+            stats: periodStats,
         });
+
     } catch (error) {
         console.error("Error fetching portfolio stats:", error);
         return NextResponse.json(

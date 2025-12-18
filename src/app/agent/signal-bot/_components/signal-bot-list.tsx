@@ -1,21 +1,20 @@
 "use client";
 
-import { SignalBot } from "@/types/signal-bot";
-import { SignalBotCard } from "@/components/signal-bot/bot-card";
+import { SignalBotCard } from "./bot-card";
+import { type BotWithExchange } from "@/features/signal-bot";
 
 interface SignalBotListProps {
-  signalBots: SignalBot[];
-  onBotUpdated: () => void;
+  signalBots: BotWithExchange[];
+  onBotUpdated?: () => void;
 }
 
 export function SignalBotList({ signalBots, onBotUpdated }: SignalBotListProps) {
   return (
-    <div className="space-y-4">
+    <div className="grid gap-6 grid-cols-1 xl:grid-cols-2">
       {signalBots.map((bot) => (
         <SignalBotCard
           key={bot.id}
           bot={bot}
-          onBotUpdated={onBotUpdated}
         />
       ))}
     </div>
