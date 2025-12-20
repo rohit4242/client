@@ -9,9 +9,9 @@ import { z } from "zod";
 export const PlaceOrderInputSchema = z.object({
     exchangeId: z.string().uuid("Invalid exchange ID"),
     symbol: z.string().min(4).max(12).toUpperCase(),
-    side: z.enum(["BUY", "SELL"], { required_error: "Side is required" }),
-    type: z.enum(["MARKET", "LIMIT"], { required_error: "Order type is required" }),
-    accountType: z.enum(["SPOT", "MARGIN"], { required_error: "Account type is required" }),
+    side: z.enum(["BUY", "SELL"], { message: "Side is required" }),
+    type: z.enum(["MARKET", "LIMIT"], { message: "Order type is required" }),
+    accountType: z.enum(["SPOT", "MARGIN"], { message: "Account type is required" }),
 
     // Quantity (one must be provided for market orders)
     quantity: z.string().optional(),

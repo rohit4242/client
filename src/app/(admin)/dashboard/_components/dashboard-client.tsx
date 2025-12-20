@@ -4,7 +4,6 @@ import { DashboardHeader } from "./dashboard-header";
 import { StatsCards } from "./stats-cards";
 import { PortfolioChart } from "./portfolio-chart";
 import { RecentOrders } from "./recent-orders";
-import { SignalBotWidget } from "./signal-bot-widget";
 import { useSelectedUser } from "@/contexts/selected-user-context";
 import { useQuery } from "@tanstack/react-query";
 import axios from "axios";
@@ -130,7 +129,6 @@ export function DashboardClient() {
                     <PortfolioChart userId={selectedUser.id} date={date} />
                 </div>
                 <div className="space-y-6">
-                    <SignalBotWidget />
                     <RecentOrders userId={selectedUser.id} />
                 </div>
             </div>

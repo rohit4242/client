@@ -6,6 +6,7 @@
 
 import { auth as betterAuth } from "@/lib/auth";
 import { headers } from "next/headers";
+import { User, UserRole } from "@prisma/client";
 
 /**
  * Get current authenticated session
@@ -31,12 +32,12 @@ export async function getSession() {
  * @returns User object
  * @throws Error if not authenticated
  */
-export async function requireAuth() {
+export async function requireAuth(): Promise<User> {
     const session = await getSession();
     if (!session?.user) {
         throw new Error("Unauthorized - Authentication required");
     }
-    return session.user;
+    return session.user as unknown as User;
 }
 
 /**
@@ -46,7 +47,7 @@ export async function requireAuth() {
  * @returns True if user has required role
  * @throws Error if not authenticated
  */
-export async function hasRole(requiredRole: "ADMIN" | "AGENT" | "CUSTOMER") {
+export async function hasRole(requiredRole: UserRole) {
     const user = await requireAuth();
     return user.role === requiredRole;
 }
@@ -57,7 +58,7 @@ export async function hasRole(requiredRole: "ADMIN" | "AGENT" | "CUSTOMER") {
  * @param requiredRole - Role required for access
  * @throws Error if user doesn't have required role
  */
-export async function requireRole(requiredRole: "ADMIN" | "AGENT" | "CUSTOMER") {
+export async function requireRole(requiredRole: UserRole) {
     const user = await requireAuth();
     if (user.role !== requiredRole) {
         throw new Error(`Unauthorized - ${requiredRole} role required`);
@@ -71,9 +72,9 @@ export async function requireRole(requiredRole: "ADMIN" | "AGENT" | "CUSTOMER") 
  * @param roles - Array of acceptable roles
  * @returns True if user has any of the roles
  */
-export async function hasAnyRole(roles: ("ADMIN" | "AGENT" | "CUSTOMER")[]) {
+export async function hasAnyRole(roles: UserRole[]) {
     const user = await requireAuth();
-    return roles.includes(user.role as "ADMIN" | "AGENT" | "CUSTOMER");
+    return roles.includes(user.role);
 }
 
 /**
@@ -82,9 +83,13 @@ export async function hasAnyRole(roles: ("ADMIN" | "AGENT" | "CUSTOMER")[]) {
  * @param roles - Array of acceptable roles
  * @throws Error if user doesn't have any of the roles
  */
-export async function requireAnyRole(roles: ("ADMIN" | "AGENT" | "CUSTOMER")[]) {
+export async function requireAnyRole(roles: (UserRole | string)[]) {
     const user = await requireAuth();
-    if (!roles.includes(user.role as "ADMIN" | "AGENT" | "CUSTOMER")) {
+    // Allow string comparison for flexibility, but prefer enum
+    const userRole = user.role as unknown as string;
+    const allowedRoles = roles.map(r => r.toString());
+
+    if (!allowedRoles.includes(userRole)) {
         throw new Error(`Unauthorized - One of these roles required: ${roles.join(", ")}`);
     }
     return user;

@@ -19,7 +19,8 @@ import { formatPrice, formatQuantity, roundToStepSize } from "@/features/binance
  */
 export async function calculateTradeParams(
     request: NormalizedTradingRequest,
-    validation: ValidationData
+    validation: ValidationData,
+    bot?: any // Optional bot data for fallback
 ): Promise<TradeParams> {
     const { order } = request;
     const { currentPrice, symbolFilters } = validation;
@@ -33,23 +34,30 @@ export async function calculateTradeParams(
         if (!order.price) {
             throw new Error("Price required for limit orders");
         }
-        price = formatPrice(parseFloat(order.price), 8);
+        const tickSize = parseFloat(symbolFilters.tickSize);
+        const precision = tickSize < 1 ? Math.abs(Math.round(Math.log10(tickSize))) : 0;
+        price = parseFloat(order.price).toFixed(precision);
     }
 
     // Calculate quantity
+    const stepSize = parseFloat(symbolFilters.stepSize);
+    const qtyPrecision = stepSize < 1 ? Math.abs(Math.round(Math.log10(stepSize))) : 0;
+
     if (order.quantity) {
         // Quantity provided directly
         const rawQty = parseFloat(order.quantity);
-        const rounded = roundToStepSize(rawQty, parseFloat(symbolFilters.stepSize));
-        quantity = formatQuantity(rounded, 8);
+        const rounded = Math.floor(rawQty / stepSize) * stepSize;
+        quantity = rounded.toFixed(qtyPrecision);
     } else if (order.quoteOrderQty) {
         // Quote order qty provided (e.g., spend $1000 USDT)
-        quoteOrderQty = formatPrice(parseFloat(order.quoteOrderQty), 8);
+        const tickSize = parseFloat(symbolFilters.tickSize);
+        const pricePrecision = tickSize < 1 ? Math.abs(Math.round(Math.log10(tickSize))) : 0;
+        quoteOrderQty = parseFloat(order.quoteOrderQty).toFixed(pricePrecision);
 
         // Estimate quantity for database record
         const estimatedQty = parseFloat(order.quoteOrderQty) / currentPrice;
-        const rounded = roundToStepSize(estimatedQty, parseFloat(symbolFilters.stepSize));
-        quantity = formatQuantity(rounded, 8);
+        const rounded = Math.floor(estimatedQty / stepSize) * stepSize;
+        quantity = rounded.toFixed(qtyPrecision);
     } else {
         throw new Error("Either quantity or quoteOrderQty must be provided");
     }
@@ -70,18 +78,23 @@ export async function calculateTradeParams(
     let stopLossPrice: number | undefined;
     let takeProfitPrice: number | undefined;
 
-    if (order.stopLoss) {
+    // Determine TP/SL percentages (Signal > Bot > None)
+    // Note: order.stopLoss/takeProfit are numbers (percentages), e.g., 2.5
+    const stopLossPercent = order.stopLoss ?? bot?.stopLoss;
+    const takeProfitPercent = order.takeProfit ?? bot?.takeProfit;
+
+    if (stopLossPercent) {
         stopLossPrice = calculateStopLossPrice(
             currentPrice,
-            order.stopLoss,
+            stopLossPercent,
             order.side === "BUY" ? "LONG" : "SHORT"
         );
     }
 
-    if (order.takeProfit) {
+    if (takeProfitPercent) {
         takeProfitPrice = calculateTakeProfitPrice(
             currentPrice,
-            order.takeProfit,
+            takeProfitPercent,
             order.side === "BUY" ? "LONG" : "SHORT"
         );
     }

@@ -40,6 +40,69 @@ export interface MarginAccountInfo {
     borrowEnabled: boolean;
 }
 
+export interface MarginOCOOrderParams {
+    symbol: string;
+    side: "BUY" | "SELL";
+    quantity: string;
+    price: string;              // Limit order price (take profit)
+    stopPrice: string;          // Stop loss trigger price
+    stopLimitPrice: string;     // Stop loss limit price
+    listClientOrderId?: string;
+    limitClientOrderId?: string;
+    stopClientOrderId?: string;
+    sideEffectType?: "NO_SIDE_EFFECT" | "AUTO_REPAY";
+}
+
+export interface MarginStopLossOrderParams {
+    symbol: string;
+    side: "BUY" | "SELL";
+    quantity: string;
+    stopPrice: string;          // Trigger price
+    price?: string;             // Limit price (optional, for STOP_LOSS_LIMIT)
+    sideEffectType?: "NO_SIDE_EFFECT" | "AUTO_REPAY";
+}
+
+export interface MarginTakeProfitOrderParams {
+    symbol: string;
+    side: "BUY" | "SELL";
+    quantity: string;
+    stopPrice: string;          // Trigger price  
+    price?: string;             // Limit price (optional)
+    sideEffectType?: "NO_SIDE_EFFECT" | "AUTO_REPAY";
+}
+
+export interface BinanceOCOOrderResponse {
+    orderListId: number;
+    contingencyType: string;
+    listStatusType: string;
+    listOrderStatus: string;
+    listClientOrderId: string;
+    transactionTime: number;
+    symbol: string;
+    orders: Array<{
+        symbol: string;
+        orderId: number;
+        clientOrderId: string;
+    }>;
+    orderReports: Array<{
+        symbol: string;
+        orderId: number;
+        orderListId: number;
+        clientOrderId: string;
+        transactTime: number;
+        price: string;
+        origQty: string;
+        executedQty: string;
+        cummulativeQuoteQty: string;
+        status: string;
+        timeInForce: string;
+        type: string;
+        side: string;
+        stopPrice?: string;
+    }>;
+}
+
+
 // ============================================================================
 // ORDER PLACEMENT
 // ============================================================================
@@ -95,6 +158,7 @@ export async function placeMarginMarketOrder(
 
         return successResult(data as BinanceOrderResponse);
     } catch (error) {
+        console.error("Error placing margin market order:", error);
         return handleBinanceError(error);
     }
 }
@@ -141,9 +205,10 @@ export async function placeMarginLimitOrder(
         return handleBinanceError(error);
     }
 }
+// ... (previous code)
 
 /**
- * Close a margin position
+ * Close a margin position (opposite order)
  */
 export async function closeMarginPosition(
     client: MarginTrading,
@@ -160,22 +225,13 @@ export async function closeMarginPosition(
         // Determine opposite side
         const orderSide = params.side === "LONG" ? "SELL" : "BUY";
 
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const orderParams: any = {
+        // Place market order to close
+        return await placeMarginMarketOrder(client, {
             symbol: params.symbol,
             side: orderSide,
-            type: "MARKET",
-            quantity: parseFloat(params.quantity),
-            sideEffectType: params.sideEffectType || "AUTO_REPAY",
-        };
-
-        // Place close order
-        const response = await client.restAPI.marginAccountNewOrder(orderParams);
-        const data = await response.data();
-
-        logResponse("closeMarginPosition", data);
-
-        return successResult(data as BinanceOrderResponse);
+            quantity: params.quantity,
+            sideEffectType: params.sideEffectType || "NO_SIDE_EFFECT",
+        });
     } catch (error) {
         return handleBinanceError(error);
     }
@@ -194,7 +250,7 @@ export async function getMarginAccount(
     try {
         logRequest("getMarginAccount", {});
 
-        const response = await client.restAPI.marginAccountDetail();
+        const response = await client.restAPI.queryCrossMarginAccountDetails();
         const data = await response.data();
 
         logResponse("getMarginAccount", data);
@@ -205,7 +261,7 @@ export async function getMarginAccount(
             totalNetAssetOfBtc: data.totalNetAssetOfBtc || "0",
             marginLevel: data.marginLevel || "0",
             tradeEnabled: data.tradeEnabled || false,
-            transferEnabled: data.transferEnabled || false,
+            transferEnabled: data.transferInEnabled || false,
             borrowEnabled: data.borrowEnabled || false,
         });
     } catch (error) {
@@ -240,6 +296,193 @@ export async function getMaxBorrowable(
     }
 }
 
+
+export async function placeMarginOCO(
+    client: MarginTrading,
+    params: {
+        symbol: string;
+        side: "BUY" | "SELL";
+        quantity: string;
+        takeProfitPrice: string; // Target Price (Limit)
+        stopLossTrigger: string; // SL Trigger (stopPrice)
+        stopLossLimit: string;  // SL Execution (price)
+        isIsolated?: boolean;
+        sideEffectType?: "NO_SIDE_EFFECT" | "AUTO_REPAY";
+    }
+): Promise<BinanceResult<BinanceOCOOrderResponse>> {
+    try {
+        logRequest("placeMarginOCO", params);
+
+        const orderParams: any = {
+            symbol: params.symbol,
+            side: params.side,
+            quantity: params.quantity,
+            price: params.takeProfitPrice,          // TP Price
+            stopPrice: params.stopLossTrigger,      // SL Trigger
+            stopLimitPrice: params.stopLossLimit,   // SL Execution
+            stopLimitTimeInForce: "GTC",
+            isIsolated: params.isIsolated ? "TRUE" : "FALSE",
+        };
+
+        if (params.sideEffectType) {
+            orderParams.sideEffectType = params.sideEffectType;
+        }
+
+        // Use the specific OCO endpoint
+        const response = await client.restAPI.marginAccountNewOco(orderParams);
+        const data = await response.data();
+
+        logResponse("placeMarginOCO", data);
+        return successResult(data as BinanceOCOOrderResponse);
+    } catch (error) {
+        return handleBinanceError(error);
+    }
+}
+
+export async function placeMarginTakeProfit(
+    client: MarginTrading,
+    params: {
+        symbol: string;
+        side: "BUY" | "SELL";
+        quantity: string;
+        stopPrice: string;       // Trigger Price
+        executionPrice?: string; // Optional: If provided, uses LIMIT. If empty, uses MARKET.
+        isIsolated?: boolean;
+        sideEffectType?: "NO_SIDE_EFFECT" | "AUTO_REPAY" | "MARGIN_BUY";
+    }
+): Promise<BinanceResult<BinanceOrderResponse>> {
+    try {
+        logRequest("placeMarginTakeProfit", params);
+
+        // Determine type based on presence of executionPrice
+        const isLimit = !!params.executionPrice;
+
+        const orderParams: any = {
+            symbol: params.symbol,
+            side: params.side,
+            type: isLimit ? "TAKE_PROFIT_LIMIT" : "TAKE_PROFIT",
+            quantity: params.quantity,
+            stopPrice: params.stopPrice,
+            isIsolated: params.isIsolated ? "TRUE" : "FALSE",
+        };
+
+        // Add limit-specific parameters if needed
+        if (isLimit) {
+            orderParams.price = params.executionPrice;
+            orderParams.timeInForce = "GTC";
+        }
+
+        if (params.sideEffectType) {
+            orderParams.sideEffectType = params.sideEffectType;
+        }
+
+        const response = await client.restAPI.marginAccountNewOrder(orderParams);
+        const data = await response.data();
+
+        logResponse("placeMarginTakeProfit", data);
+        return successResult(data as BinanceOrderResponse);
+    } catch (error) {
+        return handleBinanceError(error);
+    }
+}
+
+export async function placeMarginStopLoss(
+    client: MarginTrading,
+    params: {
+        symbol: string;
+        side: "BUY" | "SELL";
+        quantity: string;
+        stopPrice: string;       // The Trigger Price (Trigger level)
+        executionPrice?: string; // Optional: If provided, uses LIMIT. If empty, uses MARKET.
+        isIsolated?: boolean;
+        sideEffectType?: "NO_SIDE_EFFECT" | "AUTO_REPAY" | "MARGIN_BUY";
+    }
+): Promise<BinanceResult<BinanceOrderResponse>> {
+    try {
+        logRequest("placeMarginStopLoss", params);
+
+        // Determine type based on presence of executionPrice
+        const isLimit = !!params.executionPrice;
+
+        const orderParams: any = {
+            symbol: params.symbol,
+            side: params.side,
+            // STOP_LOSS triggers a Market order, STOP_LOSS_LIMIT triggers a Limit order
+            type: isLimit ? "STOP_LOSS_LIMIT" : "STOP_LOSS",
+            quantity: params.quantity,
+            stopPrice: params.stopPrice,
+            isIsolated: params.isIsolated ? "TRUE" : "FALSE",
+        };
+
+        if (isLimit) {
+            orderParams.price = params.executionPrice;
+            orderParams.timeInForce = "GTC";
+        }
+
+        if (params.sideEffectType) {
+            orderParams.sideEffectType = params.sideEffectType;
+        }
+
+        const response = await client.restAPI.marginAccountNewOrder(orderParams);
+        const data = await response.data();
+
+        logResponse("placeMarginStopLoss", data);
+        return successResult(data as BinanceOrderResponse);
+    } catch (error) {
+        return handleBinanceError(error);
+    }
+}
+
+/**
+ * Get OCO order status
+ */
+export async function getMarginOCOOrder(
+    client: MarginTrading,
+    orderListId: number
+): Promise<BinanceResult<BinanceOCOOrderResponse>> {
+    try {
+        logRequest("getMarginOCOOrder", { orderListId });
+
+        const response = await client.restAPI.queryMarginAccountsOco({
+            orderListId,
+        });
+        const data = await response.data();
+
+        logResponse("getMarginOCOOrder", data);
+
+        return successResult(data as BinanceOCOOrderResponse);
+    } catch (error) {
+        return handleBinanceError(error);
+    }
+}
+
+/**
+ * Cancel OCO order
+ */
+export async function cancelMarginOCOOrder(
+    client: MarginTrading,
+    params: {
+        symbol: string;
+        orderListId: number;
+    }
+): Promise<BinanceResult<BinanceOCOOrderResponse>> {
+    try {
+        logRequest("cancelMarginOCOOrder", params);
+
+        const response = await client.restAPI.marginAccountCancelOco({
+            symbol: params.symbol,
+            orderListId: params.orderListId,
+        });
+        const data = await response.data();
+
+        logResponse("cancelMarginOCOOrder", data);
+
+        return successResult(data as BinanceOCOOrderResponse);
+    } catch (error) {
+        return handleBinanceError(error);
+    }
+}
+
 // ============================================================================
 // BORROW / REPAY
 // ============================================================================
@@ -253,19 +496,21 @@ export async function borrowMargin(
         asset: string;
         amount: string;
     }
-): Promise<BinanceResult<{ tranId: number }>> {
+): Promise<BinanceResult<{ tranId: number | bigint }>> {
     try {
         logRequest("borrowMargin", params);
 
-        const response = await client.restAPI.marginAccountBorrow({
+        const response = await client.restAPI.marginAccountBorrowRepay({
             asset: params.asset,
             amount: params.amount,
-            isIsolated: undefined,
-            symbol: undefined,
+            isIsolated: 'FALSE',
+            symbol: params.asset, // Empty string for cross-margin (allows auto-conversion)
+            type: 'BORROW',
         });
         const data = await response.data();
 
         logResponse("borrowMargin", data);
+
 
         return successResult({
             tranId: data.tranId || 0,
@@ -284,15 +529,16 @@ export async function repayMargin(
         asset: string;
         amount: string;
     }
-): Promise<BinanceResult<{ tranId: number }>> {
+): Promise<BinanceResult<{ tranId: number | bigint }>> {
     try {
         logRequest("repayMargin", params);
 
-        const response = await client.restAPI.marginAccountRepay({
+        const response = await client.restAPI.marginAccountBorrowRepay({
             asset: params.asset,
             amount: params.amount,
-            isIsolated: undefined,
-            symbol: undefined,
+            isIsolated: 'FALSE',
+            symbol: params.asset, // Empty string for cross-margin (enables cross-asset repayment)
+            type: 'REPAY',
         });
         const data = await response.data();
 

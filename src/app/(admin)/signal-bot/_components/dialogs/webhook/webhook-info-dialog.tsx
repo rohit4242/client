@@ -65,21 +65,21 @@ export function WebhookInfoDialog({ bot, open, onOpenChange }: WebhookInfoDialog
             <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto p-0 gap-0 border-none bg-slate-50 dark:bg-slate-950">
                 <div className="p-6 bg-white dark:bg-slate-900 border-b border-slate-100 dark:border-slate-800">
                     <DialogHeader>
-                        <div className="flex items-center gap-3 mb-2">
-                            <div className="p-2 bg-indigo-50 dark:bg-indigo-950/30 rounded-lg">
-                                <Globe className="h-6 w-6 text-indigo-600 dark:text-indigo-400" />
+                        <div className="flex items-center gap-3">
+                            <div className="p-2 bg-teal-50 rounded-xl">
+                                <Globe className="h-5 w-5 text-teal-600" />
                             </div>
                             <div>
-                                <DialogTitle className="text-2xl font-black">Webhook Integration</DialogTitle>
-                                <DialogDescription className="font-medium">
-                                    Configuring <span className="text-indigo-600 dark:text-indigo-400 font-bold">{bot.name}</span> for external automation.
+                                <DialogTitle className="text-xl font-bold">Webhook Integration</DialogTitle>
+                                <DialogDescription className="text-sm font-medium">
+                                    Configuring <span className="text-teal-600 font-bold">{bot.name}</span> for external automation.
                                 </DialogDescription>
                             </div>
                         </div>
                     </DialogHeader>
                 </div>
 
-                <div className="p-6">
+                <div className="p-5 space-y-4 max-h-[75vh] overflow-y-auto">
                     <Tabs defaultValue="setup" className="w-full">
                         <TabsList className="w-full mb-6 bg-slate-100 dark:bg-slate-900 p-1 rounded-xl h-11 border border-slate-200 dark:border-slate-800">
                             <TabsTrigger value="setup" className="flex-1 rounded-lg data-[state=active]:bg-white dark:data-[state=active]:bg-slate-800 data-[state=active]:shadow-sm font-bold text-xs uppercase tracking-wider">Setup</TabsTrigger>
@@ -88,20 +88,20 @@ export function WebhookInfoDialog({ bot, open, onOpenChange }: WebhookInfoDialog
                         </TabsList>
 
                         <TabsContent value="setup" className="space-y-6 focus-visible:outline-none">
-                            <div className="space-y-4">
-                                <h4 className="text-sm font-black uppercase tracking-widest text-slate-400">Connection Endpoint</h4>
+                            <div className="space-y-3">
+                                <h4 className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">Connection Endpoint</h4>
                                 <div className="flex items-center gap-2 group">
-                                    <div className="flex-1 bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-4 font-mono text-xs break-all relative overflow-hidden">
-                                        <div className="absolute left-0 top-0 w-1 h-full bg-indigo-500 opacity-0 group-hover:opacity-100 transition-opacity" />
+                                    <div className="flex-1 bg-white border border-slate-200 rounded-xl p-3 font-mono text-xs break-all relative overflow-hidden shadow-sm">
+                                        <div className="absolute left-0 top-0 w-1 h-full bg-teal-500 opacity-0 group-hover:opacity-100 transition-opacity" />
                                         {webhookUrl}
                                     </div>
                                     <Button
                                         size="icon"
                                         variant="outline"
-                                        className="h-[52px] w-[52px] rounded-xl hover:bg-indigo-50 dark:hover:bg-indigo-950"
+                                        className="h-10 w-10 rounded-xl hover:bg-teal-50"
                                         onClick={() => copyToClipboard(webhookUrl, "Webhook URL")}
                                     >
-                                        <Copy className="h-5 w-5" />
+                                        <Copy className="h-4 w-4" />
                                     </Button>
                                 </div>
                             </div>
@@ -117,15 +117,15 @@ export function WebhookInfoDialog({ bot, open, onOpenChange }: WebhookInfoDialog
                                     icon={Terminal}
                                     title="Universal API"
                                     description="Supports JSON and Underscore-separated plain text formats."
-                                    color="indigo"
+                                    color="teal"
                                 />
                             </div>
 
-                            <div className="bg-indigo-600 text-white rounded-2xl p-6 shadow-xl shadow-indigo-200 dark:shadow-indigo-950/20">
+                            <div className="bg-teal-600 text-white rounded-2xl p-6 shadow-xl shadow-teal-200 dark:shadow-teal-950/20">
                                 <h4 className="font-bold mb-2 flex items-center gap-2">
                                     <Activity className="h-5 w-5" /> Quick Checklist
                                 </h4>
-                                <ul className="space-y-2 text-indigo-100 text-sm font-medium">
+                                <ul className="space-y-2 text-teal-100 text-sm font-medium">
                                     <li className="flex items-center gap-2"><div className="h-1.5 w-1.5 rounded-full bg-white" /> Ensure Bot is toggled ACTIVE</li>
                                     <li className="flex items-center gap-2"><div className="h-1.5 w-1.5 rounded-full bg-white" /> Symbol in payload must match bot config</li>
                                     <li className="flex items-center gap-2"><div className="h-1.5 w-1.5 rounded-full bg-white" /> Price is optional (Market price used by default)</li>
@@ -196,8 +196,14 @@ export function WebhookInfoDialog({ bot, open, onOpenChange }: WebhookInfoDialog
                     </Tabs>
                 </div>
 
-                <div className="p-6 bg-slate-100 dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 flex justify-end">
-                    <Button variant="outline" onClick={() => onOpenChange(false)} className="font-bold">Close Window</Button>
+                <div className="p-5 bg-white border-t border-slate-100 flex justify-end">
+                    <Button
+                        variant="ghost"
+                        onClick={() => onOpenChange(false)}
+                        className="h-10 px-6 rounded-xl font-bold text-slate-400 hover:text-slate-900"
+                    >
+                        Close Window
+                    </Button>
                 </div>
             </DialogContent>
         </Dialog>
@@ -207,7 +213,7 @@ export function WebhookInfoDialog({ bot, open, onOpenChange }: WebhookInfoDialog
 function FeatureCard({ icon: Icon, title, description, color }: any) {
     const colors: any = {
         teal: "text-teal-600 bg-teal-50 dark:bg-teal-950/30",
-        indigo: "text-indigo-600 bg-indigo-50 dark:bg-indigo-950/30",
+        indigo: "text-teal-600 bg-teal-50 dark:bg-teal-950/30",
     };
     return (
         <div className="p-4 bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm">

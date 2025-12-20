@@ -23,10 +23,12 @@ import {
 
 interface ExchangesListProps {
   exchanges: ExchangeClient[];
+  userId: string;
 }
 
 export function ExchangesList({
   exchanges,
+  userId,
 }: ExchangesListProps) {
   const [editingExchange, setEditingExchange] = useState<ExchangeClient | null>(null);
   const [showEditDialog, setShowEditDialog] = useState(false);
@@ -37,7 +39,7 @@ export function ExchangesList({
   const deleteMutation = useDeleteExchangeMutation();
 
   const handleSync = (exchangeId: string) => {
-    syncMutation.mutate({ id: exchangeId });
+    syncMutation.mutate({ id: exchangeId, userId });
   };
 
   const handleToggleActive = (
@@ -47,13 +49,14 @@ export function ExchangesList({
     updateMutation.mutate({
       id: exchangeId,
       isActive: !currentStatus,
+      userId,
     });
   };
 
   const handleDelete = (exchangeId: string) => {
     if (!confirm("Are you sure you want to delete this exchange?")) return;
 
-    deleteMutation.mutate({ id: exchangeId });
+    deleteMutation.mutate({ id: exchangeId, userId });
   };
 
   const handleEdit = (exchange: ExchangeClient) => {

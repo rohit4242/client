@@ -4,15 +4,15 @@
  * Schemas for user management (admin features).
  */
 
+import { UserRole } from "@prisma/client";
 import { z } from "zod";
-import { Role } from "@prisma/client";
 
 // ============================================================================
 // INPUT SCHEMAS
 // ============================================================================
 
 export const GetUsersInputSchema = z.object({
-    role: z.nativeEnum(Role).optional(),
+    role: z.nativeEnum(UserRole).optional(),
     search: z.string().optional(),
     limit: z.number().int().positive().max(1000).optional(),
 });
@@ -29,7 +29,7 @@ export const UserSchema = z.object({
     id: z.string().uuid(),
     name: z.string(),
     email: z.string().email(),
-    role: z.nativeEnum(Role),
+    role: z.nativeEnum(UserRole),
     emailVerified: z.boolean(),
     image: z.string().nullable(),
     createdAt: z.date(),

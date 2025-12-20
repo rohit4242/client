@@ -7,7 +7,7 @@ import { EmptyState } from './empty-state';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Card } from '@/components/ui/card';
 
-export function ExchangesClient() {
+export function ExchangesClient({ userId }: { userId: string }) {
   const { data, isLoading } = useExchangesQuery();
   const exchanges = data?.exchanges ?? [];
 
@@ -48,6 +48,7 @@ export function ExchangesClient() {
       ) : (
         <ExchangesList
           exchanges={exchanges}
+          userId={userId}
         />
       )}
     </div>

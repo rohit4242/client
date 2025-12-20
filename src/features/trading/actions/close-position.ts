@@ -38,12 +38,12 @@ export async function closePositionAction(
                 },
             },
             include: {
-                exchange: true,
-                portfolio: {
+                portfolio: true,
+                bot: {
                     include: {
                         exchange: true,
                     },
-                },
+                }
             },
         });
 
@@ -61,7 +61,7 @@ export async function closePositionAction(
             };
         }
 
-        const exchange = position.portfolio.exchange;
+        const exchange = position.bot?.exchange;
         if (!exchange) {
             return {
                 success: false,

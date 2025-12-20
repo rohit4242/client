@@ -18,13 +18,15 @@ import {
  */
 export async function validateTrade(input: ValidateTradeInput): Promise<{ success: boolean; data?: ValidateTradeResult; error?: string }> {
     try {
-        const { user } = await getUserWithRole();
+        const user = await getUserWithRole();
         if (!user) {
             return { success: false, error: "Unauthorized" };
         }
 
         const validatedInput = ValidateTradeInputSchema.parse(input);
         const { symbol, tradeAmount, tradeAmountType, exchangeId } = validatedInput;
+
+        console.log(`[validateTrade] Validating: ${symbol}, ${tradeAmount} ${tradeAmountType}, exchange: ${exchangeId}`);
 
         // Get exchange
         const exchange = await db.exchange.findUnique({
@@ -33,6 +35,7 @@ export async function validateTrade(input: ValidateTradeInput): Promise<{ succes
         });
 
         if (!exchange || !exchange.isActive) {
+            console.error(`[validateTrade] Exchange ${exchangeId} not found or inactive`);
             return { success: false, error: "Exchange not found or not active" };
         }
 
@@ -41,13 +44,14 @@ export async function validateTrade(input: ValidateTradeInput): Promise<{ succes
             apiSecret: exchange.apiSecret,
         };
 
+        console.log(`[validateTrade] Fetching constraints for ${symbol}...`);
         // Fetch constraints and current price in parallel
         const [constraints, priceData] = await Promise.all([
             getSymbolConstraints(config, symbol),
             getPriceBySymbol(config, symbol),
         ]).catch(err => {
-            console.error("Error fetching exchange data:", err);
-            throw new Error(`Failed to fetch exchange data for ${symbol}`);
+            console.error(`[validateTrade] Error fetching exchange data for ${symbol}:`, err);
+            throw new Error(`Failed to fetch exchange data for ${symbol}: ${err.message}`);
         });
 
         if (!constraints) {

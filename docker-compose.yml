@@ -1,26 +1,42 @@
 services:
   app:
-    build: .
-    container_name: app
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: bytix-app
     restart: unless-stopped
-    env_file: .env
+    env_file:
+      - .env
+    environment:
+      - NODE_ENV=production
     networks:
-      - web
+      - bytix-network
 
   nginx:
     image: nginx:alpine
-    container_name: nginx
+    container_name: bytix-nginx
     restart: unless-stopped
     ports:
       - "80:80"
+      - "443:443"
     volumes:
-      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx-bytix.conf:/etc/nginx/nginx.conf:ro
+      - ./certbot/conf:/etc/letsencrypt
+      - ./certbot/www:/var/www/certbot
     networks:
-      - web
+      - bytix-network
     depends_on:
       - app
 
+  certbot:
+    image: certbot/certbot
+    container_name: bytix-certbot
+    volumes:
+      - ./certbot/conf:/etc/letsencrypt
+      - ./certbot/www:/var/www/certbot
+    networks:
+      - bytix-network
+
 networks:
-  web:
-
-
+  bytix-network:
+    driver: bridge

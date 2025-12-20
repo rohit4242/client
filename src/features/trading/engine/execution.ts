@@ -5,7 +5,7 @@
  */
 
 import type { NormalizedTradingRequest, TradeParams } from "../types/trading.types";
-import type { BinanceResult, BinanceOrderResponse } from "@/features/binance";
+import type { BinanceResult, BinanceOrderResponse, BinanceOCOOrderResponse } from "@/features/binance";
 import {
     createSpotClient,
     createMarginClient,
@@ -13,6 +13,9 @@ import {
     placeSpotLimitOrder,
     placeMarginMarketOrder,
     placeMarginLimitOrder,
+    placeMarginTakeProfit,
+    placeMarginStopLoss,
+    placeMarginOCO,
 } from "@/features/binance";
 
 /**
@@ -22,7 +25,7 @@ import {
 export async function executeBinanceTrade(
     request: NormalizedTradingRequest,
     params: TradeParams
-): Promise<BinanceResult<BinanceOrderResponse>> {
+): Promise<BinanceResult<BinanceOrderResponse | BinanceOCOOrderResponse>> {
     if (request.order.accountType === "SPOT") {
         return executeSpotTrade(request, params);
     } else {
@@ -74,11 +77,52 @@ async function executeSpotTrade(
 async function executeMarginTrade(
     request: NormalizedTradingRequest,
     params: TradeParams
-): Promise<BinanceResult<BinanceOrderResponse>> {
+): Promise<BinanceResult<BinanceOrderResponse | BinanceOCOOrderResponse>> {
     const client = createMarginClient({
         apiKey: request.exchange.apiKey,
         apiSecret: request.exchange.apiSecret,
     });
+    const quantity = params.quantity || request.order.quantity;
+    if (!quantity) {
+        return {
+            success: false,
+            error: "Quantity required for margin orders",
+        };
+    }
+
+    if (request.order.takeProfit && request.order.stopLoss) {
+        return placeMarginOCO(client, {
+            symbol: request.order.symbol,
+            side: request.order.side,
+            quantity: quantity,
+            takeProfitPrice: request.order.takeProfit.toString(),
+            stopLossTrigger: request.order.stopLoss.toString(),
+            stopLossLimit: request.order.stopLoss.toString(),
+        });
+    }
+
+    if (request.order.takeProfit) {
+        return placeMarginTakeProfit(client, {
+            symbol: request.order.symbol,
+            side: request.order.side,
+            quantity: quantity,
+            stopPrice: request.order.takeProfit.toString(),
+            executionPrice: request.order.price,
+            sideEffectType: request.order.sideEffectType,
+        });
+    }
+
+    if (request.order.stopLoss) {
+        return placeMarginStopLoss(client, {
+            symbol: request.order.symbol,
+            side: request.order.side,
+            quantity: quantity,
+
+            executionPrice: request.order.price,
+            stopPrice: request.order.stopLoss.toString(),
+            sideEffectType: request.order.sideEffectType,
+        });
+    }
 
     if (request.order.type === "MARKET") {
         return placeMarginMarketOrder(client, {

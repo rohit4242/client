@@ -5,6 +5,8 @@
  * All types are re-exported from Zod schemas for single source of truth.
  */
 
+export type { Action as SignalAction } from "@prisma/client";
+
 export type {
     // Input types
     CreateBotInput,
@@ -27,3 +29,5 @@ export type {
     GetBotResult,
     GetSignalsResult,
 } from "../schemas/bot.schema";
+
+export type { BotStatsResult } from "../actions/get-bots-stats";

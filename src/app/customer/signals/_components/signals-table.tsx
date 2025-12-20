@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { CustomerSignal } from "@/db/actions/customer/get-all-signals";
+import { SignalWithBot } from "@/features/signals";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -14,14 +14,12 @@ import {
 } from "@/components/ui/select";
 import { Search, Bot, CheckCircle2, XCircle, Clock, Radio } from "lucide-react";
 import {
-  ArrowUp,
-  ArrowDown,
   TrendingUp,
   TrendingDown,
 } from "lucide-react";
 
 interface SignalsTableProps {
-  signals: CustomerSignal[];
+  signals: SignalWithBot[];
 }
 
 export function SignalsTable({ signals }: SignalsTableProps) {
@@ -96,7 +94,7 @@ export function SignalsTable({ signals }: SignalsTableProps) {
     );
   };
 
-  const getStatusIcon = (signal: CustomerSignal) => {
+  const getStatusIcon = (signal: SignalWithBot) => {
     if (signal.processed) {
       return <CheckCircle2 className="h-4 w-4 text-green-500" />;
     }

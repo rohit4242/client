@@ -1,95 +1,130 @@
 "use client";
 
-import { useState, } from "react";
-import { SignalBotList } from "./signal-bot-list";
-import { CreateSignalBotDialog } from "@/components/signal-bot/dialogs/create-bot-dialog";
-import { SignalBotHeader } from "./signal-bot-header";
-import { SignalBotStats } from "./signal-bot-stats";
-import { EmptyState } from "./empty-state";
-import { useQuery } from "@tanstack/react-query";
-import axios from "axios";
-import { SignalBot } from "@/types/signal-bot";
-import { UserWithAgent } from "@/db/actions/admin/get-all-users";
+import { useState } from "react";
+import {
+  SignalBotHeader,
+  SignalBotStats,
+  SignalBotList,
+  SignalBotLoading,
+  SignalBotEmptyState,
+  SignalBotErrorState
+} from "./index";
+import { CreateSignalBotDialog } from "./dialogs/create-bot-dialog";
+import { useBotsQuery, useBotsStatsQuery } from "@/features/signal-bot";
 import { useSelectedUser } from "@/contexts/selected-user-context";
 
 interface SignalBotClientProps {
-  selectedUser: UserWithAgent;
+  userId: string;
 }
 
-export function SignalBotClient({ selectedUser }: SignalBotClientProps) {
+export function SignalBotClient({ userId }: SignalBotClientProps) {
   const [showCreateDialog, setShowCreateDialog] = useState(false);
-  const { refreshSelectedUser } = useSelectedUser();
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+  const { selectedUser, refreshSelectedUser } = useSelectedUser();
 
   const {
-    data: signalBots = [],
-    isLoading,
-    refetch,
-  } = useQuery<SignalBot[]>({
-    queryKey: ["signal-bots", selectedUser.id],
-    queryFn: async () => {
-      const response = await axios.get("/api/signal-bots");
-      return response.data;
-    },
-    refetchInterval: 30000, // Refresh every 30 seconds for real-time stats
-    staleTime: 10000, // Consider data stale after 10 seconds
-  });
+    data: botsData,
+    isLoading: isBotsLoading,
+    isFetching: isBotsFetching,
+    error: botsError,
+    refetch: refetchBots,
+  } = useBotsQuery({ userId });
 
-  const activeBots = signalBots.filter(bot => bot.isActive);
-  const totalTrades = signalBots.reduce((sum, bot) => sum + bot.totalTrades, 0);
-  const totalPnl = signalBots.reduce((sum, bot) => sum + bot.totalPnl, 0);
+  const {
+    data: statsData,
+    isLoading: isStatsLoading,
+    isFetching: isStatsFetching,
+    error: statsError,
+    refetch: refetchStats,
+  } = useBotsStatsQuery({ userId });
 
-  // Calculate proper aggregated win rate from actual wins/losses
-  const totalWins = signalBots.reduce((sum, bot) => sum + (bot.winTrades || 0), 0);
-  const winRate = totalTrades > 0 ? (totalWins / totalTrades) * 100 : 0;
+  const signalBots = botsData?.bots ?? [];
+  const isLoading = (isBotsLoading || isStatsLoading) && signalBots.length === 0;
+  const isRefreshing = isBotsFetching || isStatsFetching;
+  const isError = !!botsError || !!statsError;
 
-  const handleBotCreated = async () => {
-    setShowCreateDialog(false);
-    refetch();
-    // Refresh selected user data to update portfolio status
+  const handleRefresh = async () => {
+    refetchBots();
+    refetchStats();
     await refreshSelectedUser();
   };
 
+  const handleBotCreated = async () => {
+    setShowCreateDialog(false);
+    handleRefresh();
+  };
+
   const handleBotUpdated = () => {
-    refetch();
+    refetchBots();
+    refetchStats();
   };
 
   if (isLoading) {
-    return <div>Loading signal bots...</div>;
+    return <SignalBotLoading />;
   }
 
-  if (signalBots.length === 0) {
+  if (isError) {
+    return <SignalBotErrorState
+      error={(botsError || statsError) as Error}
+      reset={handleRefresh}
+    />;
+  }
+
+  // Common Header Props
+  const header = (
+    <SignalBotHeader
+      totalBots={statsData?.totalBots ?? 0}
+      activeBots={statsData?.activeBots ?? 0}
+      onCreateBot={() => setShowCreateDialog(true)}
+      onRefresh={handleRefresh}
+      isRefreshing={isRefreshing}
+      userName={selectedUser?.name ?? undefined}
+      viewMode={viewMode}
+      onViewModeChange={setViewMode}
+    />
+  );
+
+  if (signalBots.length === 0 && !isBotsLoading) {
     return (
-      <>
-        <EmptyState onCreateBot={() => setShowCreateDialog(true)} />
+      <div className="space-y-6">
+        {header}
+        <SignalBotEmptyState onCreateBot={() => setShowCreateDialog(true)} />
         <CreateSignalBotDialog
           open={showCreateDialog}
           onOpenChange={setShowCreateDialog}
           onSuccess={handleBotCreated}
         />
-      </>
+      </div>
     );
   }
 
   return (
-    <div className="space-y-6">
-      <SignalBotHeader
-        totalBots={signalBots.length}
-        activeBots={activeBots.length}
-        onCreateBot={() => setShowCreateDialog(true)}
-      />
+    <div className="space-y-4 pb-20">
+      {header}
 
-      <SignalBotStats
-        totalBots={signalBots.length}
-        activeBots={activeBots.length}
-        totalTrades={totalTrades}
-        totalPnl={totalPnl}
-        winRate={winRate}
-      />
+      <div className="space-y-6 mt-4">
+        <section>
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-xl font-semibold text-slate-800">Performance Overview</h2>
+          </div>
+          <SignalBotStats stats={statsData} />
+        </section>
 
-      <SignalBotList
-        signalBots={signalBots}
-        onBotUpdated={handleBotUpdated}
-      />
+        <section>
+          <div className="flex items-center justify-between mb-4 border-b border-slate-100 pb-2">
+            <h2 className="text-xl font-semibold text-slate-800">Active Bots</h2>
+            <p className="text-sm text-slate-500 font-medium">
+              Showing {signalBots.length} registered bots
+            </p>
+          </div>
+          <SignalBotList
+            signalBots={signalBots}
+            onBotUpdated={handleBotUpdated}
+            userId={userId}
+            viewMode={viewMode}
+          />
+        </section>
+      </div>
 
       <CreateSignalBotDialog
         open={showCreateDialog}

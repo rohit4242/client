@@ -1,4 +1,4 @@
-import { PositionSide } from "@/types/signal-bot";
+type PositionSide = "Long" | "Short";
 import { clsx, type ClassValue } from "clsx";
 import { toast } from "sonner";
 import { twMerge } from "tailwind-merge";

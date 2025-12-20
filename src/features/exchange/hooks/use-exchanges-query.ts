@@ -24,6 +24,10 @@ export interface UseExchangesQueryOptions {
      * @default 60000 (60 seconds)
      */
     refetchInterval?: number | false;
+    /**
+     * User ID for fetching exchanges for a specific user
+     */
+    userId?: string;
 }
 
 /**

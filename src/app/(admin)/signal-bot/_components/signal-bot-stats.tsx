@@ -1,74 +1,52 @@
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Bot, Activity, TrendingUp, DollarSign } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
+import { BotStatsResult } from "@/features/signal-bot";
+import { StatCard } from "./stat-card";
 
 interface SignalBotStatsProps {
-  totalBots: number;
-  activeBots: number;
-  totalTrades: number;
-  totalPnl: number;
-  winRate: number;
+  stats?: BotStatsResult;
 }
 
-export function SignalBotStats({ totalBots, activeBots, totalTrades, totalPnl, winRate }: SignalBotStatsProps) {
+export function SignalBotStats({ stats }: SignalBotStatsProps) {
+  const {
+    totalBots = 0,
+    activeBots = 0,
+    totalTrades = 0,
+    totalPnl = 0,
+    winRate = 0
+  } = stats || {};
 
   return (
     <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium">Total Bots</CardTitle>
-          <Bot className="h-4 w-4 text-muted-foreground" />
-        </CardHeader>
-        <CardContent>
-          <div className="text-2xl font-bold">{totalBots}</div>
-          <p className="text-xs text-muted-foreground">
-            {activeBots} active
-          </p>
-        </CardContent>
-      </Card>
+      <StatCard
+        title="Total Bots"
+        value={totalBots}
+        icon={Bot}
+        subValue={`${activeBots} active`}
+      />
 
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium">Total Trades</CardTitle>
-          <Activity className="h-4 w-4 text-muted-foreground" />
-        </CardHeader>
-        <CardContent>
-          <div className="text-2xl font-bold">{totalTrades}</div>
-          <p className="text-xs text-muted-foreground">
-            All-time trades
-          </p>
-        </CardContent>
-      </Card>
+      <StatCard
+        title="Total Trades"
+        value={totalTrades}
+        icon={Activity}
+        subValue="All-time trades"
+      />
 
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium">Total P&L</CardTitle>
-          <DollarSign className="h-4 w-4 text-muted-foreground" />
-        </CardHeader>
-        <CardContent>
-          <div className={`text-2xl font-bold ${totalPnl >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-            {formatCurrency(totalPnl)}
-          </div>
-          <p className="text-xs text-muted-foreground">
-            All-time profit/loss
-          </p>
-        </CardContent>
-      </Card>
+      <StatCard
+        title="Total P&L"
+        value={formatCurrency(totalPnl)}
+        icon={DollarSign}
+        subValue="All-time profit/loss"
+        trend={totalPnl > 0 ? "up" : totalPnl < 0 ? "down" : "neutral"}
+      />
 
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium">Performance</CardTitle>
-          <TrendingUp className="h-4 w-4 text-muted-foreground" />
-        </CardHeader>
-        <CardContent>
-          <div className="text-2xl font-bold">
-            {totalTrades > 0 ? `${winRate.toFixed(1)}%` : 'N/A'}
-          </div>
-          <p className="text-xs text-muted-foreground">
-            Overall performance
-          </p>
-        </CardContent>
-      </Card>
+      <StatCard
+        title="Performance"
+        value={totalTrades > 0 ? `${winRate.toFixed(1)}%` : 'N/A'}
+        icon={TrendingUp}
+        subValue="Overall performance"
+        trend={winRate > 50 ? "up" : winRate > 0 ? "neutral" : undefined}
+      />
     </div>
   );
 }

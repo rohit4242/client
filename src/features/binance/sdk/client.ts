@@ -21,7 +21,7 @@ export interface BinanceConfig {
 }
 
 export interface BinanceError {
-    code: number;
+    code: string;
     msg: string;
 }
 
@@ -29,7 +29,7 @@ export interface BinanceResult<T = unknown> {
     success: boolean;
     data?: T;
     error?: string;
-    errorCode?: number;
+    errorCode?: string;
 }
 
 // ============================================================================
@@ -68,7 +68,7 @@ export function createMarginClient(config: BinanceConfig): MarginTrading {
  * Standardized Binance error handler
  * Converts Binance API errors to user-friendly messages
  */
-export function handleBinanceError(error: unknown): BinanceResult {
+export function handleBinanceError<T = unknown>(error: unknown): BinanceResult<T> {
     console.error("[Binance SDK] Error:", error);
 
     // Handle Binance API errors
@@ -107,8 +107,8 @@ export function handleBinanceError(error: unknown): BinanceResult {
 /**
  * Map Binance error codes to user-friendly messages
  */
-function mapBinanceErrorCode(code: number, originalMsg: string): string {
-    const errorMap: Record<number, string> = {
+function mapBinanceErrorCode(code: string, originalMsg: string): string {
+    const errorMap: Record<string, string> = {
         // Authentication errors
         "-1022": "Invalid API key or signature",
         "-2015": "Invalid API key, IP, or permissions for action",
@@ -118,6 +118,11 @@ function mapBinanceErrorCode(code: number, originalMsg: string): string {
         "-1111": "Precision is over the maximum defined for this asset",
         "-2010": "Insufficient balance",
         "-2011": "Unknown order",
+
+        // OCO order errors
+        "-1130": "Invalid data sent for OCO order",
+        "-1131": "Invalid listClientOrderId",
+        "-1107": "Mandatory parameter was not sent, was empty/null, or malformed",
 
         // Symbol errors
         "-1121": "Invalid symbol",
@@ -130,7 +135,7 @@ function mapBinanceErrorCode(code: number, originalMsg: string): string {
         "-1015": "Too many new orders - rate limit exceeded",
     };
 
-    return errorMap[code.toString()] || originalMsg || "Binance API error";
+    return errorMap[code] || originalMsg || "Binance API error";
 }
 
 /**
@@ -146,7 +151,7 @@ export function successResult<T>(data: T): BinanceResult<T> {
 /**
  * Error result helper
  */
-export function errorResult(error: string, code?: number): BinanceResult {
+export function errorResult<T = unknown>(error: string, code?: string): BinanceResult<T> {
     return {
         success: false,
         error,

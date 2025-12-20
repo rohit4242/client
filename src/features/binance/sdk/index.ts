@@ -34,13 +34,20 @@ export {
 export {
     placeMarginMarketOrder,
     placeMarginLimitOrder,
-    closeMarginPosition,
     getMarginAccount,
     getMaxBorrowable,
     borrowMargin,
     repayMargin,
+    closeMarginPosition,
+    placeMarginOCO,
+    placeMarginTakeProfit,
+    placeMarginStopLoss,
+    getMarginOCOOrder,
+    cancelMarginOCOOrder,
     type MarginOrderParams,
     type MarginAccountInfo,
+    type MarginOCOOrderParams,
+    type BinanceOCOOrderResponse,
 } from "./margin";
 
 // Market Data

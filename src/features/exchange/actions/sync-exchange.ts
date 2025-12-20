@@ -27,18 +27,17 @@ export async function syncExchange(
     input: SyncExchangeInput
 ): Promise<ServerActionResult<SyncExchangeResult>> {
     try {
-        const session = await requireAuth();
 
         // Validate input
         const validated = SyncExchangeInputSchema.parse(input);
-        const { id } = validated;
+        const { id, userId } = validated;
 
         // Verify ownership and active status
         const exchange = await db.exchange.findFirst({
             where: {
                 id,
                 portfolio: {
-                    userId: session.id,
+                    userId
                 },
             },
         });

@@ -1,6 +1,6 @@
 import { getUserWithRole } from "@/lib/auth-utils";
 import { redirect } from "next/navigation";
-import { getAllSignals } from "@/db/actions/customer/get-all-signals";
+import { getSignals } from "@/features/signals";
 import { SignalsTable } from "./_components/signals-table";
 import { Radio } from "lucide-react";
 
@@ -12,7 +12,7 @@ export default async function CustomerSignalsPage() {
   }
 
   // Fetch all customer signals
-  const signals = await getAllSignals();
+  const { signals } = await getSignals({ limit: 100 });
 
   return (
     <div className="space-y-6">

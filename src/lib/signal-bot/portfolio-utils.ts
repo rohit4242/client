@@ -1,4 +1,4 @@
-import { SignalBot } from "@/types/signal-bot";
+import { BotWithExchange } from "@/features/signal-bot";
 
 /**
  * Get the appropriate portfolio value for a bot based on its account type
@@ -6,7 +6,7 @@ import { SignalBot } from "@/types/signal-bot";
  * @returns Portfolio value (spotValue for SPOT bots, marginValue for MARGIN bots)
  * Falls back to totalValue if specific values are not available
  */
-export function getBotPortfolioValue(bot: SignalBot): number {
+export function getBotPortfolioValue(bot: BotWithExchange): number {
   if (!bot.exchange) return 0;
 
   if (bot.accountType === 'SPOT') {
@@ -25,7 +25,7 @@ export function getBotPortfolioValue(bot: SignalBot): number {
  * @param bot - Signal bot with exchange information
  * @returns Formatted string showing which portfolio value is being used
  */
-export function formatBotPortfolioDisplay(bot: SignalBot): string {
+export function formatBotPortfolioDisplay(bot: BotWithExchange): string {
   const value = getBotPortfolioValue(bot);
   const type = bot.accountType === 'SPOT' ? 'Spot' : 'Margin';
 
@@ -41,7 +41,7 @@ export function formatBotPortfolioDisplay(bot: SignalBot): string {
  * @param currentPrice - Current price of the asset
  * @returns Calculated position size in USD
  */
-export function calculateBotPositionSize(bot: SignalBot, currentPrice: number): {
+export function calculateBotPositionSize(bot: BotWithExchange, currentPrice: number): {
   portfolioValue: number;
   tradeAmount: number;
   tradeAmountType: string;

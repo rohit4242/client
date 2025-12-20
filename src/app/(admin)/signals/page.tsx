@@ -1,36 +1,20 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { SignalWithBot } from "@/db/actions/admin/get-all-signals";
-import { SignalsTable } from "./_components/signals-table";
+import { useSignalsQuery } from "@/features/signals";
+import { SignalsTable } from "@/features/signals/components/signals-table";
+import { UserSignalsManager } from "@/features/signals/components/user-signals-manager";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Radio } from "lucide-react";
+import { Radio, Loader2 } from "lucide-react";
 import { useSelectedUser } from "@/contexts/selected-user-context";
 import { NoUserSelected } from "../_components/no-user-selected";
-import { UserSignalsManager } from "./_components/user-signals-manager";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import axios from "axios";
 
 export default function SignalsPage() {
   const { selectedUser } = useSelectedUser();
-  const [signals, setSignals] = useState<SignalWithBot[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
 
-  useEffect(() => {
-    const fetchSignals = async () => {
-      try {
-        setIsLoading(true);
-        const response = await axios.get("/api/admin/signals");
-        setSignals(response.data);
-      } catch (error) {
-        console.error("Error fetching signals:", error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    fetchSignals();
-  }, []);
+  // Use the new feature hook for global signals
+  const { data, isLoading } = useSignalsQuery();
+  const signals = data?.signals || [];
 
   return (
     <div className="space-y-6">
@@ -50,14 +34,14 @@ export default function SignalsPage() {
 
       <Tabs defaultValue="all" className="space-y-6">
         <TabsList className="bg-slate-100 p-1 rounded-xl border border-slate-200">
-          <TabsTrigger 
+          <TabsTrigger
             value="all"
             className="rounded-lg data-[state=active]:bg-white data-[state=active]:text-teal-700 data-[state=active]:shadow-sm font-medium"
           >
             All Signals
           </TabsTrigger>
-          <TabsTrigger 
-            value="user" 
+          <TabsTrigger
+            value="user"
             disabled={!selectedUser}
             className="rounded-lg data-[state=active]:bg-white data-[state=active]:text-teal-700 data-[state=active]:shadow-sm font-medium"
           >
@@ -75,7 +59,10 @@ export default function SignalsPage() {
             </CardHeader>
             <CardContent className="pt-6">
               {isLoading ? (
-                <div className="p-8 text-center text-slate-500 font-medium">Loading signals...</div>
+                <div className="flex flex-col items-center justify-center p-12 text-slate-500">
+                  <Loader2 className="size-8 animate-spin text-teal-600 mb-4" />
+                  <p className="font-medium">Loading signals...</p>
+                </div>
               ) : (
                 <SignalsTable signals={signals} />
               )}
@@ -91,7 +78,7 @@ export default function SignalsPage() {
               </CardContent>
             </Card>
           ) : (
-            <UserSignalsManager selectedUser={selectedUser} />
+            <UserSignalsManager selectedUser={(selectedUser as any)} />
           )}
         </TabsContent>
       </Tabs>

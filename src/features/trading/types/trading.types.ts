@@ -19,7 +19,7 @@ export type SignalAction = "ENTER_LONG" | "EXIT_LONG" | "ENTER_SHORT" | "EXIT_SH
 /**
  * Trading source (who initiated the trade)
  */
-export type TradingSource = "MANUAL" | "SIGNAL_BOT";
+export type TradingSource = "MANUAL" | "BOT";
 
 /**
  * Main trading request interface
