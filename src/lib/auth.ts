@@ -6,7 +6,7 @@ export const auth = betterAuth({
   database: prismaAdapter(db, {
     provider: "postgresql",
   }),
-  trustedOrigins: ["http://localhost:3000", "https://bytix.ai"],
+  trustedOrigins: ["http://localhost:3000", "https://bytix.ai", "https://www.bytix.ai"],
   emailAndPassword: {
     enabled: true,
   },
