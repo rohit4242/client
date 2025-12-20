@@ -1,0 +1,32 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: bytix-app-local
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      - NODE_ENV=production
+    ports:
+      - "3000:3000"
+    networks:
+      - bytix-local
+
+  nginx:
+    image: nginx:alpine
+    container_name: bytix-nginx-local
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx.local.conf:/etc/nginx/nginx.conf:ro
+    networks:
+      - bytix-local
+    depends_on:
+      - app
+
+networks:
+  bytix-local:
+    driver: bridge

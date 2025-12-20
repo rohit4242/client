@@ -2,7 +2,7 @@ import { getUserWithRole } from "@/lib/auth-utils";
 import { redirect } from "next/navigation";
 import { getPortfolioStats } from "@/db/actions/customer/get-portfolio-stats";
 import { getRecentPositions } from "@/db/actions/customer/get-recent-positions";
-import { getRecentSignals } from "@/db/actions/customer/get-recent-signals";
+import { getSignals } from "@/features/signals";
 import { getPortfolioChartData } from "@/db/actions/customer/get-portfolio-chart-data";
 import { StatsCards } from "./_components/stats-cards";
 import { RecentPositions } from "./_components/recent-positions";
@@ -21,10 +21,10 @@ export default async function CustomerDashboardPage() {
   }
 
   // Fetch customer data
-  const [stats, recentPositions, recentSignals, chartData] = await Promise.all([
+  const [stats, recentPositions, { signals: recentSignals }, chartData] = await Promise.all([
     getPortfolioStats(),
     getRecentPositions(5),
-    getRecentSignals(5),
+    getSignals({ limit: 5, visibleOnly: true }),
     getPortfolioChartData("1M"), // Last 30 days
   ]);
 

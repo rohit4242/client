@@ -28,11 +28,10 @@ export function usePlaceOrderMutation(options?: UsePlaceOrderMutationOptions) {
         },
         onSuccess: (data) => {
             // Invalidate relevant queries
-            queryClient.invalidateQueries({ queryKey: queryKeys.positions._def });
-            queryClient.invalidateQueries({ queryKey: queryKeys.orders._def });
-            queryClient.invalidateQueries({ queryKey: queryKeys.portfolio._def });
-            queryClient.invalidateQueries({ queryKey: queryKeys.binance.balance._def });
-
+            queryClient.invalidateQueries({ queryKey: queryKeys.positions.all() });
+            queryClient.invalidateQueries({ queryKey: queryKeys.orders.all() });
+            queryClient.invalidateQueries({ queryKey: queryKeys.portfolio.all() });
+            queryClient.invalidateQueries({ queryKey: ["binance", "balance"] });
             toast.success("Order placed successfully!");
 
             options?.onSuccess?.(data);

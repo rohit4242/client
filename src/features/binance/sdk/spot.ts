@@ -208,37 +208,53 @@ export async function closeSpotPosition(
 /**
  * Get spot account balance
  */
-export async function getSpotBalance(
-    client: Spot
-): Promise<BinanceResult<{ balances: Array<{ asset: string; free: string; locked: string }> }>> {
+// ... (existing imports)
+
+export interface SpotBalance {
+    balances: Array<{
+        asset: string;
+        free: string;
+        locked: string;
+    }>;
+}
+
+// ... (existing interfaces)
+
+/**
+ * Get spot account balance
+ */
+export async function getSpotBalance(client: Spot): Promise<BinanceResult<SpotBalance>> {
     try {
         logRequest("getSpotBalance", {});
 
-        const response = await client.restAPI.account();
+        const response = await client.restAPI.getAccount();
         const data = await response.data();
 
         logResponse("getSpotBalance", data);
 
         return successResult({
-            balances: data.balances || [],
-        });
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            balances: (data as any).balances || [],
+        } as SpotBalance);
     } catch (error) {
-        return handleBinanceError(error);
+        return handleBinanceError<SpotBalance>(error);
     }
 }
+
 
 /**
  * Get asset balance for specific asset
  */
-export async function getAssetBalance(
-    client: Spot,
-    asset: string
-): Promise<BinanceResult<{ asset: string; free: string; locked: string }>> {
+export async function getAssetBalance(client: Spot, asset: string) {
     try {
         const balanceResult = await getSpotBalance(client);
 
         if (!balanceResult.success || !balanceResult.data) {
-            return balanceResult as BinanceResult<{ asset: string; free: string; locked: string }>;
+            throw new Error("Failed to fetch spot balance");
+        }
+
+        if (!asset) {
+            throw new Error("Asset is required");
         }
 
         const assetBalance = balanceResult.data.balances.find(
@@ -306,7 +322,8 @@ export async function cancelOrder(
     try {
         logRequest("cancelOrder", params);
 
-        const response = await client.restAPI.cancelOrder({
+
+        const response = await client.restAPI.deleteOrder({
             symbol: params.symbol,
             orderId: params.orderId,
         });

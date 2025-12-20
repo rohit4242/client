@@ -85,10 +85,7 @@ export async function getSymbolPrice(
 
         logResponse("getSymbolPrice", data);
 
-        return successResult({
-            symbol: data.symbol || symbol,
-            price: data.price || "0",
-        });
+        return successResult(data as SymbolPrice);
     } catch (error) {
         return handleBinanceError(error);
     }
@@ -129,7 +126,7 @@ export async function getSymbolInfo(
     try {
         logRequest("getSymbolInfo", { symbol });
 
-        const response = await client.restAPI.exchangeInformation({ symbol });
+        const response = await client.restAPI.exchangeInfo({ symbol });
         const data = await response.data();
 
         if (!data.symbols || data.symbols.length === 0) {
@@ -158,7 +155,7 @@ export async function getExchangeInfo(
     try {
         logRequest("getExchangeInfo", {});
 
-        const response = await client.restAPI.exchangeInformation({});
+        const response = await client.restAPI.exchangeInfo({});
         const data = await response.data();
 
         logResponse("getExchangeInfo", { symbolCount: data.symbols?.length || 0 });

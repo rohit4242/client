@@ -2,7 +2,7 @@
 
 import { useSelectedUser } from "@/contexts/selected-user-context";
 import { NoUserSelected } from "../_components/no-user-selected";
-import ManualTradingView from "@/components/trading/manual-trading-view";
+import { ManualTradingView } from "@/features/manual-trading";
 
 export default function ManualTradingPage() {
   const { selectedUser } = useSelectedUser();
@@ -29,7 +29,7 @@ export default function ManualTradingPage() {
           Trading for {selectedUser.name} ({selectedUser.email})
         </p>
       </div>
-      
+
       <div className="flex-1 min-h-0">
         <ManualTradingView selectedUser={selectedUser} />
       </div>

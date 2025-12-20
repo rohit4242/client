@@ -480,7 +480,8 @@ export function toSignalClient(signal: Signal): SignalClient {
  * Parse action string to Action enum
  */
 export function parseAction(action: string): Action | null {
-    const actionUpper = action.toUpperCase().replace(/\s+/g, "_");
+    // Handle both hyphens and underscores, and convert to uppercase
+    const actionNormalized = action.toUpperCase().replace(/[-\s]+/g, "_");
 
     const actionMap: Record<string, Action> = {
         ENTER_LONG: "ENTER_LONG",
@@ -496,7 +497,47 @@ export function parseAction(action: string): Action | null {
         COVER: "EXIT_SHORT",
     };
 
-    return actionMap[actionUpper] || null;
+    return actionMap[actionNormalized] || null;
+}
+
+/**
+ * Parse a custom string signal format
+ * Format: ACTION_EXCHANGE_SYMBOL_MESSAGE_SECRET
+ * Example: ENTER-LONG_BINANCE_BTCFDUSD_Sample _4M_e267d336-a8a5-4c4b-96ee-8b71983d30d3
+ */
+export function parseCustomSignal(signalStr: string): {
+    action: string | null;
+    symbol: string | null;
+    message: string | null;
+    secret: string | null;
+} | null {
+    if (!signalStr || typeof signalStr !== "string") return null;
+
+    // The format seems to be underscore delimited
+    // ENTER-LONG _ BINANCE _ BTCFDUSD _ Sample _4M _ e267d336-a8a5-4c4b-96ee-8b71983d30d3
+    // However, the message might contain underscores itself. 
+    // Usually, these are ACTION_EXCHANGE_SYMBOL_MESSAGE_SECRET
+
+    const parts = signalStr.split("_");
+
+    // We expect at least 4 parts: Action, Exchange, Symbol, Secret
+    // If there's more, the middle parts are likely the message
+    if (parts.length < 4) return null;
+
+    const action = parts[0];
+    // parts[1] is exchange (e.g., BINANCE), we don't strictly need it if botId is in URL
+    const symbol = parts[2];
+    const secret = parts[parts.length - 1];
+
+    // Message is everything between symbol and secret
+    const message = parts.slice(3, -1).join("_").trim();
+
+    return {
+        action,
+        symbol,
+        message: message || "Signal received via custom string",
+        secret
+    };
 }
 
 /**

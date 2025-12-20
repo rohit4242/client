@@ -46,7 +46,7 @@ export function useSpotBalanceQuery(options: UseSpotBalanceQueryOptions) {
             const result = await getSpotBalanceAction({ exchangeId });
 
             if (!result.success || !result.data) {
-                throw new Error(result.error || "Failed to fetch spot balance");
+                throw new Error("Failed to fetch spot balance");
             }
 
             return result.data;

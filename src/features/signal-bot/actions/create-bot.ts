@@ -26,33 +26,41 @@ export async function createBot(
         const validated = CreateBotInputSchema.parse(input);
         const { userId, ...botData } = validated;
 
-        // Use userId from input if provided (admin creating for customer)
-        const targetUserId = userId || user.id;
-
-        // Get user's portfolio
-        const portfolio = await db.portfolio.findFirst({
-            where: { userId: targetUserId },
-        });
-
-        if (!portfolio) {
-            return {
-                success: false,
-                error: "Portfolio not found - Please add an exchange first",
-            };
-        }
-
-        // Verify exchange exists and belongs to portfolio
-        const exchange = await db.exchange.findFirst({
-            where: {
-                id: botData.exchangeId,
-                portfolioId: portfolio.id,
-            },
+        // Verify exchange exists and get its portfolio
+        const exchange = await db.exchange.findUnique({
+            where: { id: botData.exchangeId },
+            include: { portfolio: true }
         });
 
         if (!exchange) {
             return {
                 success: false,
-                error: "Exchange not found or doesn't belong to this portfolio",
+                error: "Exchange not found",
+            };
+        }
+
+        const portfolio = exchange.portfolio;
+
+        // Permission check:
+        // 1. If user is owner of portfolio
+        // 2. If user is admin
+        // 3. If user is agent and customer is assigned to them
+        const isOwner = portfolio.userId === user.id;
+        const admin = user.role === "ADMIN";
+
+        let isAssignedAgent = false;
+        if (user.role === "AGENT") {
+            const customer = await db.user.findUnique({
+                where: { id: portfolio.userId },
+                select: { agentId: true }
+            });
+            isAssignedAgent = customer?.agentId === user.id;
+        }
+
+        if (!isOwner && !admin && !isAssignedAgent) {
+            return {
+                success: false,
+                error: "You don't have permission to create a bot for this exchange/portfolio",
             };
         }
 

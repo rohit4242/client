@@ -14,5 +14,4 @@ export {
     updatePositionWithExecution,
     createOrderRecord,
     deletePendingPosition,
-    createProtectiveOrders,
 } from "./position";

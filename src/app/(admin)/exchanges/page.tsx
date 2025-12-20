@@ -21,5 +21,5 @@ export default function ExchangesPage() {
     );
   }
 
-  return <ExchangesClient />;
+  return <ExchangesClient userId={selectedUser.id} />;
 }

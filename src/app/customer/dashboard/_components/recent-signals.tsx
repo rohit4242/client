@@ -1,11 +1,11 @@
-import { RecentSignal } from "@/db/actions/customer/get-recent-signals";
+import { SignalWithBot } from "@/features/signals";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Bot, CheckCircle2, XCircle, Clock } from "lucide-react";
 import Link from "next/link";
 
 interface RecentSignalsProps {
-  signals: RecentSignal[];
+  signals: SignalWithBot[];
 }
 
 export function RecentSignals({ signals }: RecentSignalsProps) {

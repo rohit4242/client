@@ -15,9 +15,9 @@ import {
     updatePositionWithExecution,
     createOrderRecord,
     deletePendingPosition,
-    createProtectiveOrders,
 } from "./position";
 import { recalculatePortfolioStatsInternal } from "@/db/actions/portfolio/recalculate-stats";
+import { db } from "@/lib/db/client";
 
 /**
  * Execute trading request
@@ -33,8 +33,7 @@ import { recalculatePortfolioStatsInternal } from "@/db/actions/portfolio/recalc
  * 5. Execute trade on Binance
  * 6. Update position with execution data
  * 7. Create order record
- * 8. Create protective orders (SL/TP)
- * 9. Recalculate portfolio stats
+ * 8. Recalculate portfolio stats
  * 
  * @param request - Trading request (manual or signal)
  * @returns Trading result with position and order IDs
@@ -74,8 +73,23 @@ export async function executeTradingRequest(
             availableBalance: validation.data.availableBalance,
         });
 
+
+        // Fetch bot data if available (for TP/SL fallback)
+        let bot = null;
+        if (request.botId) {
+            bot = await db.bot.findUnique({
+                where: { id: request.botId },
+                select: {
+                    tradeAmountType: true,
+                    tradeAmount: true,
+                    stopLoss: true,
+                    takeProfit: true,
+                }
+            });
+        }
+
         // Step 3: Calculate trade parameters
-        const tradeParams = await calculateTradeParams(normalized, validation.data);
+        const tradeParams = await calculateTradeParams(normalized, validation.data, bot);
         console.log("[Trading Engine] Trade params calculated:", {
             quantity: tradeParams.quantity,
             quoteOrderQty: tradeParams.quoteOrderQty,
@@ -102,32 +116,37 @@ export async function executeTradingRequest(
             };
         }
 
+        // Handle potentially different response types (Single Order vs OCO)
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        let executionData: any = binanceResult.data;
+
+        if ('orderListId' in binanceResult.data && 'orderReports' in binanceResult.data) {
+            // It's an OCO order, use the first order report as the primary execution record
+            // validation ensures orderReports exists and has length
+            executionData = binanceResult.data.orderReports[0];
+            console.log("[Trading Engine] OCO execution detected, using primary order:", executionData.orderId);
+        }
+
         console.log("[Trading Engine] Binance order executed:", {
-            orderId: binanceResult.data.orderId,
-            status: binanceResult.data.status,
+            orderId: executionData.orderId,
+            status: executionData.status,
         });
 
         // Step 6: Update position with execution data
-        await updatePositionWithExecution(position.id, binanceResult.data);
+        await updatePositionWithExecution(position.id, executionData);
         console.log("[Trading Engine] Position updated with execution data");
 
         // Step 7: Create order record
         const order = await createOrderRecord(
             position.id,
             position.portfolioId,
-            binanceResult.data,
+            executionData,
             normalized.order.accountType,
             normalized.order.sideEffectType
         );
         console.log("[Trading Engineering] Order record created:", order.id);
 
-        // Step 8: Create protective orders (if specified)
-        if (normalized.order.stopLoss || normalized.order.takeProfit) {
-            await createProtectiveOrders(position.id, normalized, tradeParams);
-            console.log("[Trading Engine] Protective orders created");
-        }
-
-        // Step 9: Recalculate portfolio stats
+        // Step 8: Recalculate portfolio stats
         try {
             await recalculatePortfolioStatsInternal(request.userId);
             console.log("[Trading Engine] Portfolio stats recalculated");
@@ -137,8 +156,8 @@ export async function executeTradingRequest(
         }
 
         // Calculate execution details
-        const executedQty = parseFloat(binanceResult.data.executedQty || "0");
-        const cummulativeQuoteQty = parseFloat(binanceResult.data.cummulativeQuoteQty || "0");
+        const executedQty = parseFloat(executionData.executedQty || "0");
+        const cummulativeQuoteQty = parseFloat(executionData.cummulativeQuoteQty || "0");
         const executedPrice = executedQty > 0 ? cummulativeQuoteQty / executedQty : tradeParams.expectedPrice;
 
         console.log("[Trading Engine] Execution completed successfully:", {

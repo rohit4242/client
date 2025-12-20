@@ -46,7 +46,7 @@ export function useMarginBalanceQuery(options: UseMarginBalanceQueryOptions) {
             const result = await getMarginBalanceAction({ exchangeId });
 
             if (!result.success || !result.data) {
-                throw new Error(result.error || "Failed to fetch margin balance");
+                throw new Error("Failed to fetch margin balance");
             }
 
             return result.data;

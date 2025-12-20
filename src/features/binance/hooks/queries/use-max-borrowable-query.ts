@@ -5,7 +5,6 @@
  */
 
 import { useQuery } from "@tanstack/react-query";
-import { queryKeys } from "@/lib/query/query-keys";
 import { getMaxBorrowableAction } from "../../actions/margin/get-max-borrowable";
 
 export interface UseMaxBorrowableQueryOptions {
@@ -49,7 +48,7 @@ export function useMaxBorrowableQuery(options: UseMaxBorrowableQueryOptions) {
             const result = await getMaxBorrowableAction({ exchangeId, asset });
 
             if (!result.success || !result.data) {
-                throw new Error(result.error || "Failed to fetch max borrowable");
+                throw new Error("Failed to fetch max borrowable");
             }
 
             return result.data;

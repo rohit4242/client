@@ -31,6 +31,7 @@ export const CreateExchangeInputSchema = z.object({
  */
 export const UpdateExchangeInputSchema = z.object({
     id: z.string().uuid("Invalid exchange ID"),
+    userId: z.string().optional(), // For admin updating exchange for customer
     name: z
         .string()
         .min(1, "Exchange name is required")
@@ -47,6 +48,7 @@ export const UpdateExchangeInputSchema = z.object({
  */
 export const DeleteExchangeInputSchema = z.object({
     id: z.string().uuid("Invalid exchange ID"),
+    userId: z.string().optional(), // For admin deleting exchange for customer
 });
 
 /**
@@ -54,6 +56,7 @@ export const DeleteExchangeInputSchema = z.object({
  */
 export const SyncExchangeInputSchema = z.object({
     id: z.string().uuid("Invalid exchange ID"),
+    userId: z.string().optional(), // For admin syncing exchange for customer
 });
 
 // ============================================================================

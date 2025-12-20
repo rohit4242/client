@@ -631,6 +631,7 @@ enum Side {
 }
 
 enum PositionStatus {
+  PENDING
   OPEN
   CLOSED
   CANCELED

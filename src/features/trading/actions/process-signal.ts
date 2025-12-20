@@ -10,46 +10,34 @@
 import { db } from "@/lib/db/client";
 import { executeTradingRequest } from "../engine";
 import type { TradingRequest, TradingResult, SignalAction } from "../types/trading.types";
-
-export interface WebhookPayload {
-    action: string;
-    symbol: string;
-    price?: number;
-    message?: string;
-}
+import { getSignalWithBot, markSignalProcessed } from "../utils/signal-utils";
 
 /**
  * Process signal action (Webhook)
  * 
  * Used by webhook endpoint to process trading signals
+ * Now works with signal ID instead of payload, fetches signal from database
  * 
- * @param botId - Signal bot ID
- * @param payload - Webhook payload
+ * @param signalId - Signal ID from database
  * @returns Trading result
  */
 export async function processSignalAction(
-    botId: string,
-    payload: WebhookPayload
+    signalId: string
 ): Promise<TradingResult> {
+    let signal;
+
     try {
-        // Get bot with exchange and portfolio
-        const bot = await db.bot.findUnique({
-            where: { id: botId, isActive: true },
-            include: {
-                portfolio: true,
-                exchange: true,
-            },
+        // Fetch signal with bot, portfolio, and exchange
+        signal = await getSignalWithBot(signalId);
+
+        const { bot } = signal;
+
+        console.log("[Process Signal] Processing signal:", {
+            signalId: signal.id,
+            botId: bot.id,
+            action: signal.action,
+            symbol: signal.symbol,
         });
-
-        if (!bot) {
-            return {
-                success: false,
-                error: "Bot not found or inactive",
-            };
-        }
-
-        // Normalize action to SignalAction type
-        const action = normalizeSignalAction(payload.action);
 
         // Determine account type and side effect type based on bot config
         const accountType = bot.accountType === "MARGIN" ? "MARGIN" : "SPOT";
@@ -58,14 +46,14 @@ export async function processSignalAction(
             : "NO_SIDE_EFFECT";
 
         // Calculate quantity based on bot configuration
-        // This will be handled by the validation layer using bot settings
-        const quoteOrderQty = bot.tradeAmount?.toString();
+        const tradeAmount = bot.tradeAmount?.toString();
+        const isBase = bot.tradeAmountType === "BASE";
 
         // Build trading request
         const tradingRequest: TradingRequest = {
-            userId: bot.portfolio.userId,  // FIXED: Access userId through portfolio
+            userId: bot.portfolio.userId,
             portfolioId: bot.portfolioId,
-            source: "SIGNAL_BOT",
+            source: "BOT",
             botId: bot.id,
             exchange: {
                 id: bot.exchange.id,
@@ -73,66 +61,48 @@ export async function processSignalAction(
                 apiSecret: bot.exchange.apiSecret,
             },
             order: {
-                action, // Signal action (ENTER_LONG, EXIT_LONG, etc.)
-                symbol: payload.symbol.toUpperCase(),
-                type: "MARKET", // Signals always use market orders for fast execution
+                action: signal.action as SignalAction,
+                symbol: signal.symbol.toUpperCase(),
+                type: bot.orderType === "LIMIT" ? "LIMIT" : "MARKET",
                 accountType,
-                quoteOrderQty, // Use bot's configured trade amount
+                quoteOrderQty: isBase ? undefined : tradeAmount,
+                quantity: isBase ? tradeAmount : undefined,
                 sideEffectType,
                 stopLoss: bot.stopLoss || undefined,
                 takeProfit: bot.takeProfit || undefined,
             },
         };
 
-        // Execute via SAME unified trading engine as manual trading
+        // Execute via unified trading engine
         const result = await executeTradingRequest(tradingRequest);
+
+        // Update signal with result
+        await markSignalProcessed(signalId, result);
+
+        console.log("[Process Signal] Signal processing complete:", {
+            signalId,
+            success: result.success,
+            positionId: result.positionId,
+        });
 
         return result;
     } catch (error) {
         console.error("[Process Signal] Error:", error);
-        return {
+
+        const errorResult: TradingResult = {
             success: false,
             error: error instanceof Error ? error.message : "Failed to process signal",
         };
+
+        // Update signal with error if we have signal ID
+        if (signal?.id) {
+            try {
+                await markSignalProcessed(signal.id, errorResult);
+            } catch (updateError) {
+                console.error("[Process Signal] Failed to update signal status:", updateError);
+            }
+        }
+
+        return errorResult;
     }
-}
-
-/**
- * Normalize webhook action to SignalAction type
- */
-function normalizeSignalAction(action: string): SignalAction {
-    const normalized = action.toUpperCase().replace(/-/g, "_");
-
-    const actionMap: Record<string, SignalAction> = {
-        ENTER_LONG: "ENTER_LONG",
-        ENTERLONG: "ENTER_LONG",
-        LONG: "ENTER_LONG",
-        BUY: "ENTER_LONG",
-
-        EXIT_LONG: "EXIT_LONG",
-        EXITLONG: "EXIT_LONG",
-        CLOSE_LONG: "EXIT_LONG",
-        CLOSELONG: "EXIT_LONG",
-        SELL_LONG: "EXIT_LONG",
-        SELL: "EXIT_LONG",
-
-        ENTER_SHORT: "ENTER_SHORT",
-        ENTERSHORT: "ENTER_SHORT",
-        SHORT: "ENTER_SHORT",
-
-        EXIT_SHORT: "EXIT_SHORT",
-        EXITSHORT: "EXIT_SHORT",
-        CLOSE_SHORT: "EXIT_SHORT",
-        CLOSESHORT: "EXIT_SHORT",
-        BUY_SHORT: "EXIT_SHORT",
-        COVER: "EXIT_SHORT",
-    };
-
-    const result = actionMap[normalized];
-
-    if (!result) {
-        throw new Error(`Invalid signal action: ${action}`);
-    }
-
-    return result;
 }

@@ -42,14 +42,6 @@ export const getMarginAccounts = cache(async (
         const [accounts, total] = await Promise.all([
             db.marginAccount.findMany({
                 where,
-                include: {
-                    exchange: {
-                        select: {
-                            id: true,
-                            name: true,
-                        },
-                    },
-                },
                 orderBy: {
                     createdAt: "desc",
                 },
@@ -57,10 +49,50 @@ export const getMarginAccounts = cache(async (
             db.marginAccount.count({ where }),
         ]);
 
+        // Get portfolio info to find the exchange
+        const exchange = await db.exchange.findFirst({
+            where: {
+                portfolio: {
+                    userId: targetUserId,
+                },
+                ...(exchangeId && { id: exchangeId }),
+            },
+            select: {
+                id: true,
+                name: true,
+            },
+        });
+
+        if (!exchange) {
+            console.error("Exchange not found for user:", targetUserId);
+            return {
+                accounts: [],
+                total: 0,
+            };
+        }
+
         // Transform to client format with calculations
         const enrichedAccounts = accounts.map((account) => {
-            const clientAccount = toMarginAccountClient(account);
-            return enrichMarginAccountWithExchange(clientAccount, account.exchange);
+            // Map Prisma model to Zod schema
+            const mappedAccount = {
+                ...account,
+                exchangeId: exchange.id,
+                totalAsset: account.totalAssetValue,
+                totalNetAsset: account.totalNetAssetValue,
+                totalMarginBalance: account.totalNetAssetValue, // Approximation
+                totalBorrowable: 0, // Not in DB
+                totalCollateral: account.totalAssetValue, // Approximation
+                totalInterestBTC: account.totalInterestAccrued,
+                totalInterestUSDT: 0,
+                tradeEnabled: account.tradeEnabled,
+                transferEnabled: account.transferEnabled,
+                borrowEnabled: true, // Default
+                lastSyncedAt: account.updatedAt, // Use updatedAt as proxy
+            };
+
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const clientAccount = toMarginAccountClient(mappedAccount as any);
+            return enrichMarginAccountWithExchange(clientAccount, exchange);
         });
 
         return {

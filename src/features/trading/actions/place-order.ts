@@ -94,8 +94,8 @@ export async function placeOrderAction(
         if (!result.success) {
             return {
                 success: false,
-                error: result.error,
-                validationErrors: result.validationErrors,
+                error: result.error || "Unknown error",
+                details: result.validationErrors,
             };
         }
 

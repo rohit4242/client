@@ -6,7 +6,19 @@
  */
 
 import type { NormalizedTradingRequest, ValidationResult, ValidationData } from "../types/trading.types";
-import { getSymbolInfoAction, getSymbolPriceAction, getSpotBalanceAction, getMarginBalanceAction, getMaxBorrowableAction } from "@/features/binance";
+import {
+    getSymbolInfo,
+    getSymbolPrice,
+    getSpotBalance,
+    getMarginAccount,
+    getMaxBorrowable,
+    getPriceFilter,
+    getLotSizeFilter,
+    getMinNotionalFilter,
+    createSpotClient,
+    createMarginClient,
+    type SymbolInfo
+} from "@/features/binance";
 import { db } from "@/lib/db/client";
 
 /**
@@ -25,11 +37,11 @@ export async function validateTradingRequest(
     const errors: string[] = [];
 
     try {
+        // Create client for market data
+        const client = createSpotClient(request.exchange);
+
         // 1. Get symbol information
-        const symbolInfoResult = await getSymbolInfoAction({
-            exchangeId: request.exchange.id,
-            symbol: request.order.symbol,
-        });
+        const symbolInfoResult = await getSymbolInfo(client, request.order.symbol);
 
         if (!symbolInfoResult.success || !symbolInfoResult.data) {
             errors.push(`Symbol ${request.order.symbol} not found or not tradeable`);
@@ -47,10 +59,7 @@ export async function validateTradingRequest(
         }
 
         // 2. Get current price
-        const priceResult = await getSymbolPriceAction({
-            exchangeId: request.exchange.id,
-            symbol: request.order.symbol,
-        });
+        const priceResult = await getSymbolPrice(client, request.order.symbol);
 
         if (!priceResult.success || !priceResult.data) {
             errors.push("Failed to fetch current price");
@@ -60,7 +69,7 @@ export async function validateTradingRequest(
         const currentPrice = parseFloat(priceResult.data.price);
 
         // 3. Validate bot limits (if signal)
-        if (request.source === "SIGNAL_BOT" && request.botId) {
+        if (request.source === "BOT" && request.botId) {
             const botValidation = await validateBotLimits(request.botId, request.order.symbol);
             if (!botValidation.isValid) {
                 errors.push(...(botValidation.errors || []));
@@ -69,12 +78,9 @@ export async function validateTradingRequest(
 
         // 4. Validate balance
         const balanceValidation = await validateBalance(
-            request.exchange.id,
-            request.order.accountType,
-            request.order.symbol,
+            request,
             currentPrice,
-            request.order.quantity,
-            request.order.quoteOrderQty
+            symbolInfo
         );
 
         if (!balanceValidation.isValid) {
@@ -149,12 +155,9 @@ async function validateBotLimits(
  * Validate user balance
  */
 async function validateBalance(
-    exchangeId: string,
-    accountType: "SPOT" | "MARGIN",
-    symbol: string,
+    request: NormalizedTradingRequest,
     currentPrice: number,
-    quantity?: string,
-    quoteOrderQty?: string
+    symbolInfo: SymbolInfo
 ): Promise<{
     isValid: boolean;
     errors?: string[];
@@ -162,6 +165,8 @@ async function validateBalance(
     maxBorrowable?: number;
 }> {
     const errors: string[] = [];
+    const { order, exchange } = request;
+    const { symbol, accountType, quantity, quoteOrderQty } = order;
 
     // Determine required balance
     let requiredBalance = 0;
@@ -172,14 +177,15 @@ async function validateBalance(
     }
 
     if (accountType === "SPOT") {
-        const balanceResult = await getSpotBalanceAction({ exchangeId });
+        const client = createSpotClient(exchange);
+        const balanceResult = await getSpotBalance(client);
 
         if (!balanceResult.success || !balanceResult.data) {
-            return { isValid: false, errors: ["Failed to fetch spot balance"] };
+            return { isValid: false, errors: [balanceResult.error || "Failed to fetch spot balance"] };
         }
 
-        // Get quote asset (assume USDT for now)
-        const quoteAsset = symbol.replace(/[A-Z]+/, "").replace(symbol.match(/^[A-Z]+/)?.[0] || "", "") || "USDT";
+        // Get quote asset from symbol info
+        const quoteAsset = symbolInfo.quoteAsset;
         const assetBalance = balanceResult.data.balances.find(b => b.asset === quoteAsset);
         const available = parseFloat(assetBalance?.free || "0");
 
@@ -194,17 +200,26 @@ async function validateBalance(
         };
     } else {
         // Margin account
-        const balanceResult = await getMarginBalanceAction({ exchangeId });
+        const client = createMarginClient(exchange);
+        const balanceResult = await getMarginAccount(client);
 
         if (!balanceResult.success || !balanceResult.data) {
-            return { isValid: false, errors: ["Failed to fetch margin balance"] };
+            return { isValid: false, errors: [balanceResult.error || "Failed to fetch margin balance"] };
         }
 
-        // For margin, we can borrow if needed
-        // Return success but provide available balance info
+        // For margin, we also want to know max borrowable for the base asset or quote asset?
+        // Usually we check if we can afford the trade with what we have + what we can borrow.
+        // For now, keep it simple and return the net BTC value as before, 
+        // but we could also get max borrowable for the specific asset.
+
+        const quoteAsset = symbolInfo.quoteAsset;
+        const maxBorrowResult = await getMaxBorrowable(client, quoteAsset);
+        const maxBorrowable = maxBorrowResult.success ? maxBorrowResult.data?.amount : 0;
+
         return {
             isValid: true,
             availableBalance: parseFloat(balanceResult.data.totalNetAssetOfBtc),
+            maxBorrowable,
         };
     }
 }
@@ -212,10 +227,10 @@ async function validateBalance(
 /**
  * Extract symbol filters from symbol info
  */
-function extractSymbolFilters(symbolInfo: any) {
-    const priceFilter = symbolInfo.filters.find((f: any) => f.filterType === "PRICE_FILTER");
-    const lotSizeFilter = symbolInfo.filters.find((f: any) => f.filterType === "LOT_SIZE");
-    const minNotionalFilter = symbolInfo.filters.find((f: any) => f.filterType === "MIN_NOTIONAL" || f.filterType === "NOTIONAL");
+function extractSymbolFilters(symbolInfo: SymbolInfo) {
+    const priceFilter = getPriceFilter(symbolInfo);
+    const lotSizeFilter = getLotSizeFilter(symbolInfo);
+    const minNotionalFilter = getMinNotionalFilter(symbolInfo);
 
     return {
         minPrice: priceFilter?.minPrice || "0",
@@ -224,6 +239,6 @@ function extractSymbolFilters(symbolInfo: any) {
         minQty: lotSizeFilter?.minQty || "0",
         maxQty: lotSizeFilter?.maxQty || "999999999",
         stepSize: lotSizeFilter?.stepSize || "0.00000001",
-        minNotional: minNotionalFilter?.minNotional || minNotionalFilter?.notional || "10",
+        minNotional: minNotionalFilter?.minNotional || (minNotionalFilter as any)?.notional || "10",
     };
 }

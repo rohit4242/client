@@ -92,7 +92,7 @@ export const queryKeys = {
     // Users (Admin)
     users: {
         all: () => ["users"] as const,
-        list: () => [...queryKeys.users.all(), "list"] as const,
+        list: (filters?: { role?: string; search?: string; limit?: number }) => [...queryKeys.users.all(), "list", filters] as const,
         detail: (id: string) => [...queryKeys.users.all(), "detail", id] as const,
         portfolio: (id: string) => [...queryKeys.users.all(), "portfolio", id] as const,
         orders: (id: string) => [...queryKeys.users.all(), "orders", id] as const,

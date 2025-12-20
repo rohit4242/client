@@ -24,24 +24,30 @@ export const ErrorCodes = {
   UNAUTHORIZED: "UNAUTHORIZED",
   FORBIDDEN: "FORBIDDEN",
   INVALID_CREDENTIALS: "INVALID_CREDENTIALS",
-  
+
   // Validation
   VALIDATION_ERROR: "VALIDATION_ERROR",
   INVALID_INPUT: "INVALID_INPUT",
   MISSING_REQUIRED_FIELD: "MISSING_REQUIRED_FIELD",
-  
+
   // Trading
   INSUFFICIENT_BALANCE: "INSUFFICIENT_BALANCE",
   INVALID_ORDER: "INVALID_ORDER",
   ORDER_FAILED: "ORDER_FAILED",
   POSITION_NOT_FOUND: "POSITION_NOT_FOUND",
-  
+
   // Exchange
   EXCHANGE_ERROR: "EXCHANGE_ERROR",
   EXCHANGE_UNAVAILABLE: "EXCHANGE_UNAVAILABLE",
   INVALID_API_KEY: "INVALID_API_KEY",
   RATE_LIMIT_EXCEEDED: "RATE_LIMIT_EXCEEDED",
-  
+
+  // Webhook
+  WEBHOOK_INVALID_BOT: "WEBHOOK_INVALID_BOT",
+  WEBHOOK_INVALID_PAYLOAD: "WEBHOOK_INVALID_PAYLOAD",
+  WEBHOOK_BOT_INACTIVE: "WEBHOOK_BOT_INACTIVE",
+  WEBHOOK_PROCESSING_FAILED: "WEBHOOK_PROCESSING_FAILED",
+
   // System
   INTERNAL_ERROR: "INTERNAL_ERROR",
   NOT_FOUND: "NOT_FOUND",
@@ -65,7 +71,7 @@ export function handleApiError(error: unknown): NextResponse {
   // Handle Binance API errors
   if (error && typeof error === "object" && "message" in error) {
     const errorMessage = (error as Error).message;
-    
+
     // Check for specific Binance error patterns
     if (errorMessage.includes("Invalid API-key")) {
       return NextResponse.json(
@@ -77,7 +83,7 @@ export function handleApiError(error: unknown): NextResponse {
         { status: 401 }
       );
     }
-    
+
     if (errorMessage.includes("Insufficient balance")) {
       return NextResponse.json(
         createErrorResponse(
@@ -88,7 +94,7 @@ export function handleApiError(error: unknown): NextResponse {
         { status: 400 }
       );
     }
-    
+
     if (errorMessage.includes("Too many requests") || errorMessage.includes("Rate limit")) {
       return NextResponse.json(
         createErrorResponse(

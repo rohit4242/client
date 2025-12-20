@@ -51,7 +51,7 @@ export function useSymbolInfoQuery(options: UseSymbolInfoQueryOptions) {
             const result = await getSymbolInfoAction({ exchangeId, symbol });
 
             if (!result.success || !result.data) {
-                throw new Error(result.error || "Failed to fetch symbol info");
+                throw new Error("Failed to fetch symbol info");
             }
 
             return result.data;

@@ -19,18 +19,17 @@ export async function updateExchange(
     input: UpdateExchangeInput
 ): Promise<ServerActionResult<ExchangeClient>> {
     try {
-        const session = await requireAuth();
 
         // Validate input
         const validated = UpdateExchangeInputSchema.parse(input);
-        const { id, ...updateData } = validated;
+        const { id, userId, ...updateData } = validated;
 
         // Verify ownership
         const existingExchange = await db.exchange.findFirst({
             where: {
                 id,
                 portfolio: {
-                    userId: session.id,
+                    userId,
                 },
             },
         });

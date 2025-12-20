@@ -22,6 +22,9 @@ export { useCreatePositionMutation } from "./hooks/use-create-position-mutation"
 export { useCreateSignalMutation } from "./hooks/use-create-signal-mutation";
 export { useDeleteSignalMutation } from "./hooks/use-delete-signal-mutation";
 export { useTradeValidation } from "./hooks/use-trade-validation";
+export { useTradingCalculations } from "./hooks/use-trading-calculations";
+export { useCreateBotForm } from "./hooks/use-create-bot-form";
+export { useUpdateBotForm } from "./hooks/use-update-bot-form";
 
 // Actions
 export { getBots, getActiveBots } from "./actions/get-bots";
@@ -61,6 +64,8 @@ export type {
     GetBotsResult,
     GetBotResult,
     GetSignalsResult,
+    BotStatsResult,
+    SignalAction,
 } from "./types/bot.types";
 
 // Schemas (for advanced use cases)
@@ -72,7 +77,16 @@ export {
     BotWithExchangeSchema,
     SignalSchema,
     SignalClientSchema,
+    ProcessSignalInputSchema
 } from "./schemas/bot.schema";
+
+// Components
+export { CreateBotForm } from "./components/create-bot-form";
+export { EditBotForm } from "./components/edit-bot-form";
+export { BotConfigurationCard } from "./components/bot-configuration-card";
+export { PositionLeverageCard } from "./components/position-leverage-card";
+export { TradeSimulationCard } from "./components/trade-simulation-card";
+export { RiskManagementCard } from "./components/risk-management-card";
 
 // Utility functions
 export {
