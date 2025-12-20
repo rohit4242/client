@@ -38,6 +38,14 @@ export interface MarginAccountInfo {
     tradeEnabled: boolean;
     transferEnabled: boolean;
     borrowEnabled: boolean;
+    userAssets: Array<{
+        asset: string;
+        free: string;
+        locked: string;
+        borrowed: string;
+        interest: string;
+        netAsset: string;
+    }>;
 }
 
 export interface MarginOCOOrderParams {
@@ -263,6 +271,14 @@ export async function getMarginAccount(
             tradeEnabled: data.tradeEnabled || false,
             transferEnabled: data.transferInEnabled || false,
             borrowEnabled: data.borrowEnabled || false,
+            userAssets: (data.userAssets || []).map((asset: any) => ({
+                asset: asset.asset,
+                free: asset.free,
+                locked: asset.locked,
+                borrowed: asset.borrowed,
+                interest: asset.interest,
+                netAsset: asset.netAsset,
+            })),
         });
     } catch (error) {
         return handleBinanceError(error);

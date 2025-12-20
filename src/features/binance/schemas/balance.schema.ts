@@ -47,6 +47,14 @@ export const MarginBalanceResultSchema = z.object({
     tradeEnabled: z.boolean(),
     transferEnabled: z.boolean(),
     borrowEnabled: z.boolean(),
+    userAssets: z.array(z.object({
+        asset: z.string(),
+        free: z.string(),
+        locked: z.string(),
+        borrowed: z.string(),
+        interest: z.string(),
+        netAsset: z.string(),
+    })),
 });
 
 // ============================================================================

@@ -3,8 +3,6 @@
 import { useMemo } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useQuery } from "@tanstack/react-query";
-import axios from "axios";
 import { toast } from "sonner";
 import {
     CreateBotInputSchema,
@@ -17,6 +15,7 @@ import { Exchange } from "@/types/exchange";
 import { useLivePrice } from "@/hooks/trading/use-live-price";
 import { useTradingCalculations, MaxBorrowData } from "./use-trading-calculations";
 import { useMaxBorrowableQuery } from "@/features/binance/hooks/queries/use-max-borrowable-query";
+import { useExchangesQuery } from "@/features/exchange/hooks/use-exchanges-query";
 
 interface UseCreateBotFormProps {
     onSuccess: (result: BotWithExchange) => void;
@@ -54,14 +53,8 @@ export function useCreateBotForm({ onSuccess, onOpenChange, open }: UseCreateBot
     const watchedSymbols = form.watch("symbols");
     const watchedMaxBorrowPercent = form.watch("maxBorrowPercent");
 
-    const { data: exchanges = [] } = useQuery<Exchange[]>({
-        queryKey: ["exchanges"],
-        queryFn: async () => {
-            const response = await axios.get("/api/exchanges");
-            return response.data;
-        },
-        enabled: open,
-    });
+    const { data: exchangesData } = useExchangesQuery({ enabled: open });
+    const exchanges = exchangesData?.exchanges ?? [];
 
     const activeExchanges = useMemo(() =>
         exchanges.filter(exchange => exchange.isActive),
