@@ -29,20 +29,9 @@ export function CreateBotForm({ onSuccess, onOpenChange, open }: CreateBotFormPr
         onSubmit,
         currentPrice,
         selectedSymbol,
+        baseAsset,
+        quoteAsset,
     } = useCreateBotForm({ onSuccess, onOpenChange, open });
-
-    // Extract base and quote assets from symbol
-    const extractAssets = (symbol: string) => {
-        const quoteAssets = ['USDT', 'FDUSD', 'BUSD', 'USDC'];
-        for (const quote of quoteAssets) {
-            if (symbol.endsWith(quote)) {
-                return { baseAsset: symbol.slice(0, -quote.length), quoteAsset: quote };
-            }
-        }
-        return { baseAsset: symbol.slice(0, -5), quoteAsset: symbol.slice(-5) };
-    };
-
-    const { baseAsset, quoteAsset } = extractAssets(selectedSymbol);
 
     const watchedTradeAmount = form.watch("tradeAmount");
     const watchedTradeAmountType = form.watch("tradeAmountType");

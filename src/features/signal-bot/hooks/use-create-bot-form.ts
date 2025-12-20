@@ -16,6 +16,7 @@ import {
 import { Exchange } from "@/types/exchange";
 import { useLivePrice } from "@/hooks/trading/use-live-price";
 import { useTradingCalculations, MaxBorrowData } from "./use-trading-calculations";
+import { useMaxBorrowableQuery } from "@/features/binance/hooks/queries/use-max-borrowable-query";
 
 interface UseCreateBotFormProps {
     onSuccess: (result: BotWithExchange) => void;
@@ -72,22 +73,42 @@ export function useCreateBotForm({ onSuccess, onOpenChange, open }: UseCreateBot
         [activeExchanges, watchedExchangeId]
     );
 
-    const { data: maxBorrowData, isLoading: isLoadingMaxBorrow } = useQuery<{ data: MaxBorrowData }>({
-        queryKey: ["maxBorrow", selectedExchange?.id, "USDT"],
-        queryFn: async () => {
-            if (!selectedExchange) throw new Error("No exchange selected");
-            const response = await axios.post("/api/margin/max-borrow", {
-                asset: "USDT",
-                apiKey: selectedExchange.apiKey,
-                apiSecret: selectedExchange.apiSecret,
-            });
-            return response.data;
-        },
-        enabled: open && watchedAccountType === "MARGIN" && !!selectedExchange,
+    const selectedSymbol = watchedSymbols?.[0] || "BTCFDUSD";
+
+    // Extract base and quote assets from symbol
+    const extractAssets = (symbol: string) => {
+        const quoteAssets = ['USDT', 'FDUSD', 'BUSD', 'USDC'];
+        for (const quote of quoteAssets) {
+            if (symbol.endsWith(quote)) {
+                return { baseAsset: symbol.slice(0, -quote.length), quoteAsset: quote };
+            }
+        }
+        return { baseAsset: symbol.slice(0, -5), quoteAsset: symbol.slice(-5) };
+    };
+
+    const { baseAsset, quoteAsset } = extractAssets(selectedSymbol);
+
+    const { data: maxBorrowData, isLoading: isLoadingMaxBorrow } = useMaxBorrowableQuery({
+        exchangeId: watchedExchangeId || "",
+        asset: quoteAsset,
+        enabled: open && watchedAccountType === "MARGIN" && !!watchedExchangeId,
         staleTime: 30000,
     });
 
-    const selectedSymbol = watchedSymbols?.[0] || "BTCFDUSD";
+    // Adapt maxBorrowData to the format expected by useTradingCalculations
+    const adaptedMaxBorrowData = useMemo(() => {
+        if (!maxBorrowData) return undefined;
+        return {
+            data: {
+                asset: maxBorrowData.asset,
+                maxBorrowable: maxBorrowData.amount.toString(),
+                currentBorrowed: "0",
+                interest: "0",
+                totalOwed: "0",
+            } as MaxBorrowData
+        };
+    }, [maxBorrowData]);
+
     const { price: currentPrice } = useLivePrice(selectedSymbol);
 
     const { data: validationResult, isLoading: isValidating, isError: isValidationError, error: validationError } = useTradeValidation({
@@ -106,7 +127,7 @@ export function useCreateBotForm({ onSuccess, onOpenChange, open }: UseCreateBot
         watchedLeverage,
         watchedMaxBorrowPercent,
         currentPrice,
-        maxBorrowData,
+        maxBorrowData: adaptedMaxBorrowData,
     });
 
     const createBotMutation = useCreateBotMutation();
@@ -165,5 +186,7 @@ export function useCreateBotForm({ onSuccess, onOpenChange, open }: UseCreateBot
         onSubmit,
         currentPrice,
         selectedSymbol,
+        baseAsset,
+        quoteAsset,
     };
 }
