@@ -6,7 +6,20 @@ This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-
 - **WebSocket-based live prices** - ~100ms latency for real-time crypto prices
 - **Auto-reconnection** - Seamless reconnection on connection drops
 - **Price animations** - Visual feedback with green/red flashes on price changes
-- See `WEBSOCKET_LIVE_PRICES.md` and `WEBSOCKET_INTEGRATION_COMPLETE.md` for details
+
+# Bytix AI
+
+A powerful trading automation platform.
+
+## 🚀 Deployment
+
+For production deployment on AWS EC2 with Docker and Nginx, please refer to the comprehensive documentation in the `docs/` folder:
+
+1. [AWS EC2 Setup](./docs/01-AWS-Setup.md)
+2. [Docker Deployment](./docs/02-Docker-Deployment.md)
+3. [Nginx & SSL Configuration](./docs/03-Nginx-SSL.md)
+4. [Maintenance & Best Practices](./docs/04-Maintenance-Best-Practices.md)
+5. [Troubleshooting](./docs/05-Troubleshooting.md)
 
 ### 📊 Trading Features
 - Manual trading with real-time market data
