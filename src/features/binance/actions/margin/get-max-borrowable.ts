@@ -12,6 +12,7 @@ import { requireAuth } from "@/lib/auth/session";
 import { handleServerError, successResult, ServerActionResult } from "@/lib/validation/error-handler";
 import { createMarginClient, getMaxBorrowable } from "../../sdk";
 import { z } from "zod";
+import { getSelectedUser } from "@/lib/selected-user-server";
 
 const GetMaxBorrowableInputSchema = z.object({
     exchangeId: z.string().uuid(),
@@ -22,23 +23,33 @@ export const getMaxBorrowableAction = cache(async (
     input: unknown
 ): Promise<ServerActionResult<{ amount: number; asset: string }>> => {
     try {
-        const session = await requireAuth();
+        const selectedUser = await getSelectedUser();
+
+        if (!selectedUser) {
+            return {
+                success: false,
+                error: "User not selected",
+            };
+        }
 
         // Validate input
         const validated = GetMaxBorrowableInputSchema.parse(input);
         const { exchangeId, asset } = validated;
+
+        console.log(`[getMaxBorrowableAction] Fetching for asset ${asset} on exchange ${exchangeId}`);
 
         // Get user's exchange
         const exchange = await db.exchange.findFirst({
             where: {
                 id: exchangeId,
                 portfolio: {
-                    userId: session.id,
+                    userId: selectedUser.id,
                 },
             },
         });
 
         if (!exchange) {
+            console.error(`[getMaxBorrowableAction] Exchange not found: ${exchangeId}`);
             return {
                 success: false,
                 error: "Exchange not found or access denied",
@@ -53,6 +64,7 @@ export const getMaxBorrowableAction = cache(async (
 
         // Get max borrowable from Binance
         const result = await getMaxBorrowable(client, asset);
+        console.log(`[getMaxBorrowableAction] Binance result for ${asset}:`, result);
 
         if (!result.success || !result.data) {
             return {

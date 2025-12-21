@@ -13,6 +13,7 @@ import { db } from "@/lib/db/client";
 import { createSpotClient, createMarginClient, closeSpotPosition, closeMarginPosition } from "@/features/binance";
 import type { TradingResult } from "../types/trading.types";
 import { revalidatePath } from "next/cache";
+import { getSelectedUser } from "@/lib/selected-user-server";
 
 const ClosePositionInputSchema = z.object({
     positionId: z.string().uuid(),
@@ -23,8 +24,15 @@ export async function closePositionAction(
     input: unknown
 ): Promise<ServerActionResult<TradingResult>> {
     try {
-        const session = await requireAuth();
+      const selectedUser = await getSelectedUser();
+    
 
+      if (!selectedUser) {
+        return {
+            success: false,
+            error: "User not selected",
+        };
+    }
         // Validate input
         const validated = ClosePositionInputSchema.parse(input);
         const { positionId, sideEffectType } = validated;
@@ -34,7 +42,7 @@ export async function closePositionAction(
             where: {
                 id: positionId,
                 portfolio: {
-                    userId: session.id,
+                    userId: selectedUser.id,
                 },
             },
             include: {

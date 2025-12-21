@@ -89,6 +89,7 @@ export async function calculateTradeParams(
             stopLossPercent,
             order.side === "BUY" ? "LONG" : "SHORT"
         );
+        stopLossPrice = parseFloat(formatPrice(stopLossPrice, 2));
     }
 
     if (takeProfitPercent) {
@@ -97,6 +98,7 @@ export async function calculateTradeParams(
             takeProfitPercent,
             order.side === "BUY" ? "LONG" : "SHORT"
         );
+        takeProfitPrice = parseFloat(formatPrice(takeProfitPrice, 2));
     }
 
     return {

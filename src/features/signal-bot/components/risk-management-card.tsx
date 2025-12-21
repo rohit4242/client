@@ -1,7 +1,13 @@
 "use client";
 
-import { Shield } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Shield, Target, TrendingDown, TrendingUp, Info } from "lucide-react";
+import {
+    Card,
+    CardContent,
+    CardHeader,
+    CardTitle,
+    CardDescription,
+} from "@/components/ui/card";
 import {
     FormField,
     FormItem,
@@ -11,33 +17,64 @@ import {
     FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import { UseFormReturn } from "react-hook-form";
-import { CreateBotInput } from "@/features/signal-bot";
+import { Badge } from "@/components/ui/badge";
+import { useBotFormContext } from "../contexts/bot-form-context";
 
-interface RiskManagementCardProps {
-    form: UseFormReturn<CreateBotInput>;
-}
+export function RiskManagementCard() {
+    const { form, calculations } = useBotFormContext();
 
-export function RiskManagementCard({ form }: RiskManagementCardProps) {
+    const stopLoss = form.watch("stopLoss");
+    const takeProfit = form.watch("takeProfit");
+
+    const rrRatio =
+        stopLoss && takeProfit ? (takeProfit / stopLoss).toFixed(2) : null;
+
     return (
-        <Card>
-            <CardHeader className="pb-4 border-b bg-muted/10">
-                <CardTitle className="flex items-center gap-2 text-lg">
-                    <Shield className="h-5 w-5 text-primary" />
-                    Risk Management
-                </CardTitle>
-                <CardDescription>
-                    Set automatic stop loss and take profit levels to protect your capital.
-                </CardDescription>
+        <Card className="overflow-hidden border-slate-200/60 shadow-sm">
+            <CardHeader className="pb-4 border-b bg-gradient-to-r from-blue-50/50 to-slate-50">
+                <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                        <div className="p-2 bg-blue-500/10 rounded-xl">
+                            <Shield className="h-5 w-5 text-blue-600" />
+                        </div>
+                        <div>
+                            <CardTitle className="text-base font-bold text-slate-800">
+                                Risk Management
+                            </CardTitle>
+                            <CardDescription className="text-xs">
+                                Protect your capital with automatic stop loss and take profit
+                            </CardDescription>
+                        </div>
+                    </div>
+                    {rrRatio && (
+                        <Badge
+                            variant="outline"
+                            className={`font-mono text-xs px-3 py-1 ${parseFloat(rrRatio) >= 2
+                                    ? "bg-green-50 border-green-200 text-green-700"
+                                    : parseFloat(rrRatio) >= 1
+                                        ? "bg-amber-50 border-amber-200 text-amber-700"
+                                        : "bg-red-50 border-red-200 text-red-700"
+                                }`}
+                        >
+                            R:R = 1:{rrRatio}
+                        </Badge>
+                    )}
+                </div>
             </CardHeader>
-            <CardContent className="space-y-5 pt-6">
-                <div className="grid grid-cols-2 gap-4">
+            <CardContent className="space-y-6 pt-6">
+                {/* Stop Loss and Take Profit */}
+                <div className="grid grid-cols-2 gap-6">
                     <FormField
                         control={form.control}
                         name="stopLoss"
                         render={({ field }) => (
                             <FormItem>
-                                <FormLabel>Stop Loss</FormLabel>
+                                <FormLabel className="flex items-center gap-2 text-sm font-semibold text-red-700">
+                                    <div className="p-1 bg-red-100 rounded">
+                                        <TrendingDown className="h-3.5 w-3.5 text-red-600" />
+                                    </div>
+                                    Stop Loss
+                                </FormLabel>
                                 <FormControl>
                                     <div className="relative">
                                         <Input
@@ -45,17 +82,23 @@ export function RiskManagementCard({ form }: RiskManagementCardProps) {
                                             step="0.1"
                                             min="0.1"
                                             max="50"
-                                            className="pr-6 font-mono"
+                                            className="pr-8 font-mono text-lg bg-white border-red-200 focus:border-red-400 focus:ring-red-400/20"
                                             {...field}
-                                            onChange={(e) => field.onChange(e.target.value ? Number(e.target.value) : null)}
+                                            onChange={(e) =>
+                                                field.onChange(
+                                                    e.target.value ? Number(e.target.value) : null
+                                                )
+                                            }
                                             value={field.value || ""}
                                             placeholder="2.0"
                                         />
-                                        <span className="absolute right-2.5 top-2.5 text-xs text-muted-foreground">%</span>
+                                        <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm font-semibold text-red-500">
+                                            %
+                                        </span>
                                     </div>
                                 </FormControl>
-                                <FormDescription>
-                                    Trigger stop loss at this % drop
+                                <FormDescription className="text-xs text-slate-500">
+                                    Close position when loss exceeds this %
                                 </FormDescription>
                                 <FormMessage />
                             </FormItem>
@@ -67,7 +110,12 @@ export function RiskManagementCard({ form }: RiskManagementCardProps) {
                         name="takeProfit"
                         render={({ field }) => (
                             <FormItem>
-                                <FormLabel>Take Profit</FormLabel>
+                                <FormLabel className="flex items-center gap-2 text-sm font-semibold text-green-700">
+                                    <div className="p-1 bg-green-100 rounded">
+                                        <TrendingUp className="h-3.5 w-3.5 text-green-600" />
+                                    </div>
+                                    Take Profit
+                                </FormLabel>
                                 <FormControl>
                                     <div className="relative">
                                         <Input
@@ -75,17 +123,23 @@ export function RiskManagementCard({ form }: RiskManagementCardProps) {
                                             step="0.1"
                                             min="0.1"
                                             max="100"
-                                            className="pr-6 font-mono"
+                                            className="pr-8 font-mono text-lg bg-white border-green-200 focus:border-green-400 focus:ring-green-400/20"
                                             {...field}
-                                            onChange={(e) => field.onChange(e.target.value ? Number(e.target.value) : null)}
+                                            onChange={(e) =>
+                                                field.onChange(
+                                                    e.target.value ? Number(e.target.value) : null
+                                                )
+                                            }
                                             value={field.value || ""}
                                             placeholder="4.0"
                                         />
-                                        <span className="absolute right-2.5 top-2.5 text-xs text-muted-foreground">%</span>
+                                        <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm font-semibold text-green-500">
+                                            %
+                                        </span>
                                     </div>
                                 </FormControl>
-                                <FormDescription>
-                                    Trigger take profit at this % gain
+                                <FormDescription className="text-xs text-slate-500">
+                                    Take profit when gain exceeds this %
                                 </FormDescription>
                                 <FormMessage />
                             </FormItem>
@@ -93,22 +147,71 @@ export function RiskManagementCard({ form }: RiskManagementCardProps) {
                     />
                 </div>
 
-                <div className="bg-blue-50 dark:bg-blue-950/20 border border-blue-100 dark:border-blue-900/50 p-4 rounded-lg">
+                {/* Exit Price Calculations */}
+                {calculations?.exitPrices &&
+                    calculations.currentPrice > 0 &&
+                    (stopLoss || takeProfit) && (
+                        <div className="rounded-xl border border-slate-200 bg-gradient-to-br from-slate-50 to-white p-4">
+                            <div className="flex items-center gap-2 mb-3">
+                                <Target className="h-4 w-4 text-slate-500" />
+                                <span className="text-xs font-semibold text-slate-600 uppercase tracking-wide">
+                                    Calculated Exit Prices
+                                </span>
+                            </div>
+                            <div className="grid grid-cols-2 gap-4">
+                                {calculations.exitPrices.stopLossPrice && (
+                                    <div className="bg-red-50/50 rounded-lg p-3 border border-red-100">
+                                        <div className="text-[10px] text-red-600 uppercase font-semibold mb-0.5">
+                                            Stop Loss at
+                                        </div>
+                                        <div className="font-mono font-bold text-lg text-red-700">
+                                            $
+                                            {calculations.exitPrices.stopLossPrice.toLocaleString(
+                                                undefined,
+                                                { minimumFractionDigits: 2, maximumFractionDigits: 2 }
+                                            )}
+                                        </div>
+                                    </div>
+                                )}
+                                {calculations.exitPrices.takeProfitPrice && (
+                                    <div className="bg-green-50/50 rounded-lg p-3 border border-green-100">
+                                        <div className="text-[10px] text-green-600 uppercase font-semibold mb-0.5">
+                                            Take Profit at
+                                        </div>
+                                        <div className="font-mono font-bold text-lg text-green-700">
+                                            $
+                                            {calculations.exitPrices.takeProfitPrice.toLocaleString(
+                                                undefined,
+                                                { minimumFractionDigits: 2, maximumFractionDigits: 2 }
+                                            )}
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    )}
+
+                {/* Tips Panel */}
+                <div className="bg-gradient-to-r from-blue-50 to-blue-100/30 border border-blue-100 p-4 rounded-xl">
                     <div className="flex items-start space-x-3">
-                        <Shield className="w-5 h-5 text-blue-600 dark:text-blue-400 mt-0.5 flex-shrink-0" />
-                        <div className="text-sm">
-                            <p className="font-medium text-blue-900 dark:text-blue-100">Risk Management Tips</p>
-                            <ul className="text-blue-700 dark:text-blue-300 mt-2 space-y-1.5 text-xs">
-                                <li className="flex items-center gap-1.5">
-                                    <div className="h-1 w-1 rounded-full bg-blue-500" />
+                        <div className="p-2 bg-blue-100 rounded-lg">
+                            <Info className="w-4 h-4 text-blue-600" />
+                        </div>
+                        <div>
+                            <p className="font-semibold text-sm text-blue-900">
+                                Risk Management Tips
+                            </p>
+                            <ul className="text-blue-700 mt-2 space-y-2 text-xs">
+                                <li className="flex items-center gap-2">
+                                    <div className="h-1.5 w-1.5 rounded-full bg-blue-500" />
                                     Use a 1:2 risk-reward ratio (e.g., 2% SL, 4% TP)
                                 </li>
-                                <li className="flex items-center gap-1.5">
-                                    <div className="h-1 w-1 rounded-full bg-blue-500" />
+                                <li className="flex items-center gap-2">
+                                    <div className="h-1.5 w-1.5 rounded-full bg-blue-500" />
                                     Never risk more than 2-5% of your portfolio per trade
                                 </li>
-                                <li className="flex items-center gap-1.5">
-                                    <div className="h-1 w-1 rounded-full bg-blue-500" />
+                                <li className="flex items-center gap-2">
+                                    <div className="h-1.5 w-1.5 rounded-full bg-blue-500" />
                                     Always set stop loss to protect your capital
                                 </li>
                             </ul>

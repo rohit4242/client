@@ -1,6 +1,6 @@
 /**
  * Signal Bot Feature Exports
- * 
+ *
  * Central export point for all signal bot functionality.
  */
 
@@ -25,6 +25,19 @@ export { useTradeValidation } from "./hooks/use-trade-validation";
 export { useTradingCalculations } from "./hooks/use-trading-calculations";
 export { useCreateBotForm } from "./hooks/use-create-bot-form";
 export { useUpdateBotForm } from "./hooks/use-update-bot-form";
+export { useBotMarketData } from "./hooks/use-bot-market-data";
+
+// Context
+export {
+    BotFormProvider,
+    useBotFormContext,
+} from "./contexts/bot-form-context";
+export type {
+    BotFormContextValue,
+    TradingCalculations,
+    MaxBorrowData,
+    TradeValidationResult,
+} from "./contexts/bot-form-context";
 
 // Actions
 export { getBots, getActiveBots } from "./actions/get-bots";
@@ -77,7 +90,7 @@ export {
     BotWithExchangeSchema,
     SignalSchema,
     SignalClientSchema,
-    ProcessSignalInputSchema
+    ProcessSignalInputSchema,
 } from "./schemas/bot.schema";
 
 // Components
@@ -88,10 +101,33 @@ export { PositionLeverageCard } from "./components/position-leverage-card";
 export { TradeSimulationCard } from "./components/trade-simulation-card";
 export { RiskManagementCard } from "./components/risk-management-card";
 
-// Utility functions
+// Utility functions (legacy - from schema)
 export {
     parseAction,
     calculateMaxBorrow,
     calculateTradeAmount,
     validateBotCanTrade,
 } from "./schemas/bot.schema";
+
+// Bot calculation utilities (legacy)
+export {
+    calculateExitPrices,
+    formatPriceChange,
+    calculateRiskReward,
+    calculatePositionSize,
+    calculateBorrowAmount,
+    calculateBuyingPower,
+    validateRiskParameters,
+    validateTradeAmount,
+    formatTradeNumber,
+    checkSufficientFunds,
+} from "./utils/bot-calculations";
+
+// New trading utilities
+export {
+    extractAssets,
+    calculateLeveragedPosition,
+    calculateUserMaxBorrow,
+    convertTradeAmount,
+} from "./utils/trading.utils";
+

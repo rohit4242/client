@@ -313,6 +313,59 @@ export async function getMaxBorrowable(
 }
 
 
+
+/**
+ * Place a Margin OCO (One-Cancels-the-Other) Order
+ * 
+ * **Important**: OCO orders are protective orders used to EXIT positions, not enter them.
+ * The `side` parameter should be the OPPOSITE of your original entry side.
+ * 
+ * An OCO order creates 2 orders:
+ * 1. LIMIT_MAKER order at `takeProfitPrice` (take profit)
+ * 2. STOP_LOSS_LIMIT order triggered at `stopLossTrigger` (stop loss)
+ * 
+ * When one order fills, the other is automatically cancelled.
+ * 
+ * @example
+ * // Example 1: Closing a LONG position (entry was BUY)
+ * // Entry: Bought 1 ETH at $3000
+ * // Exit: Sell at $3100 (TP) or $2900 (SL)
+ * placeMarginOCO(client, {
+ *   symbol: 'ETHUSDT',
+ *   side: 'SELL',              // OPPOSITE of entry (BUY → SELL)
+ *   quantity: '1.0',
+ *   takeProfitPrice: '3100',   // LIMIT order price (TP above entry)
+ *   stopLossTrigger: '2900',   // STOP trigger (SL below entry)
+ *   stopLossLimit: '2897',     // STOP execution price (slightly below trigger)
+ *   sideEffectType: 'AUTO_REPAY'
+ * });
+ * 
+ * @example
+ * // Example 2: Closing a SHORT position (entry was SELL)
+ * // Entry: Sold 1 ETH at $3000
+ * // Exit: Buy at $2900 (TP) or $3100 (SL)
+ * placeMarginOCO(client, {
+ *   symbol: 'ETHUSDT',
+ *   side: 'BUY',               // OPPOSITE of entry (SELL → BUY)
+ *   quantity: '1.0',
+ *   takeProfitPrice: '2900',   // LIMIT order price (TP below entry)
+ *   stopLossTrigger: '3100',   // STOP trigger (SL above entry)
+ *   stopLossLimit: '3103',     // STOP execution price (slightly above trigger)
+ *   sideEffectType: 'AUTO_REPAY'
+ * });
+ * 
+ * @param client - Binance margin trading client
+ * @param params - OCO order parameters
+ * @param params.symbol - Trading pair symbol (e.g., 'ETHUSDT')
+ * @param params.side - Order side (OPPOSITE of entry: BUY entry → SELL OCO, SELL entry → BUY OCO)
+ * @param params.quantity - Quantity to exit
+ * @param params.takeProfitPrice - Price for LIMIT_MAKER order (take profit level)
+ * @param params.stopLossTrigger - Trigger price for STOP_LOSS_LIMIT (stop loss level)
+ * @param params.stopLossLimit - Execution price for STOP_LOSS_LIMIT (slightly beyond trigger to ensure fill)
+ * @param params.isIsolated - Use isolated margin (default: false for cross margin)
+ * @param params.sideEffectType - Use 'AUTO_REPAY' to automatically repay borrowed funds on exit
+ * @returns Promise with OCO order response
+ */
 export async function placeMarginOCO(
     client: MarginTrading,
     params: {
@@ -323,7 +376,7 @@ export async function placeMarginOCO(
         stopLossTrigger: string; // SL Trigger (stopPrice)
         stopLossLimit: string;  // SL Execution (price)
         isIsolated?: boolean;
-        sideEffectType?: "NO_SIDE_EFFECT" | "AUTO_REPAY";
+        sideEffectType?: "NO_SIDE_EFFECT" | "AUTO_REPAY" | "MARGIN_BUY" | "AUTO_BORROW_REPAY";
     }
 ): Promise<BinanceResult<BinanceOCOOrderResponse>> {
     try {
@@ -333,9 +386,9 @@ export async function placeMarginOCO(
             symbol: params.symbol,
             side: params.side,
             quantity: params.quantity,
-            price: params.takeProfitPrice,          // TP Price
-            stopPrice: params.stopLossTrigger,      // SL Trigger
-            stopLimitPrice: params.stopLossLimit,   // SL Execution
+            price: params.takeProfitPrice,          // TP Price (LIMIT_MAKER)
+            stopPrice: params.stopLossTrigger,      // SL Trigger (STOP_LOSS_LIMIT trigger)
+            stopLimitPrice: params.stopLossLimit,   // SL Execution (STOP_LOSS_LIMIT price)
             stopLimitTimeInForce: "GTC",
             isIsolated: params.isIsolated ? "TRUE" : "FALSE",
         };
@@ -354,6 +407,7 @@ export async function placeMarginOCO(
         return handleBinanceError(error);
     }
 }
+
 
 export async function placeMarginTakeProfit(
     client: MarginTrading,

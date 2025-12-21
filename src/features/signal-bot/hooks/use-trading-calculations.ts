@@ -2,6 +2,8 @@
 
 import { useMemo } from "react";
 import { Exchange } from "@/types/exchange";
+import { calculateExitPrices, calculateRiskReward } from "../utils/bot-calculations";
+import { PartialExchange } from "../contexts/bot-form-context";
 
 export interface MaxBorrowData {
     asset: string;
@@ -12,7 +14,7 @@ export interface MaxBorrowData {
 }
 
 interface UseTradingCalculationsParams {
-    selectedExchange: Exchange | undefined;
+    selectedExchange: Exchange | PartialExchange | undefined;
     watchedAccountType: string;
     watchedTradeAmount: number;
     watchedTradeAmountType: "QUOTE" | "BASE";
@@ -20,6 +22,8 @@ interface UseTradingCalculationsParams {
     watchedMaxBorrowPercent: number;
     currentPrice: number | null;
     maxBorrowData: { data: MaxBorrowData } | undefined;
+    stopLoss?: number | null;
+    takeProfit?: number | null;
 }
 
 export function useTradingCalculations({
@@ -31,6 +35,8 @@ export function useTradingCalculations({
     watchedMaxBorrowPercent,
     currentPrice,
     maxBorrowData,
+    stopLoss,
+    takeProfit,
 }: UseTradingCalculationsParams) {
     return useMemo(() => {
         if (!selectedExchange) return null;
@@ -76,6 +82,22 @@ export function useTradingCalculations({
             ? totalBuyingPower >= leveragedValue
             : hasSufficientBalance;
 
+        // Calculate exit prices if TP/SL are provided
+        const exitPrices = price > 0 ? calculateExitPrices(
+            "Long",
+            price,
+            stopLoss ?? null,
+            takeProfit ?? null
+        ) : { stopLossPrice: null, takeProfitPrice: null };
+
+        // Calculate risk/reward metrics
+        const riskReward = price > 0 ? calculateRiskReward(
+            price,
+            exitPrices.stopLossPrice,
+            exitPrices.takeProfitPrice,
+            baseValue
+        ) : null;
+
         return {
             spotValue,
             marginValue,
@@ -92,11 +114,25 @@ export function useTradingCalculations({
             exceedsMaxBorrow: borrowAmount > userMaxBorrowable && watchedAccountType === "MARGIN" && leverage > 1,
             hasSufficientBalance,
             hasSufficientWithBorrow,
-            // New fields for conversion display
+            // Conversion display
             usdtValue,
             baseValue,
             currentPrice: price,
             hasPrice: price > 0,
+            // Exit prices
+            exitPrices,
+            riskReward,
         };
-    }, [selectedExchange, watchedAccountType, watchedTradeAmount, watchedTradeAmountType, watchedLeverage, maxBorrowData, currentPrice, watchedMaxBorrowPercent]);
+    }, [
+        selectedExchange,
+        watchedAccountType,
+        watchedTradeAmount,
+        watchedTradeAmountType,
+        watchedLeverage,
+        maxBorrowData,
+        currentPrice,
+        watchedMaxBorrowPercent,
+        stopLoss,
+        takeProfit
+    ]);
 }
