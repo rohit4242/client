@@ -9,7 +9,6 @@
 
 import { cache } from "react";
 import { db } from "@/lib/db/client";
-import { requireAuth } from "@/lib/auth/session";
 import { getSelectedUser } from "@/lib/selected-user-server";
 import { GetPositionsInputSchema, enrichPositionWithCalculations, toPositionClient, type GetPositionsInput, type GetPositionsResult } from "../schemas/position.schema";
 
@@ -21,7 +20,6 @@ export const getPositions = cache(async (
     input: GetPositionsInput = {}
 ): Promise<GetPositionsResult> => {
     try {
-        const session = await requireAuth();
 
         // Validate input
         const validated = GetPositionsInputSchema.parse(input);
@@ -29,7 +27,7 @@ export const getPositions = cache(async (
 
         // Check if admin is using selected user
         const selectedUser = await getSelectedUser();
-        const targetUserId = userId || selectedUser?.id || session.id;
+        const targetUserId = userId || selectedUser?.id;
 
         // Build where clause
         const where = {

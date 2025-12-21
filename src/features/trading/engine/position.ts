@@ -58,15 +58,28 @@ export async function updatePositionWithExecution(
     const cummulativeQuoteQty = parseFloat(binanceOrder.cummulativeQuoteQty || "0");
     const executedPrice = executedQty > 0 ? cummulativeQuoteQty / executedQty : 0;
 
+    const newStatus = binanceOrder.status === "FILLED" ? "OPEN" : "PENDING";
+
+    console.log('[Position Update] Updating position with execution data:', {
+        positionId,
+        orderId: binanceOrder.orderId,
+        orderStatus: binanceOrder.status,
+        newPositionStatus: newStatus,
+        executedQty,
+        executedPrice
+    });
+
     await db.position.update({
         where: { id: positionId },
         data: {
-            status: binanceOrder.status === "FILLED" ? "OPEN" : "PENDING",
+            status: newStatus,
             entryPrice: executedPrice,
             quantity: executedQty,
-            entryValue: cummulativeQuoteQty, // FIXED: Changed from 'value' to 'entryValue'
+            entryValue: cummulativeQuoteQty,
         },
     });
+
+    console.log('[Position Update] Position status updated to:', newStatus);
 }
 
 /**

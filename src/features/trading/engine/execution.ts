@@ -213,10 +213,11 @@ async function executeMarginTrade(
             console.error('⚠️  Please manually set protective orders on Binance');
             console.error('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
 
-            // Return entry result with critical warning
+            // ✅ FIX: Return ENTRY result (FILLED) instead of failing OCO result
+            // This ensures position status is set to OPEN, not PENDING
             return {
                 success: true,  // Entry succeeded
-                data: entryResult.data,
+                data: entryResult.data,  // ✅ Use entry order data
                 warning: `CRITICAL: Position opened successfully but protective orders FAILED to place. ${ocoResult.error}. Position is UNPROTECTED - please set SL/TP manually on Binance!`,
                 protectiveOrderError: ocoResult.error,
                 isUnprotected: true
@@ -227,8 +228,16 @@ async function executeMarginTrade(
             orderListId: ocoResult.data?.orderListId
         });
 
-        // Return OCO result (contains both entry info + protective orders)
-        return ocoResult;
+        // ✅ FIX: Return ENTRY result instead of OCO result
+        // OCO orders have status NEW, but entry is FILLED
+        // We need FILLED status to set position to OPEN
+        console.log('[Trading Engine] Returning entry order result (status: FILLED)');
+        return {
+            success: true,
+            data: entryResult.data,  // ✅ Use entry order data (FILLED)
+            protectiveOrders: ocoResult.data,  // Store OCO info as metadata
+            warning: undefined
+        } as any;
     }
 
     // Only TP → Use take profit order
@@ -245,6 +254,7 @@ async function executeMarginTrade(
         if (!tpResult.success) {
             console.error('[Trading Engine] WARNING: Entry filled but TP order failed:', tpResult.error);
             console.warn('[Trading Engine] Position is partially protected (no take profit)');
+            // ✅ FIX: Return entry result, not TP result
             return {
                 success: true,
                 data: entryResult.data,
@@ -254,7 +264,12 @@ async function executeMarginTrade(
         }
 
         console.log('[Trading Engine] Protective TP placed successfully:', tpResult.data?.orderId);
-        return tpResult;
+        // ✅ FIX: Return entry result instead of TP result
+        return {
+            success: true,
+            data: entryResult.data,
+            protectiveOrders: tpResult.data,
+        } as any;
     }
 
     // Only SL → Use stop loss order
@@ -276,6 +291,7 @@ async function executeMarginTrade(
             console.error('[Trading Engine] Position has NO STOP LOSS - High risk!');
             console.error('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
 
+            // ✅ FIX: Return entry result, not SL result
             return {
                 success: true,
                 data: entryResult.data,
@@ -286,7 +302,12 @@ async function executeMarginTrade(
         }
 
         console.log('[Trading Engine] Protective SL placed successfully:', slResult.data?.orderId);
-        return slResult;
+        // ✅ FIX: Return entry result instead of SL result
+        return {
+            success: true,
+            data: entryResult.data,
+            protectiveOrders: slResult.data,
+        } as any;
     }
 
     // Fallback (shouldn't reach here)

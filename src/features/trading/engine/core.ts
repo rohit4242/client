@@ -116,16 +116,8 @@ export async function executeTradingRequest(
             };
         }
 
-        // Handle potentially different response types (Single Order vs OCO)
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        let executionData: any = binanceResult.data;
-
-        if ('orderListId' in binanceResult.data && 'orderReports' in binanceResult.data) {
-            // It's an OCO order, use the first order report as the primary execution record
-            // validation ensures orderReports exists and has length
-            executionData = binanceResult.data.orderReports[0];
-            console.log("[Trading Engine] OCO execution detected, using primary order:", executionData.orderId);
-        }
+        const executionData: any = binanceResult.data;
 
         console.log("[Trading Engine] Binance order executed:", {
             orderId: executionData.orderId,
