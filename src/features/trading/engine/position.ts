@@ -165,10 +165,18 @@ export async function createOCOOrderRecords(
             ? 'TAKE_PROFIT'
             : 'STOP_LOSS';
 
+        // Map Binance order type to Prisma OrderOrderType enum
+        // LIMIT_MAKER → TAKE_PROFIT_LIMIT (for TP in OCO)
+        // STOP_LOSS_LIMIT → STOP_LOSS_LIMIT (for SL in OCO)
+        const prismaOrderType = orderReport.type === 'LIMIT_MAKER'
+            ? 'TAKE_PROFIT_LIMIT'
+            : orderReport.type; // STOP_LOSS_LIMIT is already valid
+
         console.log('[OCO Orders] Creating order:', {
             type: orderType,
             orderId: orderReport.orderId,
             binanceType: orderReport.type,
+            mappedOrderType: prismaOrderType,
             status: orderReport.status
         });
 
@@ -181,7 +189,7 @@ export async function createOCOOrderRecords(
                 symbol: orderReport.symbol,
                 side: orderReport.side as any,
                 type: orderType,
-                orderType: orderReport.type as any,
+                orderType: prismaOrderType as any,  // Use mapped type
                 status: orderReport.status as any,
                 price: parseFloat(orderReport.price || "0"),
                 quantity: parseFloat(orderReport.origQty || "0"),
