@@ -163,26 +163,25 @@ export async function closePositionAction(
             console.log('[Close Position] Closing with sideEffectType:', closeSideEffect);
 
             // Format quantity using actual LOT_SIZE from Binance
-            // const apiConfig = {
-            //     apiKey: exchange.apiKey,
-            //     apiSecret: exchange.apiSecret,
-            // };
-            // const lotSize = await getSymbolLotSize(apiConfig, position.symbol);
-            // let closeQuantity: number;
+            const apiConfig = {
+                apiKey: exchange.apiKey,
+                apiSecret: exchange.apiSecret,
+            };
+            const lotSize = await getSymbolLotSize(apiConfig, position.symbol);
+            let closeQuantity: number;
 
-            // if (lotSize) {
-            //     closeQuantity = formatQuantityToLotSize(position.quantity, lotSize);
-            //     console.log('[Close Position] Quantity formatted with LOT_SIZE:', {
-            //         stored: position.quantity,
-            //         lotSize,
-            //         formatted: closeQuantity
-            //     });
-            // } else {
-            //     // Fallback: use position.quantity rounded to 8 decimals
-            //     closeQuantity = parseFloat(position.quantity.toFixed(8));
-            //     console.log('[Close Position] Using fallback quantity (no LOT_SIZE):', closeQuantity);
-            // }
-            const closeQuantity = parseFloat(position.quantity.toFixed(8));
+            if (lotSize) {
+                closeQuantity = formatQuantityToLotSize(position.quantity, lotSize);
+                console.log('[Close Position] Quantity formatted with LOT_SIZE:', {
+                    stored: position.quantity,
+                    lotSize,
+                    formatted: closeQuantity
+                });
+            } else {
+                // Fallback: use position.quantity rounded to 8 decimals
+                closeQuantity = parseFloat(position.quantity.toFixed(8));
+                console.log('[Close Position] Using fallback quantity (no LOT_SIZE):', closeQuantity);
+            }
 
             result = await closeMarginPosition(client, {
                 symbol: position.symbol,
