@@ -66,7 +66,7 @@ export function ConnectExchangeDialog({
   });
 
   const ipAddresses = [
-    "13.50.243.93",
+    "13.229.125.75",
   ];
 
   const copyIpAddresses = () => {

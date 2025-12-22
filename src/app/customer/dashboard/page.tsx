@@ -10,7 +10,7 @@ import { RecentSignals } from "./_components/recent-signals";
 import { PerformanceChart } from "./_components/performance-chart";
 import { PortfolioPerformanceChart } from "./_components/portfolio-performance-chart";
 import { DashboardHeader } from "./_components/dashboard-header";
-import { getExchanges } from "@/db/actions/exchange/get-exchanges";
+import { getExchanges } from "@/features/exchange/actions/get-exchanges";
 import { AccountBalances } from "@/components/trading/account-balances";
 
 export default async function CustomerDashboardPage() {
@@ -28,8 +28,8 @@ export default async function CustomerDashboardPage() {
     getPortfolioChartData("1M"), // Last 30 days
   ]);
 
-  const exchanges = await getExchanges();
-  const exchange = exchanges[0] || null;
+  const exchangesResult = await getExchanges();
+  const exchange = exchangesResult.exchanges[0] || null;
 
   return (
     <div className="space-y-6">
