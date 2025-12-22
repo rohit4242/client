@@ -29,6 +29,7 @@ import { PositionsTableToolbar } from "./positions-table-toolbar";
 import { PositionsFilteredEmpty } from "./positions-filtered-empty";
 import { useLivePrices } from "@/hooks/trading/use-live-price";
 import { useClosePositionMutation, useForceCloseAllMutation } from "@/features/position";
+import { useCloseAllPositionsMutation } from "@/features/trading";
 import { useSelectedUser } from "@/contexts/selected-user-context";
 import { usePositionsFilter } from "../_hooks/use-positions-filter";
 import { PositionDataTable } from "./position-data-table";
@@ -53,6 +54,7 @@ export function PositionsTable({
 
     // Mutation hooks
     const closeMutation = useClosePositionMutation();
+    const closeAllMutation = useCloseAllPositionsMutation();
     const forceCloseAllMutation = useForceCloseAllMutation();
     const { selectedUser } = useSelectedUser();
 
@@ -95,15 +97,9 @@ export function PositionsTable({
         }
     }, [closeMutation]);
 
-    const handleCloseAllPositions = useCallback(async () => {
-        const openPositions = filteredPositions.filter(p => p.status === "OPEN");
-        if (openPositions.length === 0) return;
-
-        for (const position of openPositions) {
-            closeMutation.mutate({ positionId: position.id });
-            await new Promise(resolve => setTimeout(resolve, 300));
-        }
-    }, [closeMutation, filteredPositions]);
+    const handleCloseAllPositions = useCallback(() => {
+        closeAllMutation.mutate();
+    }, [closeAllMutation]);
 
     const handleForceCloseAll = useCallback(() => {
         forceCloseAllMutation.mutate({});
@@ -138,7 +134,7 @@ export function PositionsTable({
                         onRefresh={onRefresh}
                         isRefreshing={isRefreshing}
                         onCloseAll={handleCloseAllPositions}
-                        isClosingAll={closeMutation.isPending}
+                        isClosingAll={closeAllMutation.isPending}
                         onForceCloseAll={handleForceCloseAll}
                         isForceClosing={forceCloseAllMutation.isPending}
                         positionsCount={positions.length}
