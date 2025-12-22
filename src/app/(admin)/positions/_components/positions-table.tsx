@@ -29,7 +29,7 @@ import { PositionsTableToolbar } from "./positions-table-toolbar";
 import { PositionsFilteredEmpty } from "./positions-filtered-empty";
 import { useLivePrices } from "@/hooks/trading/use-live-price";
 import { useClosePositionMutation, useForceCloseAllMutation } from "@/features/position";
-import { useCloseAllPositionsMutation } from "@/features/trading";
+import { useCloseAllPositionsMutation } from "@/features/trading/hooks";
 import { useSelectedUser } from "@/contexts/selected-user-context";
 import { usePositionsFilter } from "../_hooks/use-positions-filter";
 import { PositionDataTable } from "./position-data-table";
