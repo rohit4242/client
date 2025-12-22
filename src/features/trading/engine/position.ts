@@ -59,6 +59,49 @@ export async function updatePositionWithExecution(
     const cummulativeQuoteQty = parseFloat(binanceOrder.cummulativeQuoteQty || "0");
     const executedPrice = executedQty > 0 ? cummulativeQuoteQty / executedQty : 0;
 
+    // Calculate actual quantity after trading fees
+    let actualQuantity = executedQty;
+    let totalCommission = 0;
+    let commissionAsset = '';
+
+    if (binanceOrder.fills && binanceOrder.fills.length > 0) {
+        // Extract base asset from symbol (e.g., BTC from BTCUSDT)
+        const baseAsset = binanceOrder.symbol.replace(/USDT|BUSD|USDC|BNB$/i, '');
+
+        // Sum up all commissions (in case of multiple fills)
+        totalCommission = binanceOrder.fills.reduce((sum, fill) => {
+            const commission = parseFloat(fill.commission || "0");
+            const asset = fill.commissionAsset;
+
+            // Only sum if commission is in base asset
+            if (asset === baseAsset) {
+                return sum + commission;
+            }
+            return sum;
+        }, 0);
+
+        commissionAsset = binanceOrder.fills[0].commissionAsset;
+
+        // If commission is in base asset (e.g., BTC), subtract from quantity
+        if (commissionAsset === baseAsset) {
+            actualQuantity = executedQty - totalCommission;
+        }
+        // If commission is in quote asset (USDT) or BNB, quantity remains the same
+        // (fee already deducted from cummulativeQuoteQty or paid separately)
+
+        console.log('[Position Update] Fee calculation:', {
+            symbol: binanceOrder.symbol,
+            baseAsset,
+            executedQty,
+            totalCommission,
+            commissionAsset,
+            actualQuantity,
+            feeDeducted: executedQty - actualQuantity
+        });
+    } else {
+        console.log('[Position Update] No fills data, using executedQty as-is');
+    }
+
     const newStatus = binanceOrder.status === "FILLED" ? "OPEN" : "PENDING";
 
     console.log('[Position Update] Updating position with execution data:', {
@@ -66,7 +109,7 @@ export async function updatePositionWithExecution(
         orderId: binanceOrder.orderId,
         orderStatus: binanceOrder.status,
         newPositionStatus: newStatus,
-        executedQty,
+        actualQuantity,
         executedPrice,
         hasOCO: !!ocoOrderIds
     });
@@ -74,7 +117,7 @@ export async function updatePositionWithExecution(
     const updateData: any = {
         status: newStatus,
         entryPrice: executedPrice,
-        quantity: executedQty,
+        quantity: actualQuantity,  // Store actual quantity after fees
         entryValue: cummulativeQuoteQty,
     };
 
