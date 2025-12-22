@@ -15,6 +15,7 @@ import {
     updatePositionWithExecution,
     createOrderRecord,
     deletePendingPosition,
+    createOCOOrderRecords,
 } from "./position";
 import { recalculatePortfolioStatsInternal } from "@/db/actions/portfolio/recalculate-stats";
 import { db } from "@/lib/db/client";
@@ -31,9 +32,10 @@ import { db } from "@/lib/db/client";
  * 3. Calculate trade parameters (quantities, prices)
  * 4. Create pending position in database
  * 5. Execute trade on Binance
- * 6. Update position with execution data
- * 7. Create order record
- * 8. Recalculate portfolio stats
+ * 6. Create OCO order records (if protective orders present)
+ * 7. Update position with execution data and OCO references
+ * 8. Create entry order record
+ * 9. Recalculate portfolio stats
  * 
  * @param request - Trading request (manual or signal)
  * @returns Trading result with position and order IDs
@@ -124,11 +126,31 @@ export async function executeTradingRequest(
             status: executionData.status,
         });
 
-        // Step 6: Update position with execution data
-        await updatePositionWithExecution(position.id, executionData);
+        // Step 6: Check for protective orders (OCO) in result
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const hasProtectiveOrders = (binanceResult as any).protectiveOrders;
+        let ocoOrderIds: { tpOrderId?: string; slOrderId?: string } | undefined;
+
+        if (hasProtectiveOrders) {
+            console.log('[Trading Engine] Creating OCO order records');
+
+            // Create order records for TP and SL
+            ocoOrderIds = await createOCOOrderRecords(
+                position.id,
+                position.portfolioId,
+                hasProtectiveOrders,
+                normalized.order.accountType,
+                normalized.order.sideEffectType
+            );
+
+            console.log('[Trading Engine] OCO orders saved:', ocoOrderIds);
+        }
+
+        // Step 7: Update position with execution data and OCO references
+        await updatePositionWithExecution(position.id, executionData, ocoOrderIds);
         console.log("[Trading Engine] Position updated with execution data");
 
-        // Step 7: Create order record
+        // Step 8: Create order record
         const order = await createOrderRecord(
             position.id,
             position.portfolioId,
@@ -138,7 +160,7 @@ export async function executeTradingRequest(
         );
         console.log("[Trading Engineering] Order record created:", order.id);
 
-        // Step 8: Recalculate portfolio stats
+        // Step 9: Recalculate portfolio stats
         try {
             await recalculatePortfolioStatsInternal(request.userId);
             console.log("[Trading Engine] Portfolio stats recalculated");

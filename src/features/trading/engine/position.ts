@@ -6,7 +6,7 @@
 
 import { db } from "@/lib/db/client";
 import type { NormalizedTradingRequest, TradeParams } from "../types/trading.types";
-import type { BinanceOrderResponse } from "@/features/binance";
+import type { BinanceOrderResponse, BinanceOCOOrderResponse } from "@/features/binance";
 import { determinePositionSide } from "./normalization";
 
 /**
@@ -52,7 +52,8 @@ export async function createPendingPosition(
  */
 export async function updatePositionWithExecution(
     positionId: string,
-    binanceOrder: BinanceOrderResponse
+    binanceOrder: BinanceOrderResponse,
+    ocoOrderIds?: { tpOrderId?: string; slOrderId?: string }
 ): Promise<void> {
     const executedQty = parseFloat(binanceOrder.executedQty || "0");
     const cummulativeQuoteQty = parseFloat(binanceOrder.cummulativeQuoteQty || "0");
@@ -66,17 +67,33 @@ export async function updatePositionWithExecution(
         orderStatus: binanceOrder.status,
         newPositionStatus: newStatus,
         executedQty,
-        executedPrice
+        executedPrice,
+        hasOCO: !!ocoOrderIds
     });
+
+    const updateData: any = {
+        status: newStatus,
+        entryPrice: executedPrice,
+        quantity: executedQty,
+        entryValue: cummulativeQuoteQty,
+    };
+
+    // Store OCO order IDs in position for quick reference
+    if (ocoOrderIds) {
+        if (ocoOrderIds.tpOrderId) {
+            updateData.takeProfitOrderId = ocoOrderIds.tpOrderId;
+            updateData.takeProfitStatus = "NEW";
+        }
+        if (ocoOrderIds.slOrderId) {
+            updateData.stopLossOrderId = ocoOrderIds.slOrderId;
+            updateData.stopLossStatus = "NEW";
+        }
+        console.log('[Position Update] OCO order IDs stored:', ocoOrderIds);
+    }
 
     await db.position.update({
         where: { id: positionId },
-        data: {
-            status: newStatus,
-            entryPrice: executedPrice,
-            quantity: executedQty,
-            entryValue: cummulativeQuoteQty,
-        },
+        data: updateData,
     });
 
     console.log('[Position Update] Position status updated to:', newStatus);
@@ -120,6 +137,80 @@ export async function createOrderRecord(
         id: order.id,
         orderId: order.orderId,
     };
+}
+
+/**
+ * Create order records for OCO protective orders
+ * OCO orders contain two legs: Take Profit (LIMIT_MAKER) and Stop Loss (STOP_LOSS_LIMIT)
+ * This function creates separate Order records for each leg
+ */
+export async function createOCOOrderRecords(
+    positionId: string,
+    portfolioId: string,
+    ocoData: BinanceOCOOrderResponse,
+    accountType: "SPOT" | "MARGIN",
+    sideEffectType?: "NO_SIDE_EFFECT" | "MARGIN_BUY" | "AUTO_REPAY"
+): Promise<{ tpOrderId?: string; slOrderId?: string }> {
+    const result: { tpOrderId?: string; slOrderId?: string } = {};
+
+    console.log('[OCO Orders] Creating order records for OCO:', {
+        orderListId: ocoData.orderListId,
+        numOrders: ocoData.orderReports?.length || 0
+    });
+
+    // Extract order details from OCO response
+    for (const orderReport of ocoData.orderReports || []) {
+        // Determine order type based on Binance order type
+        const orderType = orderReport.type === 'LIMIT_MAKER'
+            ? 'TAKE_PROFIT'
+            : 'STOP_LOSS';
+
+        console.log('[OCO Orders] Creating order:', {
+            type: orderType,
+            orderId: orderReport.orderId,
+            binanceType: orderReport.type,
+            status: orderReport.status
+        });
+
+        const order = await db.order.create({
+            data: {
+                positionId,
+                portfolioId,
+                orderId: orderReport.orderId.toString(),
+                clientOrderId: orderReport.clientOrderId || null,
+                symbol: orderReport.symbol,
+                side: orderReport.side as any,
+                type: orderType,
+                orderType: orderReport.type as any,
+                status: orderReport.status as any,
+                price: parseFloat(orderReport.price || "0"),
+                quantity: parseFloat(orderReport.origQty || "0"),
+                executedQty: parseFloat(orderReport.executedQty || "0"),
+                cummulativeQuoteQty: parseFloat(orderReport.cummulativeQuoteQty || "0"),
+                value: parseFloat(orderReport.price || "0") * parseFloat(orderReport.origQty || "0"),
+                fillPercent: 0,
+                accountType: accountType,
+                sideEffectType: sideEffectType as any || "NO_SIDE_EFFECT",
+                transactTime: new Date(orderReport.transactTime || Date.now()),
+            },
+        });
+
+        // Track which order ID corresponds to TP vs SL
+        if (orderType === 'TAKE_PROFIT') {
+            result.tpOrderId = order.orderId;
+        } else {
+            result.slOrderId = order.orderId;
+        }
+
+        console.log('[OCO Orders] Order created:', {
+            type: orderType,
+            dbId: order.id,
+            orderId: order.orderId
+        });
+    }
+
+    console.log('[OCO Orders] All OCO orders created:', result);
+    return result;
 }
 
 /**
