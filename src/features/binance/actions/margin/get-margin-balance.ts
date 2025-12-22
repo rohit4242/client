@@ -8,7 +8,6 @@
 
 import { cache } from "react";
 import { db } from "@/lib/db/client";
-import { requireAuth } from "@/lib/auth/session";
 import { handleServerError, successResult, ServerActionResult } from "@/lib/validation/error-handler";
 import { GetMarginBalanceInputSchema, type MarginBalanceResult } from "../../schemas/balance.schema";
 import { createMarginClient, getMarginAccount } from "../../sdk";
@@ -17,19 +16,15 @@ export const getMarginBalanceAction = cache(async (
     input: unknown
 ): Promise<ServerActionResult<MarginBalanceResult>> => {
     try {
-        const session = await requireAuth();
-
         // Validate input
         const validated = GetMarginBalanceInputSchema.parse(input);
-        const { exchangeId } = validated;
+        const { exchangeId, userId } = validated;
 
         // Get user's exchange
         const exchange = await db.exchange.findFirst({
             where: {
                 id: exchangeId,
-                portfolio: {
-                    userId: session.id,
-                },
+                portfolioId: userId,
             },
         });
 

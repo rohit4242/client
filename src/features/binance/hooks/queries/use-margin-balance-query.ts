@@ -14,6 +14,10 @@ export interface UseMarginBalanceQueryOptions {
      */
     exchangeId: string;
     /**
+     * User ID (for admin viewing selected user's data)
+     */
+    userId?: string;
+    /**
      * Enable/disable the query
      * @default true
      */
@@ -38,15 +42,20 @@ export interface UseMarginBalanceQueryOptions {
  * const marginLevel = parseFloat(data?.marginLevel ?? "0");
  */
 export function useMarginBalanceQuery(options: UseMarginBalanceQueryOptions) {
-    const { exchangeId, enabled = true, staleTime = 10_000, refetchInterval = 30_000 } = options;
+    const { exchangeId, userId, enabled = true, staleTime = 10_000, refetchInterval = 30_000 } = options;
 
     return useQuery({
         queryKey: queryKeys.binance.balance(exchangeId, "MARGIN"),
         queryFn: async () => {
-            const result = await getMarginBalanceAction({ exchangeId });
+            // Pass userId if provided (for admin viewing selected user data)
+            const result = await getMarginBalanceAction({
+                exchangeId,
+                userId: userId || "" // Will use selectedUser in action if empty
+            });
 
-            if (!result.success || !result.data) {
-                throw new Error("Failed to fetch margin balance");
+            if (!result.success) {
+                // Use the actual error message from the backend
+                throw new Error(result.error || "Failed to fetch margin balance");
             }
 
             return result.data;

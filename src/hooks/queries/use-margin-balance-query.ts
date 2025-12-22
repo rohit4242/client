@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { Exchange } from "@/types/exchange";
+import { type ExchangeClient } from "@/features/exchange";
 import { ApiSuccessResponse } from "@/types/api";
 
 export interface MarginAssetBalance {
@@ -43,7 +43,7 @@ interface UseMarginBalanceQueryOptions {
  */
 export function useMarginBalanceQuery(
   asset: string | null | undefined,
-  exchange: Exchange | null,
+  exchange: ExchangeClient | null,
   options?: UseMarginBalanceQueryOptions
 ) {
   return useQuery<MarginAssetBalance | null | MarginAssetBalance[], Error>({

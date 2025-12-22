@@ -1,10 +1,10 @@
 import { useState, useEffect } from "react";
-import { Exchange } from "@/types/exchange";
+import { type ExchangeClient } from "@/features/exchange";
 import { SpotRestAPI } from "@binance/spot";
 
 interface UseSymbolInfoProps {
   symbol: string;
-  exchange: Exchange | null;
+  exchange: ExchangeClient | null;
 }
 
 export function useSymbolInfo({ symbol, exchange }: UseSymbolInfoProps) {

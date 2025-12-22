@@ -4,15 +4,15 @@
  * TypeScript types and interfaces for manual trading
  */
 
-import { Exchange } from "@/types/exchange";
+import { type ExchangeClient } from "@/features/exchange";
 import { AccountType } from "@/types/margin";
 import type { OrderTypeType, OrderSideType, TimeInForceType } from "@/db/schema/order";
 
 /**
  * Trading form props shared between spot and margin forms
  */
-export interface TradingFormProps {
-    selectedExchange: Exchange | null;
+export interface ManualTradingState {
+    selectedExchange: ExchangeClient | null;
     onSelectAssetsChange: (assets: string[]) => void;
     selectedAsset: string;
     userId: string;

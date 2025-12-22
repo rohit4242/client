@@ -6,7 +6,6 @@
 
 // ===== Types ===== 
 export type {
-    TradingFormProps,
     OrderFormData,
     CostBreakdown,
     ValidationContext,

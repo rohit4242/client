@@ -2,7 +2,7 @@
 
 import React, { createContext, useContext, useMemo } from "react";
 import { UseFormReturn, FieldValues } from "react-hook-form";
-import { Exchange } from "@/types/exchange";
+import { type ExchangeClient } from "@/features/exchange";
 
 // ============================================================================
 // Types
@@ -80,9 +80,9 @@ export interface BotFormContextValue {
     form: BotFormType;
     mode: "create" | "edit";
     // Exchange data
-    exchanges: Exchange[];
+    exchanges: ExchangeClient[];
     isLoadingExchanges: boolean;
-    selectedExchange: Exchange | PartialExchange | undefined;
+    selectedExchange: ExchangeClient | PartialExchange | undefined;
     // Symbol data
     selectedSymbol: string;
     baseAsset: string;

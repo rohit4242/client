@@ -38,11 +38,13 @@ export interface UseExchangesQueryOptions {
  * const exchanges = data?.exchanges ?? [];
  */
 export function useExchangesQuery(options?: UseExchangesQueryOptions) {
+    const { userId, ...queryOptions } = options || {};
+
     return useQuery({
-        queryKey: queryKeys.exchanges.list(),
+        queryKey: userId ? queryKeys.exchanges.list({ userId }) : queryKeys.exchanges.list(),
         queryFn: getExchanges,
-        staleTime: options?.staleTime ?? 30_000,
-        enabled: options?.enabled ?? true,
-        refetchInterval: options?.refetchInterval ?? 60_000,
+        staleTime: queryOptions.staleTime ?? 30_000,
+        enabled: queryOptions.enabled ?? true,
+        refetchInterval: queryOptions.refetchInterval ?? 60_000,
     });
 }

@@ -3,7 +3,7 @@
  * Main orchestrator for order flow - used by both manual trading and signal bot
  */
 
-import { Exchange } from "@/types/exchange";
+import { type ExchangeClient } from "@/features/exchange";
 import { placeSpotOrder } from "./exchange/binance-spot";
 import { placeMarginOrder } from "./exchange/binance-margin";
 import { toBinanceConfig, SpotOrderParams, MarginOrderParams } from "./exchange/types";

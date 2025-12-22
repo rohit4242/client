@@ -24,7 +24,7 @@ import type {
     TradeValidationResult,
     PartialExchange,
 } from "../contexts/bot-form-context";
-import { Exchange } from "@/types/exchange";
+import { type ExchangeClient } from "@/features/exchange";
 
 // ============================================================================
 // Types
@@ -38,9 +38,9 @@ interface UseBotMarketDataParams {
 
 interface UseBotMarketDataResult {
     // Exchange data
-    exchanges: Exchange[];
+    exchanges: ExchangeClient[];
     isLoadingExchanges: boolean;
-    selectedExchange: Exchange | PartialExchange | undefined;
+    selectedExchange: ExchangeClient | PartialExchange | undefined;
     // Symbol data
     selectedSymbol: string;
     baseAsset: string;

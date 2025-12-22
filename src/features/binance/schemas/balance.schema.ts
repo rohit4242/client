@@ -12,15 +12,18 @@ import { z } from "zod";
 
 export const GetSpotBalanceInputSchema = z.object({
     exchangeId: z.string().uuid("Invalid exchange ID"),
+    userId: z.string().uuid("Invalid user ID"),
 });
 
 export const GetMarginBalanceInputSchema = z.object({
     exchangeId: z.string().uuid("Invalid exchange ID"),
+    userId: z.string().uuid("Invalid user ID"),
 });
 
 export const GetAssetBalanceInputSchema = z.object({
     exchangeId: z.string().uuid("Invalid exchange ID"),
     asset: z.string().min(2).max(10),
+    userId: z.string().uuid("Invalid user ID"),
 });
 
 // ============================================================================

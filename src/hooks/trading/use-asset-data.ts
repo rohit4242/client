@@ -14,7 +14,7 @@
  */
 
 import { useState, useEffect, useRef, useCallback } from "react";
-import { Exchange } from "@/types/exchange";
+import { type ExchangeClient } from "@/features/exchange";
 import { AssetData, LivePriceConfig, DEFAULT_LIVE_PRICE_CONFIG } from "@/types/trading";
 import { getAsset } from "@/db/actions/assets/get-asset";
 import { getPrice } from "@/db/actions/assets/get-price";
@@ -25,11 +25,11 @@ interface UseAssetDataOptions {
 
 export function useAssetData(
   symbol: string | null,
-  exchange: Exchange | null,
+  exchange: ExchangeClient | null,
   options: UseAssetDataOptions = {}
 ) {
   const config = { ...DEFAULT_LIVE_PRICE_CONFIG, ...options.livePriceConfig };
-  
+
   // Consolidated state
   const [data, setData] = useState<AssetData>({
     balance: null,
@@ -38,7 +38,7 @@ export function useAssetData(
     isLoading: false,
     error: null,
   });
-  
+
   // Separate loading states for granular control
   const [loadingStates, setLoadingStates] = useState({
     balance: false,
@@ -55,7 +55,7 @@ export function useAssetData(
 
     try {
       const result = await getPrice(symbol, exchange);
-      
+
       if (mountedRef.current && result?.price) {
         setData(prev => ({
           ...prev,
@@ -67,10 +67,10 @@ export function useAssetData(
       }
     } catch (error) {
       console.error("Price fetch error:", error);
-      
+
       if (mountedRef.current) {
         retryCountRef.current++;
-        
+
         if (retryCountRef.current >= config.maxRetries) {
           setData(prev => ({
             ...prev,
@@ -90,7 +90,7 @@ export function useAssetData(
     try {
       console.log("fetching balance: ", symbol, exchange)
       const result = await getAsset(symbol, exchange);
-      
+
       if (mountedRef.current) {
         setData(prev => ({
           ...prev,
@@ -100,13 +100,13 @@ export function useAssetData(
       }
     } catch (error) {
       console.error("Balance fetch error:", error);
-      
+
       if (mountedRef.current) {
         // Retry once if it's a timestamp error and we haven't retried yet
-        if (retryCount === 0 && error instanceof Error && 
-            (error.message.includes('recvWindow') || error.message.includes('timestamp'))) {
+        if (retryCount === 0 && error instanceof Error &&
+          (error.message.includes('recvWindow') || error.message.includes('timestamp'))) {
           console.log(`Retrying balance fetch for ${symbol} due to timestamp error...`);
-          
+
           // Wait 1 second before retrying
           setTimeout(() => {
             if (mountedRef.current) {
@@ -115,7 +115,7 @@ export function useAssetData(
           }, 1000);
           return;
         }
-        
+
         setData(prev => ({
           ...prev,
           balance: null,
@@ -134,7 +134,7 @@ export function useAssetData(
     if (!symbol || !exchange) return;
 
     setLoadingStates({ balance: true, price: true });
-    
+
     try {
       await Promise.all([fetchBalance(), fetchPrice()]);
     } finally {
@@ -191,7 +191,7 @@ export function useAssetData(
   // Cleanup on unmount
   useEffect(() => {
     mountedRef.current = true;
-    
+
     return () => {
       mountedRef.current = false;
       if (intervalRef.current) {
@@ -206,12 +206,12 @@ export function useAssetData(
     price: data.price,
     lastUpdate: data.lastUpdate,
     error: data.error,
-    
+
     // Loading states
     isLoading: data.isLoading,
     isLoadingBalance: loadingStates.balance,
     isLoadingPrice: loadingStates.price,
-    
+
     // Actions
     refreshData,
     refreshPrice: fetchPrice,

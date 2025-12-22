@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
-import { Exchange } from "@/types/exchange";
+import { type ExchangeClient } from "@/features/exchange";
 import { calculateExitPrices, calculateRiskReward } from "../utils/bot-calculations";
 import { PartialExchange } from "../contexts/bot-form-context";
 
@@ -14,7 +14,7 @@ export interface MaxBorrowData {
 }
 
 interface UseTradingCalculationsParams {
-    selectedExchange: Exchange | PartialExchange | undefined;
+    selectedExchange: ExchangeClient | PartialExchange | undefined;
     watchedAccountType: string;
     watchedTradeAmount: number;
     watchedTradeAmountType: "QUOTE" | "BASE";

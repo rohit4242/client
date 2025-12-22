@@ -1,11 +1,11 @@
 import { useMemo } from "react";
-import { Exchange } from "@/types/exchange";
+import { type ExchangeClient } from "@/features/exchange";
 import { useMaxBorrow } from "./use-margin-operations";
 
 interface UseMarginValidationProps {
   quoteAsset: string;
   baseAsset: string;
-  exchange: Exchange | null;
+  exchange: ExchangeClient | null;
   sideEffectType: string;
   orderSide: 'BUY' | 'SELL';
   enabled: boolean;
@@ -34,11 +34,11 @@ export function useMarginValidation({
   enabled,
 }: UseMarginValidationProps): MarginValidationData {
   // Fetch max borrowable for quote asset when MARGIN_BUY is selected for BUY orders
-  const shouldFetchQuote = enabled && 
-    exchange !== null && 
+  const shouldFetchQuote = enabled &&
+    exchange !== null &&
     sideEffectType === 'MARGIN_BUY' &&
     orderSide === 'BUY';
-  
+
   const {
     data: quoteData,
     isLoading: isLoadingQuote,
@@ -48,11 +48,11 @@ export function useMarginValidation({
   // Fetch max borrowable for base asset when:
   // 1. MARGIN_BUY is selected for SELL orders (short selling - borrow base asset to sell)
   // 2. AUTO_REPAY is selected for SELL orders (optional, for future validation)
-  const shouldFetchBase = enabled && 
-    exchange !== null && 
+  const shouldFetchBase = enabled &&
+    exchange !== null &&
     ((sideEffectType === 'MARGIN_BUY' && orderSide === 'SELL') ||
-     (sideEffectType === 'AUTO_REPAY' && orderSide === 'SELL'));
-  
+      (sideEffectType === 'AUTO_REPAY' && orderSide === 'SELL'));
+
   const {
     data: baseData,
     isLoading: isLoadingBase,
@@ -60,12 +60,12 @@ export function useMarginValidation({
   } = useMaxBorrow(baseAsset, exchange!, shouldFetchBase);
 
   return useMemo(() => {
-    const maxBorrowableQuote = quoteData?.data?.maxBorrowable 
-      ? parseFloat(quoteData.data.maxBorrowable) 
+    const maxBorrowableQuote = quoteData?.data?.maxBorrowable
+      ? parseFloat(quoteData.data.maxBorrowable)
       : null;
-    
-    const maxBorrowableBase = baseData?.data?.maxBorrowable 
-      ? parseFloat(baseData.data.maxBorrowable) 
+
+    const maxBorrowableBase = baseData?.data?.maxBorrowable
+      ? parseFloat(baseData.data.maxBorrowable)
       : null;
 
     return {

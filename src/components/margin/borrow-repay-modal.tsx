@@ -23,7 +23,7 @@ import { useBorrow, useRepay, useMaxBorrow } from "@/hooks/trading/use-margin-op
 import { BORROWABLE_ASSETS } from "@/lib/margin/margin-constants";
 import { AlertTriangle, Loader2, Info, Wallet, ArrowRightLeft } from "lucide-react";
 import { formatAssetAmount } from "@/lib/margin/margin-utils";
-import { Exchange } from "@/types/exchange";
+import { type ExchangeClient } from "@/features/exchange";
 import { useQuery } from "@tanstack/react-query";
 import axios from "axios";
 import { MarginAsset } from "@/types/margin";
@@ -31,7 +31,7 @@ import { MarginAsset } from "@/types/margin";
 interface BorrowRepayModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  exchange?: Exchange;
+  exchange?: ExchangeClient;
 }
 
 export function BorrowRepayModal({
@@ -43,13 +43,13 @@ export function BorrowRepayModal({
   const [asset, setAsset] = useState<string>("USDT");
   const [amount, setAmount] = useState<string>("");
 
-  const borrowMutation = useBorrow(exchange as Exchange);
-  const repayMutation = useRepay(exchange as Exchange);
-  
+  const borrowMutation = useBorrow(exchange as ExchangeClient);
+  const repayMutation = useRepay(exchange as ExchangeClient);
+
   // Fetch max borrow data when modal is open (for both borrow and repay tabs)
   const { data: maxBorrowData, isLoading: isLoadingMax } = useMaxBorrow(
     asset,
-    exchange as Exchange,
+    exchange as ExchangeClient,
     open && !!exchange
   );
 
@@ -120,18 +120,18 @@ export function BorrowRepayModal({
   };
 
   const isLoading = borrowMutation.isPending || repayMutation.isPending;
-  
-  const maxBorrowable = maxBorrowData?.data?.maxBorrowable 
-    ? parseFloat(maxBorrowData.data.maxBorrowable) 
+
+  const maxBorrowable = maxBorrowData?.data?.maxBorrowable
+    ? parseFloat(maxBorrowData.data.maxBorrowable)
     : 0;
-  const currentBorrowed = maxBorrowData?.data?.currentBorrowed 
-    ? parseFloat(maxBorrowData.data.currentBorrowed) 
+  const currentBorrowed = maxBorrowData?.data?.currentBorrowed
+    ? parseFloat(maxBorrowData.data.currentBorrowed)
     : 0;
-  const interest = maxBorrowData?.data?.interest 
-    ? parseFloat(maxBorrowData.data.interest) 
+  const interest = maxBorrowData?.data?.interest
+    ? parseFloat(maxBorrowData.data.interest)
     : 0;
-  const totalOwed = maxBorrowData?.data?.totalOwed 
-    ? parseFloat(maxBorrowData.data.totalOwed) 
+  const totalOwed = maxBorrowData?.data?.totalOwed
+    ? parseFloat(maxBorrowData.data.totalOwed)
     : 0;
 
   return (
@@ -390,8 +390,8 @@ export function BorrowRepayModal({
                   {marginAccountData.data.userAssets
                     .filter((userAsset: MarginAsset) => parseFloat(userAsset.free) > 0)
                     .map((userAsset: MarginAsset) => (
-                      <div 
-                        key={userAsset.asset} 
+                      <div
+                        key={userAsset.asset}
                         className="flex items-center justify-between text-xs p-1.5 hover:bg-muted rounded"
                       >
                         <div className="flex items-center gap-2">

@@ -1,6 +1,6 @@
 "use client";
 
-import { Exchange } from "@/types/exchange";
+import { type ExchangeClient } from "@/features/exchange";
 import { ExchangeSelector } from "@/components/trading/exchange-selector";
 import { useState } from "react";
 import { SpotTradingForm } from "@/components/trading/forms/spot-trading-form";
@@ -22,7 +22,7 @@ interface ManualTradingViewProps {
 }
 
 export function ManualTradingView({ selectedUser }: ManualTradingViewProps) {
-    const [selectedExchange, setSelectedExchange] = useState<Exchange | null>(
+    const [selectedExchange, setSelectedExchange] = useState<ExchangeClient | null>(
         null
     );
     const [selectedAsset, setSelectedAsset] = useState<string>(
@@ -120,12 +120,12 @@ export function ManualTradingView({ selectedUser }: ManualTradingViewProps) {
             <BorrowRepayModal
                 open={borrowRepayModalOpen}
                 onOpenChange={setBorrowRepayModalOpen}
-                exchange={selectedExchange as Exchange}
+                exchange={selectedExchange as ExchangeClient}
             />
             <TransferModal
                 open={transferModalOpen}
                 onOpenChange={setTransferModalOpen}
-                exchange={selectedExchange as Exchange}
+                exchange={selectedExchange as ExchangeClient}
             />
         </div>
     );

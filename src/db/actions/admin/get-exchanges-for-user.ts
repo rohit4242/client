@@ -2,9 +2,9 @@
 
 import { isAdmin } from "@/lib/auth-utils";
 import db from "@/db";
-import { Exchange } from "@/types/exchange";
+import { type ExchangeClient } from "@/features/exchange";
 
-export async function getExchangesForUser(userId: string): Promise<Exchange[]> {
+export async function getExchangesForUser(userId: string): Promise<ExchangeClient[]> {
   try {
     const admin = await isAdmin();
 
@@ -41,7 +41,7 @@ export async function getExchangesForUser(userId: string): Promise<Exchange[]> {
       updatedAt: exchange.updatedAt.toISOString(),
     }));
 
-    return processedExchanges as Exchange[];
+    return processedExchanges as ExchangeClient[];
   } catch (error) {
     console.error("Error fetching exchanges for user:", error);
     return [];

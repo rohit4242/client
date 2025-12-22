@@ -26,7 +26,7 @@ export const queryKeys = {
     // Exchanges
     exchanges: {
         all: () => ["exchanges"] as const,
-        list: () => [...queryKeys.exchanges.all(), "list"] as const,
+        list: (filters?: { userId?: string }) => [...queryKeys.exchanges.all(), "list", filters] as const,
         detail: (id: string) => [...queryKeys.exchanges.all(), "detail", id] as const,
     },
 

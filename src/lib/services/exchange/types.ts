@@ -3,7 +3,7 @@
  * Used by both spot and margin trading
  */
 
-import { Exchange } from "@/types/exchange";
+import { type ExchangeClient } from "@/features/exchange";
 
 // Binance API configuration
 export interface BinanceConfig {

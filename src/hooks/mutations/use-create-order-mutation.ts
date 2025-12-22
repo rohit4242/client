@@ -1,10 +1,10 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { Exchange } from "@/types/exchange";
+import { type ExchangeClient } from "@/features/exchange";
 import { SideEffectType } from "@prisma/client";
 import { toast } from "sonner";
 
 export interface OrderRequest {
-  exchange: Exchange;
+  exchange: ExchangeClient;
   order: {
     symbol: string;
     side: 'BUY' | 'SELL';

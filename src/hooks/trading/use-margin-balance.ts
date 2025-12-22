@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from "react";
-import { Exchange } from "@/types/exchange";
+import { type ExchangeClient } from "@/features/exchange";
 
 interface MarginAssetBalance {
   asset: string;
@@ -23,7 +23,7 @@ interface MarginBalanceData {
  */
 export function useMarginBalance(
   asset: string | null,
-  exchange: Exchange | null
+  exchange: ExchangeClient | null
 ): MarginBalanceData {
   const [data, setData] = useState<MarginBalanceData>({
     balance: null,
@@ -57,7 +57,7 @@ export function useMarginBalance(
       }
 
       const result = await response.json();
-      
+
       if (mountedRef.current && result.success) {
         // Find the specific asset in the margin account
         const assetData = result.data.userAssets?.find(
@@ -97,7 +97,7 @@ export function useMarginBalance(
       }
     } catch (error) {
       console.error('Error fetching margin balance:', error);
-      
+
       if (mountedRef.current) {
         setData({
           balance: null,
@@ -126,7 +126,7 @@ export function useMarginBalance(
   // Cleanup on unmount
   useEffect(() => {
     mountedRef.current = true;
-    
+
     return () => {
       mountedRef.current = false;
       if (intervalRef.current) {

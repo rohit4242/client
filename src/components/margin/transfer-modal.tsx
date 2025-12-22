@@ -24,14 +24,14 @@ import { useMarginAccount } from "@/hooks/trading/use-margin-account";
 import { getAsset } from "@/db/actions/assets/get-asset";
 import { BORROWABLE_ASSETS } from "@/lib/margin/margin-constants";
 import { ArrowRight, Loader2 } from "lucide-react";
-import { Exchange } from "@/types/exchange";
+import { type ExchangeClient } from "@/features/exchange";
 import { useQuery } from "@tanstack/react-query";
 import { formatAssetAmount } from "@/lib/margin/margin-utils";
 
 interface TransferModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  exchange?: Exchange;
+  exchange?: ExchangeClient;
 }
 
 export function TransferModal({
@@ -43,7 +43,7 @@ export function TransferModal({
   const [asset, setAsset] = useState<string>("USDT");
   const [amount, setAmount] = useState<string>("");
 
-  const transferMutation = useTransfer(exchange as Exchange);
+  const transferMutation = useTransfer(exchange as ExchangeClient);
 
   // Fetch spot balance when transferring from Spot (toMargin)
   const { data: spotBalanceData, isLoading: isLoadingSpot } = useQuery({
@@ -60,7 +60,7 @@ export function TransferModal({
 
   // Fetch margin balance when transferring from Margin (toSpot)
   const { data: marginAccountData, isLoading: isLoadingMargin } = useMarginAccount(
-    exchange as Exchange,
+    exchange as ExchangeClient,
     open && direction === "toSpot" && !!exchange
   );
 

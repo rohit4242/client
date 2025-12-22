@@ -2,7 +2,7 @@ import { useLivePriceQuery } from "@/hooks/use-live-price-query";
 import { useBalanceQuery } from "@/hooks/queries/use-balance-query";
 import { useMarginBalanceQuery, MarginAssetBalance } from "@/hooks/queries/use-margin-balance-query";
 import { useSymbolInfoQuery } from "@/hooks/queries/use-symbol-info-query";
-import { Exchange } from "@/types/exchange";
+import { Exchange, type ExchangeClient } from "@/features/exchange";
 import { AssetBalance } from "@/types/trading";
 import { extractBaseAsset } from "@/lib/utils";
 import { useMemo } from "react";
@@ -72,7 +72,7 @@ interface TradingDataReturn {
  */
 export function useTradingData(
   symbol: string | null,
-  exchange: Exchange | null,
+  exchange: ExchangeClient | null,
   options?: UseTradingDataOptions
 ): TradingDataReturn {
   const accountType = options?.accountType || 'spot';

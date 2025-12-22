@@ -15,13 +15,13 @@ import { RefreshCw } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { useQuery } from "@tanstack/react-query";
 import { getExchangesForUser } from "@/db/actions/admin/get-exchanges-for-user";
-import { Exchange } from "@/types/exchange";
+import { type ExchangeClient } from "@/features/exchange";
 
 import { Spinner } from "@/components/spinner";
 
 interface ExchangeSelectorProps {
-  onSelect: (exchange: Exchange | null) => void;
-  selectedExchange: Exchange | null;
+  onSelect: (exchange: ExchangeClient | null) => void;
+  selectedExchange: ExchangeClient | null;
   userId: string;
 }
 
@@ -35,11 +35,11 @@ export function ExchangeSelector({
     isLoading,
     error,
     refetch,
-  } = useQuery<Exchange[]>({
+  } = useQuery<ExchangeClient[]>({
     queryKey: ["exchanges", userId],
     queryFn: async () => {
       const exchanges = await getExchangesForUser(userId);
-      return exchanges as Exchange[];
+      return exchanges as ExchangeClient[];
     },
   });
 
@@ -47,9 +47,9 @@ export function ExchangeSelector({
     refetch();
   };
 
-  const onExchangeChange = (value: string) => {
+  const handleValueChange = (value: string) => {
     const exchange = exchanges?.find(
-      (exchange: Exchange) => exchange.name === value
+      (exchange: ExchangeClient) => exchange.name === value
     );
     onSelect(exchange ?? null);
   };
@@ -94,7 +94,7 @@ export function ExchangeSelector({
           <Label className="text-sm font-medium">Exchange</Label>
           <Select
             value={selectedExchange?.name ?? ""}
-            onValueChange={onExchangeChange}
+            onValueChange={handleValueChange}
           >
             <SelectTrigger className="w-full">
               <SelectValue placeholder="Select exchange">
@@ -109,7 +109,7 @@ export function ExchangeSelector({
               </SelectValue>
             </SelectTrigger>
             <SelectContent>
-              {exchanges?.map((exchange: Exchange) => (
+              {exchanges?.map((exchange: ExchangeClient) => (
                 <SelectItem key={exchange.name} value={exchange.name}>
                   <div className="flex items-center gap-2">
                     <span className="font-medium">{exchange.name}</span>

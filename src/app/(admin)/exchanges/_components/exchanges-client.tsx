@@ -8,7 +8,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Card } from '@/components/ui/card';
 
 export function ExchangesClient({ userId }: { userId: string }) {
-  const { data, isLoading } = useExchangesQuery();
+  const { data, isLoading } = useExchangesQuery({ userId });
   const exchanges = data?.exchanges ?? [];
 
   if (isLoading) {

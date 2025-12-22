@@ -3,7 +3,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { useMarginAccount } from "@/hooks/trading/use-margin-account";
-import { Exchange } from "@/types/exchange";
+import { type ExchangeClient } from "@/features/exchange";
 import {
     formatMarginLevel,
     getRiskLevel,
@@ -16,7 +16,7 @@ import { Progress } from "@/components/ui/progress";
 import { MarginAsset } from "@/types/margin";
 
 interface MarginAccountCardProps {
-    selectedExchange: Exchange | null;
+    selectedExchange: ExchangeClient | null;
 }
 
 // Assets to display
@@ -149,14 +149,13 @@ export function MarginAccountCard({ selectedExchange }: MarginAccountCardProps) 
                 <div className="space-y-2">
                     <div className="flex items-center justify-between">
                         <span className="text-sm font-medium">Margin Level</span>
-                        <span className={`text-lg font-bold ${
-                            riskLevel === "safe" ? "text-green-600" : 
-                            riskLevel === "warning" ? "text-yellow-600" : "text-red-600"
-                        }`}>
+                        <span className={`text-lg font-bold ${riskLevel === "safe" ? "text-green-600" :
+                                riskLevel === "warning" ? "text-yellow-600" : "text-red-600"
+                            }`}>
                             {formatMarginLevel(marginLevelValue)}
                         </span>
                     </div>
-                    <Progress 
+                    <Progress
                         value={Math.min((marginLevelValue / 10) * 100, 100)}
                         className="h-2"
                     />
@@ -198,7 +197,7 @@ export function MarginAccountCard({ selectedExchange }: MarginAccountCardProps) 
                                                 {formatAssetAmount(netAsset, asset.asset === 'USDT' ? 2 : 8)}
                                             </span>
                                         </div>
-                                        
+
                                         <div className="grid grid-cols-2 gap-2 text-xs">
                                             <div className="flex justify-between">
                                                 <span className="text-muted-foreground">Free:</span>

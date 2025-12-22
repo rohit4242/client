@@ -20,11 +20,13 @@ export function AccountBalances({ exchange }: AccountBalancesProps) {
 
     const { data: spotData, isLoading: isLoadingSpot, error: spotError } = useSpotBalanceQuery({
         exchangeId: exchange?.id || "",
+        userId: exchange?.portfolioId, // portfolioId corresponds to the userId
         enabled: !!exchange && activeTab === "spot"
     });
 
     const { data: marginData, isLoading: isLoadingMargin, error: marginError } = useMarginBalanceQuery({
         exchangeId: exchange?.id || "",
+        userId: exchange?.portfolioId, // portfolioId corresponds to the userId  
         enabled: !!exchange && activeTab === "margin"
     });
 

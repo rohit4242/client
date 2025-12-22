@@ -1,4 +1,4 @@
-import { Exchange } from "@/types/exchange";
+import { type ExchangeClient } from "@/features/exchange";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import axios from "axios";
 import { toast } from "sonner";
@@ -26,14 +26,14 @@ interface TransferParams {
  * Hook for borrowing margin assets
  */
 export const useBorrow = (
-  exchange: Exchange,
+  exchange: ExchangeClient,
 ) => {
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: async (params: BorrowParams) => {
       try {
-        const response = await axios.post("/api/margin/borrow", 
+        const response = await axios.post("/api/margin/borrow",
           {
             asset: params.asset,
             amount: params.amount,
@@ -66,7 +66,7 @@ export const useBorrow = (
  * Hook for repaying margin assets
  */
 export const useRepay = (
-  exchange: Exchange,
+  exchange: ExchangeClient,
 ) => {
   const queryClient = useQueryClient();
 
@@ -95,7 +95,7 @@ export const useRepay = (
       queryClient.invalidateQueries({ queryKey: ["marginAccount"] });
       toast.success(
         data.message ||
-          `Successfully repaid ${params.amount} ${params.asset}`
+        `Successfully repaid ${params.amount} ${params.asset}`
       );
     },
     onError: (error: Error) => {
@@ -108,7 +108,7 @@ export const useRepay = (
  * Hook for transferring assets between spot and margin
  */
 export const useTransfer = (
-  exchange: Exchange,
+  exchange: ExchangeClient,
 ) => {
   const queryClient = useQueryClient();
 
@@ -123,9 +123,9 @@ export const useTransfer = (
           apiSecret: exchange?.apiSecret,
         });
 
-      if (!response.data.success) {
-        throw new Error(response.data.error || "Failed to transfer");
-      }
+        if (!response.data.success) {
+          throw new Error(response.data.error || "Failed to transfer");
+        }
 
         return response.data;
       } catch (error: any) {
@@ -139,12 +139,12 @@ export const useTransfer = (
       // Also invalidate spot balance queries
       queryClient.invalidateQueries({ queryKey: ["assetData"] });
       queryClient.invalidateQueries({ queryKey: ["spotBalance"] });
-      
+
       const directionText =
         params.direction === "toMargin" ? "to Margin" : "to Spot";
       toast.success(
         data.message ||
-          `Successfully transferred ${params.amount} ${params.asset} ${directionText}`
+        `Successfully transferred ${params.amount} ${params.asset} ${directionText}`
       );
     },
     onError: (error: Error) => {
@@ -158,7 +158,7 @@ export const useTransfer = (
  */
 export const useMaxBorrow = (
   asset: string,
-  exchange: Exchange,
+  exchange: ExchangeClient,
   enabled: boolean = true
 ) => {
   return useQuery({
@@ -171,7 +171,7 @@ export const useMaxBorrow = (
       });
 
       if (!response.data.success) {
-        const error = response.data.error || "Failed to fetch max borrow" ;
+        const error = response.data.error || "Failed to fetch max borrow";
         throw new Error(error.error || "Failed to fetch max borrow");
       }
 

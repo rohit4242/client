@@ -3,7 +3,7 @@
  * Validates if user has sufficient balance for orders
  */
 
-import { Exchange } from "@/types/exchange";
+import { type ExchangeClient } from "@/features/exchange";
 import { getMaxBorrowable } from "../exchange/binance-margin";
 import { toBinanceConfig } from "../exchange/types";
 
@@ -53,7 +53,7 @@ export async function validateMarginBalance(
   required: number,
   asset: string,
   sideEffectType: string,
-  exchange: Exchange
+  exchange: ExchangeClient
 ): Promise<BalanceValidationResult> {
   // If NO_SIDE_EFFECT, treat like spot (must have full balance)
   if (sideEffectType === "NO_SIDE_EFFECT") {

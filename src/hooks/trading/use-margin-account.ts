@@ -2,7 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { MarginAccountInfo, MarginAccountStats } from '@/types/margin';
 import { REFRESH_INTERVALS } from '@/lib/margin/margin-constants';
 import axios from 'axios';
-import { Exchange } from '@/types/exchange';
+import { type ExchangeClient } from '@/features/exchange';
 
 interface MarginAccountResponse {
   success: boolean;
@@ -17,7 +17,7 @@ interface MarginAccountResponse {
  * @param enabled - Whether the query should run
  */
 export const useMarginAccount = (
-  exchange?: Exchange,
+  exchange?: ExchangeClient,
   enabled: boolean = true
 ) => {
   return useQuery<MarginAccountResponse>({

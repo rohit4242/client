@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { Exchange } from "@/types/exchange";
+import { type ExchangeClient } from "@/features/exchange";
 import { AssetBalance } from "@/types/trading";
 import { getAsset } from "@/db/actions/assets/get-asset";
 import { extractBaseAsset, extractQuoteAsset } from "@/lib/utils";
@@ -7,7 +7,7 @@ import { extractBaseAsset, extractQuoteAsset } from "@/lib/utils";
 interface UseTradingBalanceProps {
   symbol: string;
   side: "BUY" | "SELL";
-  exchange: Exchange | null;
+  exchange: ExchangeClient | null;
 }
 
 export function useTradingBalance({ symbol, side, exchange }: UseTradingBalanceProps) {
@@ -28,12 +28,12 @@ export function useTradingBalance({ symbol, side, exchange }: UseTradingBalanceP
       // For BUY orders, we need the quote asset balance (e.g., USDT for BTCUSDT)
       // For SELL orders, we need the base asset balance (e.g., BTC for BTCUSDT)
       const assetToFetch = side === "BUY" ? extractQuoteAsset(symbol) : extractBaseAsset(symbol);
-      
+
       // Create a symbol that represents the asset we want to check balance for
       const balanceSymbol = assetToFetch === "USDT" ? "USDTUSDT" : `${assetToFetch}USDT`;
-      
+
       const result = await getAsset(balanceSymbol, exchange);
-      
+
       if (result?.asset) {
         setBalance(result.asset);
       } else {

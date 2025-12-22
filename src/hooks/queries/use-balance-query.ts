@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { Exchange } from "@/types/exchange";
+import { type ExchangeClient } from "@/features/exchange";
 import { AssetBalance } from "@/types/trading";
 import { ApiSuccessResponse } from "@/types/api";
 
@@ -30,7 +30,7 @@ interface UseBalanceQueryOptions {
  */
 export function useBalanceQuery(
   asset: string | null | undefined,
-  exchange: Exchange | null,
+  exchange: ExchangeClient | null,
   options?: UseBalanceQueryOptions
 ) {
   return useQuery<AssetBalance | null | AssetBalance[], Error>({

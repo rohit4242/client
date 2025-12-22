@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { Exchange } from "@/types/exchange";
+import { type ExchangeClient } from "@/features/exchange";
 import { SpotRestAPI } from "@binance/spot";
 
 interface UseSymbolInfoQueryOptions {
@@ -29,7 +29,7 @@ interface UseSymbolInfoQueryOptions {
  */
 export function useSymbolInfoQuery(
   symbol: string | null,
-  exchange: Exchange | null,
+  exchange: ExchangeClient | null,
   options?: UseSymbolInfoQueryOptions
 ) {
   return useQuery<SpotRestAPI.ExchangeInfoResponse | null, Error>({

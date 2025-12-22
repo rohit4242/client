@@ -10,7 +10,7 @@ import {
   TradingFormData,
   TradingFormSchema,
 } from "@/db/schema/order";
-import { Exchange } from "@/types/exchange";
+import { type ExchangeClient } from "@/features/exchange";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -54,7 +54,7 @@ const extractQuoteAsset = (symbol: string): string => {
 };
 
 interface SpotTradingFormProps {
-  selectedExchange: Exchange | null;
+  selectedExchange: ExchangeClient | null;
   onSelectAssetsChange: (assets: string[]) => void;
   selectedAsset: string;
   userId: string;
@@ -570,8 +570,8 @@ export function SpotTradingForm({
             <Button
               type="submit"
               className={`w-full h-12 text-base font-semibold ${form.watch("side") === "BUY"
-                  ? "bg-teal-600 hover:bg-teal-700"
-                  : "bg-rose-600 hover:bg-rose-700"
+                ? "bg-teal-600 hover:bg-teal-700"
+                : "bg-rose-600 hover:bg-rose-700"
                 }`}
               disabled={!selectedExchange || isPending || isLoadingSymbolInfo}
             >
