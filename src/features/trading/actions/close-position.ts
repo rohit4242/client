@@ -10,7 +10,7 @@ import { z } from "zod";
 import { requireAuth } from "@/lib/auth/session";
 import { handleServerError, successResult, type ServerActionResult } from "@/lib/validation/error-handler";
 import { db } from "@/lib/db/client";
-import { createSpotClient, createMarginClient, closeSpotPosition, closeMarginPosition } from "@/features/binance";
+import { createSpotClient, createMarginClient, closeSpotPosition, closeMarginPosition, cancelMarginOCOOrder } from "@/features/binance";
 import type { TradingResult } from "../types/trading.types";
 import { revalidatePath } from "next/cache";
 import { getSelectedUser } from "@/lib/selected-user-server";
@@ -24,15 +24,15 @@ export async function closePositionAction(
     input: unknown
 ): Promise<ServerActionResult<TradingResult>> {
     try {
-      const selectedUser = await getSelectedUser();
-    
+        const selectedUser = await getSelectedUser();
 
-      if (!selectedUser) {
-        return {
-            success: false,
-            error: "User not selected",
-        };
-    }
+
+        if (!selectedUser) {
+            return {
+                success: false,
+                error: "User not selected",
+            };
+        }
         // Validate input
         const validated = ClosePositionInputSchema.parse(input);
         const { positionId, sideEffectType } = validated;
@@ -51,6 +51,12 @@ export async function closePositionAction(
                     include: {
                         exchange: true,
                     },
+                },
+                orders: {
+                    where: {
+                        type: { in: ['TAKE_PROFIT', 'STOP_LOSS'] },
+                        status: 'NEW'
+                    }
                 }
             },
         });
@@ -77,7 +83,58 @@ export async function closePositionAction(
             };
         }
 
-        // Close position via Binance SDK
+        // Step 1: Cancel active OCO orders if they exist
+        const hasActiveOCO = position.stopLossOrderId || position.takeProfitOrderId;
+
+        if (hasActiveOCO && position.accountType === 'MARGIN') {
+            console.log('[Close Position] Cancelling active OCO orders');
+
+            const client = createMarginClient({
+                apiKey: exchange.apiKey,
+                apiSecret: exchange.apiSecret,
+            });
+
+            try {
+                // Get any OCO order ID (they're linked, cancelling one cancels both)
+                // Binance uses orderListId which should be stored in one of the order IDs
+                // We need to query the actual Order record to get more details if needed
+                const ocoOrder = position.orders?.find(o =>
+                    o.type === 'TAKE_PROFIT' || o.type === 'STOP_LOSS'
+                );
+
+                if (ocoOrder) {
+                    // Note: For OCO, we need the orderListId, not individual order IDs
+                    // The orderListId should have been stored, but if not we try with order ID
+                    const cancelResult = await cancelMarginOCOOrder(client, {
+                        symbol: position.symbol,
+                        orderListId: parseInt(ocoOrder.orderId)
+                    });
+
+                    if (cancelResult.success) {
+                        console.log('[Close Position] OCO orders cancelled successfully');
+
+                        // Update order statuses in database
+                        await db.order.updateMany({
+                            where: {
+                                positionId: position.id,
+                                type: { in: ['TAKE_PROFIT', 'STOP_LOSS'] },
+                                status: 'NEW'
+                            },
+                            data: {
+                                status: 'CANCELED'
+                            }
+                        });
+                    } else {
+                        // Log warning but continue - position close is more important
+                        console.warn('[Close Position] Failed to cancel OCO:', cancelResult.error);
+                    }
+                }
+            } catch (error) {
+                console.warn('[Close Position] Error cancelling OCO (continuing anyway):', error);
+            }
+        }
+
+        // Step 2: Close position via Binance SDK
         let result;
         if (position.accountType === "MARGIN") {
             const client = createMarginClient({
@@ -129,6 +186,9 @@ export async function closePositionAction(
                 pnl,          // FIXED: Changed from realizedPnl to pnl
                 pnlPercent,   // FIXED: Added pnlPercent
                 closedAt: new Date(),
+                // Update OCO statuses
+                stopLossStatus: position.stopLossOrderId ? 'CANCELED' : null,
+                takeProfitStatus: position.takeProfitOrderId ? 'CANCELED' : null,
             },
         });
 

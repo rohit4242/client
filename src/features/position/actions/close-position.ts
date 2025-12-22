@@ -12,6 +12,7 @@ import { requireAuth } from "@/lib/auth/session";
 import { handleServerError, successResult, ServerActionResult } from "@/lib/validation/error-handler";
 import { ClosePositionInputSchema, ClosePositionResultSchema, type ClosePositionResult } from "../schemas/position.schema";
 import { PositionStatus } from "@prisma/client";
+import { getSelectedUser } from "@/lib/selected-user-server";
 
 /**
  * Close a position at market price
@@ -20,8 +21,16 @@ export async function closePosition(
     input: { positionId: string }
 ): Promise<ServerActionResult<ClosePositionResult>> {
     try {
-        const session = await requireAuth();
 
+        const selectedUser = await getSelectedUser();
+        
+
+        if (!selectedUser) {
+            return {
+                success: false,
+                error: "User not selected",
+            };
+        }
         // Validate input
         const validated = ClosePositionInputSchema.parse(input);
         const { positionId } = validated;
@@ -46,7 +55,7 @@ export async function closePosition(
         }
 
         // Verify ownership
-        if (position.portfolio.userId !== session.id) {
+        if (position.portfolio.userId !== selectedUser.id) {
             return {
                 success: false,
                 error: "Unauthorized",
