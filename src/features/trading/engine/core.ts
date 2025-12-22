@@ -145,7 +145,20 @@ export async function executeTradingRequest(
         }
 
         // Step 7: Update position with execution data and OCO references
-        await updatePositionWithExecution(position.id, executionData, ocoOrderIds);
+        // Extract warning message and error details from binance result (if protective orders failed)
+        let warningMessage: string | undefined;
+        const resultWarning = (binanceResult as any).warning;
+        const resultError = (binanceResult as any).protectiveOrderError;
+
+        if (resultWarning || resultError) {
+            // Combine warning and error for complete context
+            warningMessage = resultWarning || '';
+            if (resultError && resultWarning !== resultError) {
+                warningMessage += warningMessage ? ` Error details: ${resultError}` : resultError;
+            }
+        }
+
+        await updatePositionWithExecution(position.id, executionData, ocoOrderIds, warningMessage);
         console.log("[Trading Engine] Position updated with execution data");
 
         // Step 8: Create order record

@@ -53,7 +53,8 @@ export async function createPendingPosition(
 export async function updatePositionWithExecution(
     positionId: string,
     binanceOrder: BinanceOrderResponse,
-    ocoOrderIds?: { tpOrderId?: string; slOrderId?: string }
+    ocoOrderIds?: { tpOrderId?: string; slOrderId?: string },
+    warningMessage?: string  // Critical warnings (e.g., OCO placement failures)
 ): Promise<void> {
     const executedQty = parseFloat(binanceOrder.executedQty || "0");
     const cummulativeQuoteQty = parseFloat(binanceOrder.cummulativeQuoteQty || "0");
@@ -132,6 +133,12 @@ export async function updatePositionWithExecution(
             updateData.stopLossStatus = "NEW";
         }
         console.log('[Position Update] OCO order IDs stored:', ocoOrderIds);
+    }
+
+    // Store warning message if provided (e.g., OCO placement failure)
+    if (warningMessage) {
+        updateData.warningMessage = warningMessage;
+        console.log('[Position Update] Warning stored:', warningMessage);
     }
 
     await db.position.update({

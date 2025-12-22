@@ -338,6 +338,9 @@ model Position {
   botId      String?
   strategyId String? // Unique strategy identifier
 
+  // Critical warnings (e.g., protective order failures)
+  warningMessage String? // Warning message for unprotected positions or other critical issues
+
   // Timestamps
   openedAt  DateTime  @default(now())
   closedAt  DateTime?
