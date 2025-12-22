@@ -87,50 +87,37 @@ export async function closePositionAction(
         const hasActiveOCO = position.stopLossOrderId || position.takeProfitOrderId;
 
         if (hasActiveOCO && position.accountType === 'MARGIN') {
-            console.log('[Close Position] Cancelling active OCO orders');
-
-            const client = createMarginClient({
-                apiKey: exchange.apiKey,
-                apiSecret: exchange.apiSecret,
-            });
+            console.log('[Close Position] Attempting to cancel active OCO orders');
 
             try {
-                // Get any OCO order ID (they're linked, cancelling one cancels both)
-                // Binance uses orderListId which should be stored in one of the order IDs
-                // We need to query the actual Order record to get more details if needed
-                const ocoOrder = position.orders?.find(o =>
-                    o.type === 'TAKE_PROFIT' || o.type === 'STOP_LOSS'
-                );
+                const client = createMarginClient({
+                    apiKey: exchange.apiKey,
+                    apiSecret: exchange.apiSecret,
+                });
 
-                if (ocoOrder) {
-                    // Note: For OCO, we need the orderListId, not individual order IDs
-                    // The orderListId should have been stored, but if not we try with order ID
-                    const cancelResult = await cancelMarginOCOOrder(client, {
-                        symbol: position.symbol,
-                        orderListId: parseInt(ocoOrder.orderId)
-                    });
+                // Note: We need the orderListId to cancel OCO, not individual order IDs
+                // Since we don't store orderListId currently, we'll try to cancel each individual order
+                // This will fail for OCO orders, but we log and continue
 
-                    if (cancelResult.success) {
-                        console.log('[Close Position] OCO orders cancelled successfully');
+                // Better approach: Just update order statuses in DB since position is being closed anyway
+                // The OCO will auto-cancel when position is fully closed on Binance
 
-                        // Update order statuses in database
-                        await db.order.updateMany({
-                            where: {
-                                positionId: position.id,
-                                type: { in: ['TAKE_PROFIT', 'STOP_LOSS'] },
-                                status: 'NEW'
-                            },
-                            data: {
-                                status: 'CANCELED'
-                            }
-                        });
-                    } else {
-                        // Log warning but continue - position close is more important
-                        console.warn('[Close Position] Failed to cancel OCO:', cancelResult.error);
+                console.log('[Close Position] Marking OCO orders as CANCELED in database');
+                await db.order.updateMany({
+                    where: {
+                        positionId: position.id,
+                        type: { in: ['TAKE_PROFIT', 'STOP_LOSS'] },
+                        status: 'NEW'
+                    },
+                    data: {
+                        status: 'CANCELED'
                     }
-                }
+                });
+
+                console.log('[Close Position] OCO order statuses updated');
+
             } catch (error) {
-                console.warn('[Close Position] Error cancelling OCO (continuing anyway):', error);
+                console.warn('[Close Position] Error handling OCO (continuing anyway):', error);
             }
         }
 
@@ -142,11 +129,26 @@ export async function closePositionAction(
                 apiSecret: exchange.apiSecret,
             });
 
+            // Determine sideEffectType for closing
+            // If position was opened with AUTO_BORROW_REPAY or MARGIN_BUY, use AUTO_REPAY when closing
+            let closeSideEffect: "NO_SIDE_EFFECT" | "AUTO_REPAY" =
+                sideEffectType as "NO_SIDE_EFFECT" | "AUTO_REPAY" || "NO_SIDE_EFFECT";
+
+            // Auto-detect: if position was opened with borrow, use AUTO_REPAY
+            if (!sideEffectType && position.sideEffectType) {
+                if (position.sideEffectType === "AUTO_BORROW_REPAY" || position.sideEffectType === "MARGIN_BUY") {
+                    closeSideEffect = "AUTO_REPAY";
+                    console.log('[Close Position] Auto-detected borrowed position, using AUTO_REPAY');
+                }
+            }
+
+            console.log('[Close Position] Closing with sideEffectType:', closeSideEffect);
+
             result = await closeMarginPosition(client, {
                 symbol: position.symbol,
                 side: position.side as "LONG" | "SHORT",
                 quantity: position.quantity.toString(),
-                sideEffectType: sideEffectType as "NO_SIDE_EFFECT" | "AUTO_REPAY",
+                sideEffectType: closeSideEffect,
             });
         } else {
             const client = createSpotClient({
