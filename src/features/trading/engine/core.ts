@@ -138,9 +138,7 @@ export async function executeTradingRequest(
             ocoOrderIds = await createOCOOrderRecords(
                 position.id,
                 position.portfolioId,
-                hasProtectiveOrders,
-                normalized.order.accountType,
-                normalized.order.sideEffectType
+                hasProtectiveOrders
             );
 
             console.log('[Trading Engine] OCO orders saved:', ocoOrderIds);
