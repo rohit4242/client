@@ -144,10 +144,19 @@ export async function closePositionAction(
 
             console.log('[Close Position] Closing with sideEffectType:', closeSideEffect);
 
+            // Round quantity to proper precision (8 decimals for most crypto)
+            // This prevents LOT_SIZE filter errors
+            const closeQuantity = parseFloat(position.quantity.toFixed(8));
+
+            console.log('[Close Position] Quantity precision:', {
+                stored: position.quantity,
+                rounded: closeQuantity
+            });
+
             result = await closeMarginPosition(client, {
                 symbol: position.symbol,
                 side: position.side as "LONG" | "SHORT",
-                quantity: position.quantity.toString(),
+                quantity: closeQuantity.toString(),
                 sideEffectType: closeSideEffect,
             });
         } else {
