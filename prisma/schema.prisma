@@ -366,6 +366,7 @@ model Order {
   // Order identification
   orderId       String // External order ID from exchange
   clientOrderId String? // Client order ID for tracking
+  orderListId   String? // OCO orderListId from Binance (for cancellation)
   symbol        String
   type          OrderType      @default(ENTRY) // ENTRY, EXIT, STOP_LOSS, TAKE_PROFIT
   side          OrderSide      @default(BUY) // BUY, SELL

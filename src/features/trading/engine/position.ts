@@ -190,74 +190,75 @@ export async function createOrderRecord(
 export async function createOCOOrderRecords(
     positionId: string,
     portfolioId: string,
-    ocoData: BinanceOCOOrderResponse,
-    accountType: "SPOT" | "MARGIN",
-    sideEffectType?: "NO_SIDE_EFFECT" | "MARGIN_BUY" | "AUTO_REPAY"
+    ocoData: BinanceOCOOrderResponse
 ): Promise<{ tpOrderId?: string; slOrderId?: string }> {
     const result: { tpOrderId?: string; slOrderId?: string } = {};
 
     console.log('[OCO Orders] Creating order records for OCO:', {
         orderListId: ocoData.orderListId,
-        numOrders: ocoData.orderReports?.length || 0
+        numOrders: ocoData.orderReports.length
     });
 
-    // Extract order details from OCO response
-    for (const orderReport of ocoData.orderReports || []) {
-        // Determine order type based on Binance order type
-        const orderType = orderReport.type === 'LIMIT_MAKER'
-            ? 'TAKE_PROFIT'
-            : 'STOP_LOSS';
+    // Extract orderListId from response
+    const orderListId = ocoData.orderListId.toString();
 
-        // Map Binance order type to Prisma OrderOrderType enum
-        // LIMIT_MAKER → TAKE_PROFIT_LIMIT (for TP in OCO)
-        // STOP_LOSS_LIMIT → STOP_LOSS_LIMIT (for SL in OCO)
-        const prismaOrderType = orderReport.type === 'LIMIT_MAKER'
-            ? 'TAKE_PROFIT_LIMIT'
-            : orderReport.type; // STOP_LOSS_LIMIT is already valid
+    for (const orderReport of ocoData.orderReports) {
+        // Determine order type based on stopPrice
+        const isStopLoss = orderReport.stopPrice !== undefined;
+        const orderType = isStopLoss ? 'STOP_LOSS' : 'TAKE_PROFIT';
+
+        // Map Binance order type to Prisma enum
+        const binanceType = orderReport.type;
+        let prismaOrderType: string;
+
+        if (binanceType === 'STOP_LOSS_LIMIT') {
+            prismaOrderType = 'STOP_LOSS_LIMIT';
+        } else if (binanceType === 'LIMIT_MAKER') {
+            prismaOrderType = 'TAKE_PROFIT_LIMIT';
+        } else {
+            prismaOrderType = binanceType;
+        }
 
         console.log('[OCO Orders] Creating order:', {
             type: orderType,
             orderId: orderReport.orderId,
-            binanceType: orderReport.type,
+            binanceType,
             mappedOrderType: prismaOrderType,
             status: orderReport.status
         });
 
+        // Create order record
         const order = await db.order.create({
             data: {
                 positionId,
                 portfolioId,
                 orderId: orderReport.orderId.toString(),
-                clientOrderId: orderReport.clientOrderId || null,
+                orderListId, // ← Store OCO orderListId for cancellation
+                clientOrderId: orderReport.clientOrderId,
                 symbol: orderReport.symbol,
+                type: orderType as any,
                 side: orderReport.side as any,
-                type: orderType,
-                orderType: prismaOrderType as any,  // Use mapped type
+                orderType: prismaOrderType as any,
+                price: parseFloat(orderReport.price),
+                quantity: parseFloat(orderReport.origQty),
+                value: parseFloat(orderReport.price) * parseFloat(orderReport.origQty),
                 status: orderReport.status as any,
-                price: parseFloat(orderReport.price || "0"),
-                quantity: parseFloat(orderReport.origQty || "0"),
-                executedQty: parseFloat(orderReport.executedQty || "0"),
-                cummulativeQuoteQty: parseFloat(orderReport.cummulativeQuoteQty || "0"),
-                value: parseFloat(orderReport.price || "0") * parseFloat(orderReport.origQty || "0"),
-                fillPercent: 0,
-                accountType: accountType,
-                sideEffectType: sideEffectType as any || "NO_SIDE_EFFECT",
-                transactTime: new Date(orderReport.transactTime || Date.now()),
+                transactTime: new Date(orderReport.transactTime),
             },
         });
-
-        // Track which order ID corresponds to TP vs SL
-        if (orderType === 'TAKE_PROFIT') {
-            result.tpOrderId = order.orderId;
-        } else {
-            result.slOrderId = order.orderId;
-        }
 
         console.log('[OCO Orders] Order created:', {
             type: orderType,
             dbId: order.id,
             orderId: order.orderId
         });
+
+        // Store IDs
+        if (isStopLoss) {
+            result.slOrderId = order.orderId;
+        } else {
+            result.tpOrderId = order.orderId;
+        }
     }
 
     console.log('[OCO Orders] All OCO orders created:', result);

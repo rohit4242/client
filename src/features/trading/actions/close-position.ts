@@ -84,42 +84,59 @@ export async function closePositionAction(
             };
         }
 
-        // Step 1: Cancel active OCO orders if they exist
-        const hasActiveOCO = position.stopLossOrderId || position.takeProfitOrderId;
+        // Step 1: Cancel active OCO orders on Binance
+        const activeOCOOrders = position.orders.filter(order => order.status === 'NEW');
 
-        if (hasActiveOCO && position.accountType === 'MARGIN') {
-            console.log('[Close Position] Attempting to cancel active OCO orders');
+        if (activeOCOOrders.length > 0) {
+            console.log('[Close Position] Canceling active OCO orders on Binance');
 
-            try {
-                const client = createMarginClient({
-                    apiKey: exchange.apiKey,
-                    apiSecret: exchange.apiSecret,
-                });
+            const client = createMarginClient({
+                apiKey: exchange.apiKey,
+                apiSecret: exchange.apiSecret,
+            });
 
-                // Note: We need the orderListId to cancel OCO, not individual order IDs
-                // Since we don't store orderListId currently, we'll try to cancel each individual order
-                // This will fail for OCO orders, but we log and continue
+            // Get unique orderListIds (both TP and SL share same orderListId)
+            const orderListIds = [...new Set(
+                activeOCOOrders
+                    .map(o => o.orderListId)
+                    .filter(Boolean)
+            )];
 
-                // Better approach: Just update order statuses in DB since position is being closed anyway
-                // The OCO will auto-cancel when position is fully closed on Binance
+            console.log('[Close Position] Found OCO orderListIds:', orderListIds);
 
-                console.log('[Close Position] Marking OCO orders as CANCELED in database');
-                await db.order.updateMany({
-                    where: {
-                        positionId: position.id,
-                        type: { in: ['TAKE_PROFIT', 'STOP_LOSS'] },
-                        status: 'NEW'
-                    },
-                    data: {
-                        status: 'CANCELED'
-                    }
-                });
+            // Cancel each OCO order list on Binance
+            for (const orderListId of orderListIds) {
+                try {
+                    const cancelResult = await cancelMarginOCOOrder(client, {
+                        symbol: position.symbol,
+                        orderListId: parseInt(orderListId!),
+                    });
 
-                console.log('[Close Position] OCO order statuses updated');
-
-            } catch (error) {
-                console.warn('[Close Position] Error handling OCO (continuing anyway):', error);
+                    console.log('[Close Position] OCO canceled on Binance:', {
+                        orderListId,
+                        success: cancelResult.success
+                    });
+                } catch (error) {
+                    console.warn('[Close Position] OCO cancel failed (continuing anyway):', error);
+                    // Continue - order might be already filled/canceled
+                }
             }
+
+            // Update database status
+            await db.order.updateMany({
+                where: {
+                    positionId: position.id,
+                    type: { in: ['TAKE_PROFIT', 'STOP_LOSS'] },
+                    status: 'NEW'
+                },
+                data: {
+                    status: 'CANCELED'
+                }
+            });
+
+            console.log('[Close Position] OCO orders canceled and database updated');
+        } else {
+            console.log('[Close Position] No active OCO orders to cancel');
         }
 
         // Step 2: Close position via Binance SDK
@@ -146,25 +163,26 @@ export async function closePositionAction(
             console.log('[Close Position] Closing with sideEffectType:', closeSideEffect);
 
             // Format quantity using actual LOT_SIZE from Binance
-            const apiConfig = {
-                apiKey: exchange.apiKey,
-                apiSecret: exchange.apiSecret,
-            };
-            const lotSize = await getSymbolLotSize(apiConfig, position.symbol);
-            let closeQuantity: number;
+            // const apiConfig = {
+            //     apiKey: exchange.apiKey,
+            //     apiSecret: exchange.apiSecret,
+            // };
+            // const lotSize = await getSymbolLotSize(apiConfig, position.symbol);
+            // let closeQuantity: number;
 
-            if (lotSize) {
-                closeQuantity = formatQuantityToLotSize(position.quantity, lotSize);
-                console.log('[Close Position] Quantity formatted with LOT_SIZE:', {
-                    stored: position.quantity,
-                    lotSize,
-                    formatted: closeQuantity
-                });
-            } else {
-                // Fallback: use position.quantity rounded to 8 decimals
-                closeQuantity = parseFloat(position.quantity.toFixed(8));
-                console.log('[Close Position] Using fallback quantity (no LOT_SIZE):', closeQuantity);
-            }
+            // if (lotSize) {
+            //     closeQuantity = formatQuantityToLotSize(position.quantity, lotSize);
+            //     console.log('[Close Position] Quantity formatted with LOT_SIZE:', {
+            //         stored: position.quantity,
+            //         lotSize,
+            //         formatted: closeQuantity
+            //     });
+            // } else {
+            //     // Fallback: use position.quantity rounded to 8 decimals
+            //     closeQuantity = parseFloat(position.quantity.toFixed(8));
+            //     console.log('[Close Position] Using fallback quantity (no LOT_SIZE):', closeQuantity);
+            // }
+            const closeQuantity = parseFloat(position.quantity.toFixed(8));
 
             result = await closeMarginPosition(client, {
                 symbol: position.symbol,
