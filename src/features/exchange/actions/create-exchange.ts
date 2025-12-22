@@ -12,6 +12,7 @@ import { requireAuth } from "@/lib/auth/session";
 import { handleServerError, successResult, ServerActionResult } from "@/lib/validation/error-handler";
 import { CreateExchangeInputSchema, toExchangeClient, type CreateExchangeInput, type ExchangeClient } from "../schemas/exchange.schema";
 import { Spot } from "@binance/spot";
+import { getSelectedUser } from "@/lib/selected-user-server";
 
 /**
  * Validate Binance API credentials
@@ -46,14 +47,22 @@ export async function createExchange(
     input: CreateExchangeInput
 ): Promise<ServerActionResult<ExchangeClient>> {
     try {
-        const session = await requireAuth();
+        const selectedUser = await getSelectedUser();
+
+        if (!selectedUser) {
+            return {
+                success: false,
+                error: "Selected user not found",
+            };
+        }
+
 
         // Validate input
         const validated = CreateExchangeInputSchema.parse(input);
         const { name, apiKey, apiSecret, positionMode, userId } = validated;
 
-        // Use userId from input if provided (admin creating for customer)
-        const targetUserId = userId || session.id;
+        // Use userId from selected user if provided (admin creating for customer)
+        const targetUserId = userId || selectedUser.id;
 
         // Check if exchange already exists
         const existingExchange = await db.exchange.findFirst({

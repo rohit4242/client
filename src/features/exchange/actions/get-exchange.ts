@@ -11,6 +11,7 @@ import { db } from "@/lib/db/client";
 import { requireAuth } from "@/lib/auth/session";
 import { handleServerError, assertExists } from "@/lib/validation/error-handler";
 import { toExchangeClient, type GetExchangeResult } from "../schemas/exchange.schema";
+import { getSelectedUser } from "@/lib/selected-user-server";
 
 /**
  * Get exchange by ID
@@ -18,14 +19,17 @@ import { toExchangeClient, type GetExchangeResult } from "../schemas/exchange.sc
  */
 export const getExchange = cache(async (id: string): Promise<GetExchangeResult> => {
     try {
-        const session = await requireAuth();
+       const selectedUser = await getSelectedUser();
+       if (!selectedUser) {
+            throw new Error("Selected user not found");
+        }
 
         // Fetch exchange with portfolio check
         const exchange = await db.exchange.findFirst({
             where: {
                 id,
                 portfolio: {
-                    userId: session.id,
+                    userId: selectedUser.id,
                 },
             },
         });

@@ -11,6 +11,7 @@ import { db } from "@/lib/db/client";
 import { requireAuth } from "@/lib/auth/session";
 import { handleServerError, successResult, assertExists, ServerActionResult } from "@/lib/validation/error-handler";
 import { DeleteExchangeInputSchema, type DeleteExchangeInput } from "../schemas/exchange.schema";
+import { getSelectedUser } from "@/lib/selected-user-server";
 
 /**
  * Delete exchange
@@ -19,7 +20,14 @@ export async function deleteExchange(
     input: DeleteExchangeInput
 ): Promise<ServerActionResult<{ id: string }>> {
     try {
-        const session = await requireAuth();
+        const selectedUser = await getSelectedUser();
+
+        if (!selectedUser) {
+            return {
+                success: false,
+                error: "Selected user not found",
+            };
+        }
 
         // Validate input
         const validated = DeleteExchangeInputSchema.parse(input);
@@ -30,7 +38,7 @@ export async function deleteExchange(
             where: {
                 id,
                 portfolio: {
-                    userId: session.id,
+                    userId: selectedUser.id,
                 },
             },
         });

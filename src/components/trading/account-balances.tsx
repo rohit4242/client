@@ -6,23 +6,24 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useSpotBalanceQuery } from "@/features/binance/hooks/queries/use-spot-balance-query";
 import { useMarginBalanceQuery } from "@/features/binance/hooks/queries/use-margin-balance-query";
-import { Exchange } from "@/types/exchange";
-import { Loader2 } from "lucide-react";
+import { type ExchangeClient } from "@/features/exchange";
+import { Loader2, AlertCircle } from "lucide-react";
 import { formatNumber } from "@/lib/utils";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 interface AccountBalancesProps {
-    exchange: Exchange | null;
+    exchange: ExchangeClient | null;
 }
 
 export function AccountBalances({ exchange }: AccountBalancesProps) {
     const [activeTab, setActiveTab] = useState("spot");
 
-    const { data: spotData, isLoading: isLoadingSpot } = useSpotBalanceQuery({
+    const { data: spotData, isLoading: isLoadingSpot, error: spotError } = useSpotBalanceQuery({
         exchangeId: exchange?.id || "",
         enabled: !!exchange && activeTab === "spot"
     });
 
-    const { data: marginData, isLoading: isLoadingMargin } = useMarginBalanceQuery({
+    const { data: marginData, isLoading: isLoadingMargin, error: marginError } = useMarginBalanceQuery({
         exchangeId: exchange?.id || "",
         enabled: !!exchange && activeTab === "margin"
     });
@@ -63,6 +64,13 @@ export function AccountBalances({ exchange }: AccountBalancesProps) {
                             <div className="flex justify-center p-8">
                                 <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
                             </div>
+                        ) : spotError ? (
+                            <Alert variant="destructive">
+                                <AlertCircle className="h-4 w-4" />
+                                <AlertDescription>
+                                    Failed to load spot balances: {spotError instanceof Error ? spotError.message : "Unknown error"}
+                                </AlertDescription>
+                            </Alert>
                         ) : filteredSpotAssets.length === 0 ? (
                             <div className="text-center p-8 text-muted-foreground">
                                 No active spot balances found.
@@ -104,6 +112,13 @@ export function AccountBalances({ exchange }: AccountBalancesProps) {
                             <div className="flex justify-center p-8">
                                 <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
                             </div>
+                        ) : marginError ? (
+                            <Alert variant="destructive">
+                                <AlertCircle className="h-4 w-4" />
+                                <AlertDescription>
+                                    Failed to load margin balances: {marginError instanceof Error ? marginError.message : "Unknown error"}
+                                </AlertDescription>
+                            </Alert>
                         ) : filteredMarginAssets.length === 0 ? (
                             <div className="text-center p-8 text-muted-foreground">
                                 No active margin balances found.

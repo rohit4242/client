@@ -249,7 +249,7 @@ export function ConnectExchangeDialog({
                       className="flex flex-col space-y-2"
                     >
                       <div className="flex items-center space-x-2">
-                        <RadioGroupItem value="OneWay" id="one-way" />
+                        <RadioGroupItem value="One_Way" id="one-way" />
                         <label
                           htmlFor="one-way"
                           className="text-sm font-medium cursor-pointer"
