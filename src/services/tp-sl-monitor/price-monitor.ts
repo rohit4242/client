@@ -89,6 +89,11 @@ export class PriceMonitorService {
                         lastUpdate: new Date()
                     });
 
+                    // Log price update periodically for debugging (every 10th update per symbol)
+                    if (Math.random() < 0.1) {
+                        console.log(`[PriceMonitor] 📈 ${symbol} price: ${price}`);
+                    }
+
                     this.handlePriceUpdate(symbol, price);
                 }
             } catch (error) {

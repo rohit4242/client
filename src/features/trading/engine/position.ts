@@ -122,15 +122,15 @@ export async function updatePositionWithExecution(
         entryValue: cummulativeQuoteQty,
     };
 
-    await db.position.update({
+    const updatedPosition = await db.position.update({
         where: { id: positionId },
         data: updateData,
     });
 
     console.log('[Position Update] Position status updated to:', newStatus);
 
-    // If position is now OPEN and has TP/SL in updateData, start monitoring
-    if (newStatus === 'OPEN' && (updateData.stopLoss || updateData.takeProfit)) {
+    // If position is now OPEN and has TP/SL, start monitoring
+    if (newStatus === 'OPEN' && (updatedPosition.stopLoss || updatedPosition.takeProfit)) {
         try {
             const { startMonitoringPosition } = await import('@/services/tp-sl-monitor');
             await startMonitoringPosition(positionId);

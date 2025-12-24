@@ -8,7 +8,7 @@
 "use client";
 
 import { usePositionOrdersQuery } from "@/features/order";
-import { PositionWithRelations, calculatePositionPnl } from "@/features/position";
+import { PositionWithRelations, usePositionMetrics } from "@/features/position";
 import { PositionOrderDetails } from "./position-order-details";
 import { MarginStat, PnlStat, PriceStat, RiskIndicator, StatItem } from "./position-stats";
 import { OrderHistory } from "./order-history";
@@ -29,19 +29,9 @@ export function PositionCard({ position, currentPrice }: PositionCardProps) {
     const { data: orderData, isLoading: ordersLoading } = usePositionOrdersQuery(position.id);
     const orders = orderData?.orders ?? [];
 
-    // Use live price if available, otherwise fall back to position data
-    const effectivePrice = currentPrice ?? position.currentPrice ?? position.entryPrice;
-
-    // Recalculate P/L with live price for open positions
-    const pnlData = calculatePositionPnl({
-        side: position.side,
-        entryPrice: position.entryPrice,
-        entryValue: position.entryValue,
-        currentPrice: effectivePrice,
-        exitPrice: position.exitPrice,
-        quantity: position.quantity,
-        status: position.status,
-        pnl: position.pnl,
+    const { effectivePrice, pnlData } = usePositionMetrics({
+        position,
+        overridePrice: currentPrice,
     });
 
     const copyToClipboard = (text: string, label: string) => {

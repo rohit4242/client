@@ -14,6 +14,9 @@ export { useClosedPositionsQuery } from "./hooks/use-closed-positions-query";
 export { useClosePositionMutation } from "./hooks/use-close-position-mutation";
 export { useForceCloseAllMutation } from "./hooks/use-force-close-all-mutation";
 
+// Hooks - Utilities
+export { usePositionMetrics } from "./hooks/use-position-metrics";
+
 // Types
 export type {
     GetPositionsInput,

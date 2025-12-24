@@ -4,12 +4,11 @@ import { useState, useMemo, memo } from "react";
 import { TableCell, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { ChevronDown, ChevronUp } from "lucide-react";
-import { PositionWithRelations, calculatePositionPnl } from "@/features/position";
+import { PositionWithRelations, usePositionMetrics } from "@/features/position";
 import { PositionAction } from "@/features/position";
 import { PositionActions } from "./position-actions";
 import { PositionDetailsPanel } from "./position-details-panel";
 import { cn, formatDate } from "@/lib/utils";
-import { useRealtimePrice } from "@/features/binance/client";
 import { MarkPrice } from "@/components/ui/live-price";
 import { useSelectedUser } from "@/contexts/selected-user-context";
 import {
@@ -38,29 +37,12 @@ function PositionRowComponent({
   const [actionLoading, setActionLoading] = useState(false);
   const { selectedUser } = useSelectedUser();
 
-  // Use real-time price hook from features/binance
-  const { price: livePrice, isLive } = useRealtimePrice(position.symbol, {
-    exchangeId: position.exchange.id,
-    enabled: position.status === "OPEN",
+  const { effectivePrice, pnlData } = usePositionMetrics({
+    position,
+    overridePrice: currentPrice,
   });
-
-  // Priority: passed currentPrice > live price > position.currentPrice > entryPrice as fallback
-  const price = currentPrice || (livePrice ? parseFloat(livePrice) : null) || position.currentPrice || position.entryPrice;
 
   const isClosedPosition = position.status === "CLOSED";
-
-
-  // Recalculate P/L with live price for open positions
-  const pnlData = calculatePositionPnl({
-    side: position.side,
-    entryPrice: position.entryPrice,
-    entryValue: position.entryValue,
-    currentPrice: price,
-    exitPrice: position.exitPrice,
-    quantity: position.quantity,
-    status: position.status,
-    pnl: position.pnl,
-  });
 
   const handlePositionAction = async (action: PositionAction) => {
     if (!onPositionAction) return;
@@ -181,7 +163,7 @@ function PositionRowComponent({
       {isExpanded && (
         <TableRow className="bg-slate-50/30">
           <TableCell colSpan={11} className="p-0">
-            <PositionDetailsPanel position={position} currentPrice={price} />
+            <PositionDetailsPanel position={position} currentPrice={effectivePrice} />
           </TableCell>
         </TableRow>
       )}
