@@ -40,4 +40,5 @@ export {
     PositionSchema,
     PositionClientSchema,
     PositionWithRelationsSchema,
+    calculatePositionPnl,
 } from "./schemas/position.schema";

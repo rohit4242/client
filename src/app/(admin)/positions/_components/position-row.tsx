@@ -169,7 +169,7 @@ function PositionRowComponent({
       {isExpanded && (
         <TableRow className="bg-slate-50/30">
           <TableCell colSpan={11} className="p-0">
-            <PositionDetailsPanel position={position} />
+            <PositionDetailsPanel position={position} currentPrice={price} />
           </TableCell>
         </TableRow>
       )}

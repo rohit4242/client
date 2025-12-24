@@ -8,7 +8,7 @@
 "use client";
 
 import { usePositionOrdersQuery } from "@/features/order";
-import { PositionWithRelations } from "@/features/position";
+import { PositionWithRelations, calculatePositionPnl } from "@/features/position";
 import { PositionOrderDetails } from "./position-order-details";
 import { MarginStat, PnlStat, PriceStat, RiskIndicator, StatItem } from "./position-stats";
 import { OrderHistory } from "./order-history";
@@ -21,12 +21,28 @@ import { cn } from "@/lib/utils";
 
 interface PositionCardProps {
     position: PositionWithRelations;
+    currentPrice?: number;
 }
 
-export function PositionCard({ position }: PositionCardProps) {
+export function PositionCard({ position, currentPrice }: PositionCardProps) {
     // Fetch real-time orders for this position
     const { data: orderData, isLoading: ordersLoading } = usePositionOrdersQuery(position.id);
     const orders = orderData?.orders ?? [];
+
+    // Use live price if available, otherwise fall back to position data
+    const effectivePrice = currentPrice ?? position.currentPrice ?? position.entryPrice;
+
+    // Recalculate P/L with live price for open positions
+    const pnlData = calculatePositionPnl({
+        side: position.side,
+        entryPrice: position.entryPrice,
+        entryValue: position.entryValue,
+        currentPrice: effectivePrice,
+        exitPrice: position.exitPrice,
+        quantity: position.quantity,
+        status: position.status,
+        pnl: position.pnl,
+    });
 
     const copyToClipboard = (text: string, label: string) => {
         navigator.clipboard.writeText(text);
@@ -84,11 +100,11 @@ export function PositionCard({ position }: PositionCardProps) {
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
                     <PnlStat
                         label="ROI / P&L"
-                        amount={position.pnlDisplay}
-                        percent={position.roiPercent}
+                        amount={pnlData.pnlDisplay}
+                        percent={pnlData.roiPercent}
                     />
                     <PriceStat label="Entry Price" price={position.entryPrice} precision={4} />
-                    <PriceStat label="Current Price" price={position.currentPrice ?? position.entryPrice} precision={4} />
+                    <PriceStat label="Current Price" price={effectivePrice} precision={4} />
 
                     {/* Margin & Leverage */}
                     <MarginStat
