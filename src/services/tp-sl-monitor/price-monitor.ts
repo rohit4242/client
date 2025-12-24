@@ -55,22 +55,34 @@ export class PriceMonitorService {
         const activeSymbols = Array.from(this.symbolPositions.keys());
         const streams = activeSymbols.length > 0
             ? activeSymbols.map(s => `${s.toLowerCase()}@ticker`).join('/')
-            : '!miniTicker@arr'; // Use a low-traffic dummy stream if no symbols yet to keep connection alive
+            : '!miniTicker@arr';
 
         const wsUrl = `wss://stream.binance.com:9443/stream?streams=${streams}`;
 
-        console.log(`[PriceMonitor] Connecting to ${wsUrl}`);
+        console.log(`[PriceMonitor] 🚀 Starting service connection...`);
+        console.log(`[PriceMonitor] 🔗 URL: ${wsUrl}`);
 
-        this.ws = new WS(wsUrl);
+        this.ws = new WS(wsUrl, {
+            handshakeTimeout: 10000,
+        });
 
         this.ws.on('open', () => {
-            console.log('[PriceMonitor] WebSocket connected');
+            console.log('[PriceMonitor] ✅ WebSocket Connected and Streaming');
             this.isConnected = true;
             this.reconnectAttempts = 0;
 
-            // Re-subscribe to all active symbols if this was a reconnection
-            if (activeSymbols.length > 0) {
-                this.subscribeToSymbols(activeSymbols);
+            // Log monitoring status
+            console.log(`[PriceMonitor] 📊 Monitoring ${this.positions.size} positions across ${this.symbolPositions.size} symbols`);
+
+            // Re-subscribe to all active symbols
+            const symbolsToSubscribe = new Set([
+                ...activeSymbols,
+                ...Array.from(this.pendingSubscriptions)
+            ]);
+
+            if (symbolsToSubscribe.size > 0) {
+                this.subscribeToSymbols(Array.from(symbolsToSubscribe));
+                this.pendingSubscriptions.clear();
             }
         });
 
@@ -80,21 +92,15 @@ export class PriceMonitorService {
 
                 // Handle combined stream format: { "stream": "...", "data": { ... } }
                 if (message.stream && message.data) {
-                    const symbol = message.data.s; // Symbol name from data
-                    const price = parseFloat(message.data.c); // Last price
+                    const data = message.data;
 
-                    this.symbolPrices.set(symbol, {
-                        symbol,
-                        lastPrice: price,
-                        lastUpdate: new Date()
-                    });
-
-                    // Log price update periodically for debugging (every 10th update per symbol)
-                    if (Math.random() < 0.1) {
-                        console.log(`[PriceMonitor] 📈 ${symbol} price: ${price}`);
+                    // Handle array of tickers (e.g., !miniTicker@arr)
+                    if (Array.isArray(data)) {
+                        data.forEach(item => this.processTickerData(item));
+                    } else {
+                        // Handle single ticker object
+                        this.processTickerData(data);
                     }
-
-                    this.handlePriceUpdate(symbol, price);
                 }
             } catch (error) {
                 console.error('[PriceMonitor] Error parsing message:', error);
@@ -201,6 +207,29 @@ export class PriceMonitorService {
                 this.symbolPrices.delete(position.symbol);
             }
         }
+    }
+
+    /**
+     * Process ticker data and update state
+     */
+    private processTickerData(data: any): void {
+        const symbol = data.s;
+        const price = parseFloat(data.c);
+
+        if (!symbol || isNaN(price)) return;
+
+        this.symbolPrices.set(symbol, {
+            symbol,
+            lastPrice: price,
+            lastUpdate: new Date()
+        });
+
+        // Log price update periodically for debugging (approx 1% of updates to avoid spam)
+        if (Math.random() < 0.01) {
+            console.log(`[PriceMonitor] 📈 ${symbol} price: ${price}`);
+        }
+
+        this.handlePriceUpdate(symbol, price);
     }
 
     /**

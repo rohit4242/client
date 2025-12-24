@@ -6,7 +6,9 @@ export async function register() {
             const { initializeTPSLMonitoring } = await import('@/services/tp-sl-monitor');
             await initializeTPSLMonitoring();
 
-            console.log('[Instrumentation] TP/SL Monitor initialized');
+            console.log('******************************************');
+            console.log('🚀 TP/SL MONITOR IS ACTIVE AND RUNNING');
+            console.log('******************************************');
         } catch (error) {
             console.error('[Instrumentation] Failed to initialize services:', error);
         }
