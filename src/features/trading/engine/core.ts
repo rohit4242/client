@@ -15,7 +15,6 @@ import {
     updatePositionWithExecution,
     createOrderRecord,
     deletePendingPosition,
-    createOCOOrderRecords,
 } from "./position";
 import { recalculatePortfolioStatsInternal } from "@/db/actions/portfolio/recalculate-stats";
 import { db } from "@/lib/db/client";
@@ -32,10 +31,9 @@ import { db } from "@/lib/db/client";
  * 3. Calculate trade parameters (quantities, prices)
  * 4. Create pending position in database
  * 5. Execute trade on Binance
- * 6. Create OCO order records (if protective orders present)
- * 7. Update position with execution data and OCO references
- * 8. Create entry order record
- * 9. Recalculate portfolio stats
+ * 6. Update position with execution data
+ * 7. Create entry order record
+ * 8. Recalculate portfolio stats
  * 
  * @param request - Trading request (manual or signal)
  * @returns Trading result with position and order IDs
@@ -126,39 +124,8 @@ export async function executeTradingRequest(
             status: executionData.status,
         });
 
-        // Step 6: Check for protective orders (OCO) in result
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const hasProtectiveOrders = (binanceResult as any).protectiveOrders;
-        let ocoOrderIds: { tpOrderId?: string; slOrderId?: string } | undefined;
-
-        if (hasProtectiveOrders) {
-            console.log('[Trading Engine] Creating OCO order records');
-
-            // Create order records for TP and SL
-            ocoOrderIds = await createOCOOrderRecords(
-                position.id,
-                position.portfolioId,
-                hasProtectiveOrders
-            );
-
-            console.log('[Trading Engine] OCO orders saved:', ocoOrderIds);
-        }
-
-        // Step 7: Update position with execution data and OCO references
-        // Extract warning message and error details from binance result (if protective orders failed)
-        let warningMessage: string | undefined;
-        const resultWarning = (binanceResult as any).warning;
-        const resultError = (binanceResult as any).protectiveOrderError;
-
-        if (resultWarning || resultError) {
-            // Combine warning and error for complete context
-            warningMessage = resultWarning || '';
-            if (resultError && resultWarning !== resultError) {
-                warningMessage += warningMessage ? ` Error details: ${resultError}` : resultError;
-            }
-        }
-
-        await updatePositionWithExecution(position.id, executionData, ocoOrderIds, warningMessage);
+        // Step 7: Update position with execution data
+        await updatePositionWithExecution(position.id, executionData);
         console.log("[Trading Engine] Position updated with execution data");
 
         // Step 8: Create order record

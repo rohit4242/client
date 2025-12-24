@@ -10,7 +10,7 @@ import { z } from "zod";
 import { requireAuth } from "@/lib/auth/session";
 import { handleServerError, successResult, type ServerActionResult } from "@/lib/validation/error-handler";
 import { db } from "@/lib/db/client";
-import { createSpotClient, createMarginClient, closeSpotPosition, closeMarginPosition, cancelMarginOCOOrder } from "@/features/binance";
+import { createSpotClient, createMarginClient, closeSpotPosition, closeMarginPosition } from "@/features/binance";
 import { formatQuantityToLotSize, getSymbolLotSize } from "@/lib/signal-bot/exchange-info-utils";
 import type { TradingResult } from "../types/trading.types";
 import { revalidatePath } from "next/cache";
@@ -82,61 +82,6 @@ export async function closePositionAction(
                 success: false,
                 error: "Exchange not found",
             };
-        }
-
-        // Step 1: Cancel active OCO orders on Binance
-        const activeOCOOrders = position.orders.filter(order => order.status === 'NEW');
-
-        if (activeOCOOrders.length > 0) {
-            console.log('[Close Position] Canceling active OCO orders on Binance');
-
-            const client = createMarginClient({
-                apiKey: exchange.apiKey,
-                apiSecret: exchange.apiSecret,
-            });
-
-            // Get unique orderListIds (both TP and SL share same orderListId)
-            const orderListIds = [...new Set(
-                activeOCOOrders
-                    .map(o => o.orderListId)
-                    .filter(Boolean)
-            )];
-
-            console.log('[Close Position] Found OCO orderListIds:', orderListIds);
-
-            // Cancel each OCO order list on Binance
-            for (const orderListId of orderListIds) {
-                try {
-                    const cancelResult = await cancelMarginOCOOrder(client, {
-                        symbol: position.symbol,
-                        orderListId: parseInt(orderListId!),
-                    });
-
-                    console.log('[Close Position] OCO canceled on Binance:', {
-                        orderListId,
-                        success: cancelResult.success
-                    });
-                } catch (error) {
-                    console.warn('[Close Position] OCO cancel failed (continuing anyway):', error);
-                    // Continue - order might be already filled/canceled
-                }
-            }
-
-            // Update database status
-            await db.order.updateMany({
-                where: {
-                    positionId: position.id,
-                    type: { in: ['TAKE_PROFIT', 'STOP_LOSS'] },
-                    status: 'NEW'
-                },
-                data: {
-                    status: 'CANCELED'
-                }
-            });
-
-            console.log('[Close Position] OCO orders canceled and database updated');
-        } else {
-            console.log('[Close Position] No active OCO orders to cancel');
         }
 
         // Step 2: Close position via Binance SDK
@@ -232,6 +177,15 @@ export async function closePositionAction(
                 takeProfitStatus: position.takeProfitOrderId ? 'CANCELED' : null,
             },
         });
+
+        // Stop monitoring this position
+        try {
+            const { stopMonitoringPosition } = await import('@/services/tp-sl-monitor');
+            await stopMonitoringPosition(positionId);
+            console.log('[Close Position] Stopped TP/SL monitoring');
+        } catch (error) {
+            console.error('[Close Position] Failed to stop monitoring:', error);
+        }
 
         // Create exit order record
         await db.order.create({

@@ -145,8 +145,8 @@ export function PositionLeverageCard() {
                                                     )
                                                 }
                                                 className={`px-3 text-xs font-semibold rounded-sm transition-all ${watchedTradeAmountType === option.value
-                                                        ? "bg-white text-teal-700 shadow-sm border border-teal-200"
-                                                        : "text-slate-500 hover:text-slate-700"
+                                                    ? "bg-white text-teal-700 shadow-sm border border-teal-200"
+                                                    : "text-slate-500 hover:text-slate-700"
                                                     }`}
                                             >
                                                 {option.value === "QUOTE" ? quoteAsset : baseAsset}
@@ -175,10 +175,10 @@ export function PositionLeverageCard() {
                                 <Badge
                                     variant={field.value > 1 ? "default" : "secondary"}
                                     className={`font-mono text-sm px-3 ${field.value > 3
-                                            ? "bg-amber-500"
-                                            : field.value > 1
-                                                ? "bg-teal-600"
-                                                : ""
+                                        ? "bg-amber-500"
+                                        : field.value > 1
+                                            ? "bg-teal-600"
+                                            : ""
                                         }`}
                                 >
                                     {field.value}x
@@ -192,21 +192,21 @@ export function PositionLeverageCard() {
                                     <div className="flex-1 relative">
                                         <Slider
                                             min={1}
-                                            max={watchedAccountType === "MARGIN" ? 10 : 1}
+                                            max={watchedAccountType === "MARGIN" ? 4 : 1}
                                             step={1}
                                             value={[field.value || 1]}
                                             onValueChange={(vals) => field.onChange(vals[0])}
                                             disabled={watchedAccountType === "SPOT"}
                                             className="flex-1"
                                         />
-                                        {field.value > 3 && watchedAccountType === "MARGIN" && (
+                                        {field.value > 2 && watchedAccountType === "MARGIN" && (
                                             <div className="absolute -bottom-5 left-1/2 -translate-x-1/2 text-[10px] text-amber-600 font-medium">
                                                 ⚠️ High leverage
                                             </div>
                                         )}
                                     </div>
                                     <span className="text-xs text-muted-foreground w-8 text-right font-mono">
-                                        {watchedAccountType === "MARGIN" ? "10x" : "1x"}
+                                        {watchedAccountType === "MARGIN" ? "4x" : "1x"}
                                     </span>
                                 </div>
                             </FormControl>
@@ -252,8 +252,8 @@ export function PositionLeverageCard() {
                                         }
                                         size="sm"
                                         className={`h-6 text-[10px] px-2 ${watchedMaxBorrowPercent === pct
-                                                ? "bg-teal-600 hover:bg-teal-700"
-                                                : ""
+                                            ? "bg-teal-600 hover:bg-teal-700"
+                                            : ""
                                             }`}
                                         onClick={() => form.setValue("maxBorrowPercent", pct)}
                                     >

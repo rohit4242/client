@@ -451,8 +451,10 @@ model Bot {
   maxBorrowPercent Float          @default(50) // Max % of collateral to borrow
 
   // Risk management
-  stopLoss   Float? // % stop loss
-  takeProfit Float? // % take profit
+  useStopLoss   Boolean @default(true)
+  useTakeProfit Boolean @default(true)
+  stopLoss      Float? // % stop loss
+  takeProfit    Float? // % take profit
 
   // Daily/position limits
   maxDailyTrades   Int? // Max trades per day

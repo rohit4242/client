@@ -59,9 +59,17 @@ export function useTradingCalculations({
             ? (price > 0 ? tradeAmount / price : 0)
             : tradeAmount;
 
-        // Position value is always in USDT for calculations
+        // Position value is the required margin (collateral needed)
+        // For 1x leverage: position value = trade amount
+        // For >1x leverage: position value = trade amount / leverage, but we use trade amount as position
         const positionValue = usdtValue;
+
+        // Leveraged value is total position size (exposure)
+        // Example: $1000 margin + 3x leverage = $3000 total position
         const leveragedValue = positionValue * leverage;
+
+        // Borrow amount is what needs to be borrowed to reach leveraged position
+        // Example: $3000 position - $1000 margin = $2000 to borrow
         const borrowAmount = leveragedValue - positionValue;
 
         // Rename for clarity
@@ -73,7 +81,7 @@ export function useTradingCalculations({
         const userMaxBorrowable = exchangeMaxBorrowable * ((watchedMaxBorrowPercent || 0) / 100);
 
         // For Spot: Must have full position value
-        // For Margin: Can use balance + borrow to cover position
+        // For Margin: Can use balance + borrow to cover leveraged position
         const hasSufficientBalance = activeValue >= usdtValue;
         const totalBuyingPower = watchedAccountType === "MARGIN"
             ? activeValue + userMaxBorrowable

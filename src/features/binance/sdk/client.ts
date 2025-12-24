@@ -119,11 +119,6 @@ function mapBinanceErrorCode(code: string, originalMsg: string): string {
         "-2010": "Insufficient balance",
         "-2011": "Unknown order",
 
-        // OCO order errors
-        "-1130": "Invalid data sent for OCO order",
-        "-1131": "Invalid listClientOrderId",
-        "-1107": "Mandatory parameter was not sent, was empty/null, or malformed",
-
         // Symbol errors
         "-1121": "Invalid symbol",
 

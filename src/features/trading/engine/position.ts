@@ -6,7 +6,7 @@
 
 import { db } from "@/lib/db/client";
 import type { NormalizedTradingRequest, TradeParams } from "../types/trading.types";
-import type { BinanceOrderResponse, BinanceOCOOrderResponse } from "@/features/binance";
+import type { BinanceOrderResponse } from "@/features/binance";
 import { determinePositionSide } from "./normalization";
 
 /**
@@ -52,9 +52,7 @@ export async function createPendingPosition(
  */
 export async function updatePositionWithExecution(
     positionId: string,
-    binanceOrder: BinanceOrderResponse,
-    ocoOrderIds?: { tpOrderId?: string; slOrderId?: string },
-    warningMessage?: string  // Critical warnings (e.g., OCO placement failures)
+    binanceOrder: BinanceOrderResponse
 ): Promise<void> {
     const executedQty = parseFloat(binanceOrder.executedQty || "0");
     const cummulativeQuoteQty = parseFloat(binanceOrder.cummulativeQuoteQty || "0");
@@ -111,8 +109,7 @@ export async function updatePositionWithExecution(
         orderStatus: binanceOrder.status,
         newPositionStatus: newStatus,
         actualQuantity,
-        executedPrice,
-        hasOCO: !!ocoOrderIds
+        executedPrice
     });
 
     const updateData: any = {
@@ -122,31 +119,23 @@ export async function updatePositionWithExecution(
         entryValue: cummulativeQuoteQty,
     };
 
-    // Store OCO order IDs in position for quick reference
-    if (ocoOrderIds) {
-        if (ocoOrderIds.tpOrderId) {
-            updateData.takeProfitOrderId = ocoOrderIds.tpOrderId;
-            updateData.takeProfitStatus = "NEW";
-        }
-        if (ocoOrderIds.slOrderId) {
-            updateData.stopLossOrderId = ocoOrderIds.slOrderId;
-            updateData.stopLossStatus = "NEW";
-        }
-        console.log('[Position Update] OCO order IDs stored:', ocoOrderIds);
-    }
-
-    // Store warning message if provided (e.g., OCO placement failure)
-    if (warningMessage) {
-        updateData.warningMessage = warningMessage;
-        console.log('[Position Update] Warning stored:', warningMessage);
-    }
-
     await db.position.update({
         where: { id: positionId },
         data: updateData,
     });
 
     console.log('[Position Update] Position status updated to:', newStatus);
+
+    // If position is now OPEN and has TP/SL in updateData, start monitoring
+    if (newStatus === 'OPEN' && (updateData.stopLoss || updateData.takeProfit)) {
+        try {
+            const { startMonitoringPosition } = await import('@/services/tp-sl-monitor');
+            await startMonitoringPosition(positionId);
+            console.log('[Position Update] Started TP/SL monitoring for position:', positionId);
+        } catch (error) {
+            console.error('[Position Update] Failed to start TP/SL monitoring:', error);
+        }
+    }
 }
 
 /**
@@ -187,89 +176,6 @@ export async function createOrderRecord(
         id: order.id,
         orderId: order.orderId,
     };
-}
-
-/**
- * Create order records for OCO protective orders
- * OCO orders contain two legs: Take Profit (LIMIT_MAKER) and Stop Loss (STOP_LOSS_LIMIT)
- * This function creates separate Order records for each leg
- */
-export async function createOCOOrderRecords(
-    positionId: string,
-    portfolioId: string,
-    ocoData: BinanceOCOOrderResponse
-): Promise<{ tpOrderId?: string; slOrderId?: string }> {
-    const result: { tpOrderId?: string; slOrderId?: string } = {};
-
-    console.log('[OCO Orders] Creating order records for OCO:', {
-        orderListId: ocoData.orderListId,
-        numOrders: ocoData.orderReports.length
-    });
-
-    // Extract orderListId from response
-    const orderListId = ocoData.orderListId.toString();
-
-    for (const orderReport of ocoData.orderReports) {
-        // Determine order type based on stopPrice
-        const isStopLoss = orderReport.stopPrice !== undefined;
-        const orderType = isStopLoss ? 'STOP_LOSS' : 'TAKE_PROFIT';
-
-        // Map Binance order type to Prisma enum
-        const binanceType = orderReport.type;
-        let prismaOrderType: string;
-
-        if (binanceType === 'STOP_LOSS_LIMIT') {
-            prismaOrderType = 'STOP_LOSS_LIMIT';
-        } else if (binanceType === 'LIMIT_MAKER') {
-            prismaOrderType = 'TAKE_PROFIT_LIMIT';
-        } else {
-            prismaOrderType = binanceType;
-        }
-
-        console.log('[OCO Orders] Creating order:', {
-            type: orderType,
-            orderId: orderReport.orderId,
-            binanceType,
-            mappedOrderType: prismaOrderType,
-            status: orderReport.status
-        });
-
-        // Create order record
-        const order = await db.order.create({
-            data: {
-                positionId,
-                portfolioId,
-                orderId: orderReport.orderId.toString(),
-                orderListId, // ← Store OCO orderListId for cancellation
-                clientOrderId: orderReport.clientOrderId,
-                symbol: orderReport.symbol,
-                type: orderType as any,
-                side: orderReport.side as any,
-                orderType: prismaOrderType as any,
-                price: parseFloat(orderReport.price),
-                quantity: parseFloat(orderReport.origQty),
-                value: parseFloat(orderReport.price) * parseFloat(orderReport.origQty),
-                status: orderReport.status as any,
-                transactTime: new Date(orderReport.transactTime),
-            },
-        });
-
-        console.log('[OCO Orders] Order created:', {
-            type: orderType,
-            dbId: order.id,
-            orderId: order.orderId
-        });
-
-        // Store IDs
-        if (isStopLoss) {
-            result.slOrderId = order.orderId;
-        } else {
-            result.tpOrderId = order.orderId;
-        }
-    }
-
-    console.log('[OCO Orders] All OCO orders created:', result);
-    return result;
 }
 
 /**

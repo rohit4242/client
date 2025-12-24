@@ -100,6 +100,16 @@ export function SignalBotCardHeader({
                     />
                 </div>
 
+                <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={onWebhook}
+                    className="h-8 w-8 rounded-lg hover:bg-blue-50 text-blue-600 hover:text-blue-700"
+                    title="View Alerts & Webhook"
+                >
+                    <Shield className="h-4 w-4" />
+                </Button>
+
                 <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                         <Button

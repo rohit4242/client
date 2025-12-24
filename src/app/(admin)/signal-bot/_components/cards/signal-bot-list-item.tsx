@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { BotWithExchange, useToggleBotMutation } from "@/features/signal-bot";
-import { Bot, Globe, Activity, TrendingUp, DollarSign, Edit, Trash2, Link, Zap } from "lucide-react";
+import { Bot, Globe, Activity, TrendingUp, DollarSign, Edit, Trash2, Link, Zap, Shield } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
@@ -117,6 +117,15 @@ export function SignalBotListItem({ bot, onBotUpdated, userId }: SignalBotListIt
                             />
 
                             <div className="flex items-center gap-1 border-l border-slate-100 pl-2">
+                                <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="size-8 text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded-lg"
+                                    onClick={() => setShowWebhookDialog(true)}
+                                    title="View Alerts"
+                                >
+                                    <Shield className="size-4" />
+                                </Button>
                                 <Button
                                     variant="ghost"
                                     size="icon"

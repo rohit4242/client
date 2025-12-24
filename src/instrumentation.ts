@@ -2,15 +2,13 @@ export async function register() {
     // Only run on the server side (Node.js runtime)
     if (process.env.NEXT_RUNTIME === 'nodejs') {
         try {
-            // Dynamically import the stream manager
-            const { binanceStreamManager } = await import('@/services/binance-stream');
+            // Initialize TP/SL monitoring system
+            const { initializeTPSLMonitoring } = await import('@/services/tp-sl-monitor');
+            await initializeTPSLMonitoring();
 
-            // Initialize streams for all active users
-            await binanceStreamManager.initializeAllActiveStreams();
-
-            console.log('[Instrumentation] Binance Stream Manager initialized');
+            console.log('[Instrumentation] TP/SL Monitor initialized');
         } catch (error) {
-            console.error('[Instrumentation] Failed to initialize Binance Stream Manager:', error);
+            console.error('[Instrumentation] Failed to initialize services:', error);
         }
     }
 }

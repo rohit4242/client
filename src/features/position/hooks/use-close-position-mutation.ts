@@ -49,7 +49,7 @@ export function useClosePositionMutation() {
                 queryKey: queryKeys.positions.detail(variables.positionId)
             });
 
-            // Invalidate orders (OCO orders status changed)
+            // Invalidate orders (order status changed)
             queryClient.invalidateQueries({ queryKey: queryKeys.orders.all() });
 
             // Invalidate portfolio (balance may have changed)

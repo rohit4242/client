@@ -64,6 +64,8 @@ export function useUpdateBotForm({
                 | "AUTO_BORROW_REPAY",
             autoRepay: bot.autoRepay || false,
             maxBorrowPercent: bot.maxBorrowPercent || 50,
+            useStopLoss: bot.useStopLoss ?? true,
+            useTakeProfit: bot.useTakeProfit ?? true,
             stopLoss: bot.stopLoss || null,
             takeProfit: bot.takeProfit || null,
         },
@@ -91,6 +93,8 @@ export function useUpdateBotForm({
                     | "AUTO_BORROW_REPAY",
                 autoRepay: bot.autoRepay || false,
                 maxBorrowPercent: bot.maxBorrowPercent || 50,
+                useStopLoss: bot.useStopLoss ?? true,
+                useTakeProfit: bot.useTakeProfit ?? true,
                 stopLoss: bot.stopLoss || null,
                 takeProfit: bot.takeProfit || null,
             });

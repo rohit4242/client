@@ -38,7 +38,7 @@ export const CreateBotInputSchema = z.object({
     // Account Type
     accountType: z.nativeEnum(AccountType),
     marginType: z.nativeEnum(MarginType).optional().nullable(),
-    leverage: z.number().min(1, "Min leverage is 1").max(10, "Max leverage is 10"),
+    leverage: z.number().min(1, "Min leverage is 1").max(4, "Max leverage is 4"),
 
     // Margin-Specific Settings
     sideEffectType: z.nativeEnum(SideEffectType),
@@ -49,8 +49,11 @@ export const CreateBotInputSchema = z.object({
         .max(100, "Max 100%"),
 
     // Risk Management
+    useStopLoss: z.boolean().default(true),
+    useTakeProfit: z.boolean().default(true),
     stopLoss: z.number().min(0.1).max(50).nullable().optional(),
     takeProfit: z.number().min(0.1).max(100).nullable().optional(),
+
 
     // Position Limits
     maxDailyTrades: z.number().int().positive().max(1000).optional().nullable(),
@@ -216,6 +219,8 @@ export const BotSchema = z.object({
     maxBorrowPercent: z.number(),
 
     // Risk management
+    useStopLoss: z.boolean(),
+    useTakeProfit: z.boolean(),
     stopLoss: z.number().nullable(),
     takeProfit: z.number().nullable(),
 

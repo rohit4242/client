@@ -46,6 +46,8 @@ const DEFAULT_VALUES: CreateBotInput = {
     sideEffectType: "NO_SIDE_EFFECT" as const,
     autoRepay: false,
     maxBorrowPercent: 50,
+    useStopLoss: true,
+    useTakeProfit: true,
     stopLoss: null,
     takeProfit: null,
 };
@@ -63,7 +65,7 @@ export function useCreateBotForm({
     // Form Setup
     // -------------------------------------------------------------------------
     const form = useForm<CreateBotInput>({
-        resolver: zodResolver(CreateBotInputSchema),
+        resolver: zodResolver(CreateBotInputSchema) as any,
         defaultValues: DEFAULT_VALUES,
     });
 
