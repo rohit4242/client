@@ -84,12 +84,20 @@ export const formatPercentage = (value: number) => {
 
 /**
  * Formats a number as USD currency
+ * Shows more decimals for small amounts to maintain precision
  */
 export const formatCurrency = (value: number) => {
+    const absValue = Math.abs(value);
+
+    // For very small amounts (common in crypto with small quantities)
+    // show up to 6 decimals if under $1
+    const minimumFractionDigits = absValue > 0 && absValue < 1 ? 4 : 2;
+    const maximumFractionDigits = absValue > 0 && absValue < 1 ? 6 : 2;
+
     return new Intl.NumberFormat("en-US", {
         style: "currency",
         currency: "USD",
-        minimumFractionDigits: 2,
-        maximumFractionDigits: 2,
+        minimumFractionDigits,
+        maximumFractionDigits,
     }).format(value);
 };

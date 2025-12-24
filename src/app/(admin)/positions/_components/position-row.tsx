@@ -4,7 +4,7 @@ import { useState, useMemo, memo } from "react";
 import { TableCell, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { ChevronDown, ChevronUp } from "lucide-react";
-import type { PositionWithRelations } from "@/features/position";
+import { PositionWithRelations, calculatePositionPnl } from "@/features/position";
 import { PositionAction } from "@/features/position";
 import { PositionActions } from "./position-actions";
 import { PositionDetailsPanel } from "./position-details-panel";
@@ -49,6 +49,18 @@ function PositionRowComponent({
 
   const isClosedPosition = position.status === "CLOSED";
 
+
+  // Recalculate P/L with live price for open positions
+  const pnlData = calculatePositionPnl({
+    side: position.side,
+    entryPrice: position.entryPrice,
+    entryValue: position.entryValue,
+    currentPrice: price,
+    exitPrice: position.exitPrice,
+    quantity: position.quantity,
+    status: position.status,
+    pnl: position.pnl,
+  });
 
   const handlePositionAction = async (action: PositionAction) => {
     if (!onPositionAction) return;
@@ -132,16 +144,16 @@ function PositionRowComponent({
 
         {/* P/L % */}
         <TableCell>
-          <span className={cn("font-mono font-bold text-sm", getPnLColor(position.roiPercent))}>
-            {formatPercentage(position.roiPercent)}
+          <span className={cn("font-mono font-bold text-sm", getPnLColor(pnlData.roiPercent))}>
+            {formatPercentage(pnlData.roiPercent)}
           </span>
         </TableCell>
 
         {/* P/L USD */}
         <TableCell>
-          <span className={cn("font-mono text-sm", getPnLColor(position.pnlDisplay))}>
-            {position.pnlDisplay >= 0 ? "+" : ""}
-            {formatCurrency(position.pnlDisplay)}
+          <span className={cn("font-mono text-sm", getPnLColor(pnlData.pnlDisplay))}>
+            {pnlData.pnlDisplay >= 0 ? "+" : ""}
+            {formatCurrency(pnlData.pnlDisplay)}
           </span>
         </TableCell>
 
