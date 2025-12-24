@@ -38,6 +38,9 @@ export async function createPendingPosition(
             botId: request.botId || null,
             sideEffectType: request.order.sideEffectType || "NO_SIDE_EFFECT",
             marginType: request.order.accountType === "MARGIN" ? "CROSS" : null,
+            // Add TP/SL from request (bot configuration)
+            stopLoss: request.order.stopLoss || null,
+            takeProfit: request.order.takeProfit || null,
         },
     });
 
