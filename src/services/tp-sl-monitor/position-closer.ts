@@ -25,6 +25,10 @@ export class PositionCloserService {
     // Callback to remove position from monitoring
     private onPositionClosed?: (positionId: string) => void;
 
+    // Retry tracking: positionId -> retry count
+    private retryCount: Map<string, number> = new Map();
+    private readonly MAX_RETRIES = 3;
+
     constructor() {
         console.log('[PositionCloser] Service initialized');
     }
@@ -78,9 +82,29 @@ export class PositionCloserService {
 
             try {
                 await this.closePosition(request);
+                // Success! Clear retry count
+                this.retryCount.delete(positionId);
             } catch (error) {
                 console.error(`[PositionCloser] Failed to close ${positionId}:`, error);
-                // Position remains in monitoring, will retry on next price update
+
+                // Track retry count
+                const currentRetries = this.retryCount.get(positionId) || 0;
+                const newRetries = currentRetries + 1;
+                this.retryCount.set(positionId, newRetries);
+
+                console.log(`[PositionCloser] Retry count for ${positionId}: ${newRetries}/${this.MAX_RETRIES}`);
+
+                // If max retries exceeded, remove from monitoring
+                if (newRetries >= this.MAX_RETRIES) {
+                    console.error(`[PositionCloser] ❌ Max retries (${this.MAX_RETRIES}) exceeded for ${positionId}. Removing from monitoring.`);
+                    this.retryCount.delete(positionId);
+
+                    // Remove from monitoring to stop infinite retries
+                    if (this.onPositionClosed) {
+                        this.onPositionClosed(positionId);
+                    }
+                }
+                // Otherwise, position remains in monitoring and will retry on next price update
             }
 
             // Small delay to avoid rate limiting
@@ -130,12 +154,20 @@ export class PositionCloserService {
         } catch (error: any) {
             console.error(`[PositionCloser] Failed to close ${position.id}:`, error);
 
+            const retries = this.retryCount.get(position.id) || 0;
+            const isPermanentFailure = retries >= this.MAX_RETRIES - 1; // Will hit max on next attempt
+
             // Update position with warning message
             await db.position.update({
                 where: { id: position.id },
                 data: {
-                    warningMessage: `Exit Failed: ${error.message || 'Unknown error'}`.substring(0, 190) // Truncate to fit
+                    warningMessage: isPermanentFailure
+                        ? `⚠️ TP/SL Failed (Max Retries): ${error.message || 'Unknown error'}`.substring(0, 190)
+                        : `⚠️ TP/SL Exit Failed (Retry ${retries + 1}/${this.MAX_RETRIES}): ${error.message}`.substring(0, 190)
                 }
+            }).catch(dbError => {
+                console.error(`[PositionCloser] Failed to update position warning:
+`, dbError);
             });
 
             throw error; // Re-throw to ensure processQueue knows it failed
