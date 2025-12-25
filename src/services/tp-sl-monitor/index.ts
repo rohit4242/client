@@ -89,9 +89,16 @@ export async function initializeTPSLMonitoring(): Promise<void> {
 
         // Log stats
         const stats = priceMonitor.getStats();
+        let connectionStatus = 'DISCONNECTED';
+        if (stats.isConnected) {
+            connectionStatus = 'CONNECTED';
+        } else if (stats.activeSymbols > 0) {
+            connectionStatus = 'CONNECTING...';
+        }
+
         console.log(`[TPSL Monitor] Monitoring ${stats.monitoredPositions} positions across ${stats.activeSymbols} symbols`);
         console.log(`[TPSL Monitor] Active symbols: ${stats.symbols.join(', ')}`);
-        console.log(`[TPSL Monitor] Connection status: ${stats.isConnected ? 'CONNECTED' : 'DISCONNECTED'}`);
+        console.log(`[TPSL Monitor] Connection status: ${connectionStatus}`);
 
     } catch (error) {
         console.error('[TPSL Monitor] ❌ Initialization failed:', error);

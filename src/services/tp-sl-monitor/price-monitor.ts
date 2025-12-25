@@ -191,6 +191,12 @@ export class PriceMonitorService {
 
         this.symbolPositions.get(position.symbol)!.add(position.id);
         console.log(`[PriceMonitor] Monitoring ${position.id} for ${position.symbol}`);
+
+        // If service is idle (no WS), wake it up!
+        if (!this.ws) {
+            console.log('[PriceMonitor] 💤 Service is idle. Waking up to monitor new position...');
+            this.connect();
+        }
     }
 
     /**
