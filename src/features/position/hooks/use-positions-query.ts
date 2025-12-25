@@ -1,10 +1,10 @@
 /**
  * usePositionsQuery Hook
  * 
- * React Query hook for fetching positions with filters.
+ * React Query hook for fetching positions with filters and pagination.
  */
 
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, keepPreviousData } from "@tanstack/react-query";
 import { queryKeys } from "@/lib/query/query-keys";
 import { getPositions } from "../actions/get-positions";
 import type { GetPositionsInput } from "../types/position.types";
@@ -28,13 +28,13 @@ export interface UsePositionsQueryOptions {
 }
 
 /**
- * Fetch positions with optional filters
+ * Fetch positions with optional filters and pagination
  * 
- * @param filters - Optional filters (status, symbol, accountType, source, limit)
+ * @param filters - Optional filters (status, symbol, accountType, source, page, pageSize, limit)
  * @param options - Query options
  * 
  * @example
- * const { data, isLoading } = usePositionsQuery({ status: "OPEN" });
+ * const { data, isLoading } = usePositionsQuery({ status: "OPEN", page: 1, pageSize: 20 });
  * const positions = data?.positions ?? [];
  */
 export function usePositionsQuery(
@@ -47,5 +47,7 @@ export function usePositionsQuery(
         staleTime: options?.staleTime ?? 10_000,
         enabled: options?.enabled ?? true,
         refetchInterval: options?.refetchInterval ?? 30_000,
+        // Keep previous data while fetching next page for smooth transitions
+        placeholderData: keepPreviousData,
     });
 }

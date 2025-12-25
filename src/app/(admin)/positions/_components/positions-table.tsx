@@ -1,13 +1,14 @@
 /**
  * Positions Table
  * 
- * Main table component for displaying positions
+ * Main table component for displaying positions with pagination
  * Optimized client component with React Query integration and real-time updates
  * 
  * Performance optimizations:
  * - Memoized filtering and unique value extraction
  * - Position rows use React.memo to prevent unnecessary re-renders
  * - Efficient live price updates via WebSocket
+ * - Pagination for large datasets
  */
 
 "use client";
@@ -27,6 +28,7 @@ import { PositionAction, PositionFilters } from "@/features/position";
 import { PositionRow } from "./position-row";
 import { PositionsTableToolbar } from "./positions-table-toolbar";
 import { PositionsFilteredEmpty } from "./positions-filtered-empty";
+import { PaginationControls } from "./pagination-controls";
 import { useLivePrices } from "@/hooks/trading/use-live-price";
 import { useClosePositionMutation, useForceCloseAllMutation } from "@/features/position";
 import { useCloseAllPositionsMutation } from "@/features/trading/hooks";
@@ -36,6 +38,16 @@ import { PositionDataTable } from "./position-data-table";
 
 interface PositionsTableProps {
     positions: PositionWithRelations[];
+    pagination: {
+        page: number;
+        pageSize: number;
+        totalPages: number;
+        total: number;
+        hasNextPage: boolean;
+        hasPreviousPage: boolean;
+    };
+    onPageChange: (page: number) => void;
+    onPageSizeChange: (pageSize: number) => void;
     isLoading?: boolean;
     isRefreshing?: boolean;
     onRefresh?: () => void;
@@ -43,6 +55,9 @@ interface PositionsTableProps {
 
 export function PositionsTable({
     positions,
+    pagination,
+    onPageChange,
+    onPageSizeChange,
     isLoading,
     isRefreshing,
     onRefresh,
@@ -145,18 +160,30 @@ export function PositionsTable({
                     {liveData.length === 0 ? (
                         <PositionsFilteredEmpty onClearFilters={hasActiveFilters ? handleClearFilters : undefined} />
                     ) : (
-                        <Card>
-                            <CardContent className="p-0">
-                                <PositionDataTable
-                                    mode="live"
-                                    positions={liveData}
-                                    expandedRows={expandedRows}
-                                    onToggleExpand={toggleRowExpansion}
-                                    onPositionAction={handlePositionAction}
-                                    livePrices={livePrices}
-                                />
-                            </CardContent>
-                        </Card>
+                        <>
+                            <Card>
+                                <CardContent className="p-0">
+                                    <PositionDataTable
+                                        mode="live"
+                                        positions={liveData}
+                                        expandedRows={expandedRows}
+                                        onToggleExpand={toggleRowExpansion}
+                                        onPositionAction={handlePositionAction}
+                                        livePrices={livePrices}
+                                    />
+                                </CardContent>
+                            </Card>
+                            <PaginationControls
+                                page={pagination.page}
+                                pageSize={pagination.pageSize}
+                                totalPages={pagination.totalPages}
+                                total={pagination.total}
+                                hasNextPage={pagination.hasNextPage}
+                                hasPreviousPage={pagination.hasPreviousPage}
+                                onPageChange={onPageChange}
+                                onPageSizeChange={onPageSizeChange}
+                            />
+                        </>
                     )}
                 </TabsContent>
 
@@ -164,17 +191,29 @@ export function PositionsTable({
                     {historyData.length === 0 ? (
                         <PositionsFilteredEmpty onClearFilters={hasActiveFilters ? handleClearFilters : undefined} />
                     ) : (
-                        <Card>
-                            <CardContent className="p-0">
-                                <PositionDataTable
-                                    mode="history"
-                                    positions={historyData}
-                                    expandedRows={expandedRows}
-                                    onToggleExpand={toggleRowExpansion}
-                                    onPositionAction={handlePositionAction}
-                                />
-                            </CardContent>
-                        </Card>
+                        <>
+                            <Card>
+                                <CardContent className="p-0">
+                                    <PositionDataTable
+                                        mode="history"
+                                        positions={historyData}
+                                        expandedRows={expandedRows}
+                                        onToggleExpand={toggleRowExpansion}
+                                        onPositionAction={handlePositionAction}
+                                    />
+                                </CardContent>
+                            </Card>
+                            <PaginationControls
+                                page={pagination.page}
+                                pageSize={pagination.pageSize}
+                                totalPages={pagination.totalPages}
+                                total={pagination.total}
+                                hasNextPage={pagination.hasNextPage}
+                                hasPreviousPage={pagination.hasPreviousPage}
+                                onPageChange={onPageChange}
+                                onPageSizeChange={onPageSizeChange}
+                            />
+                        </>
                     )}
                 </TabsContent>
             </Tabs>

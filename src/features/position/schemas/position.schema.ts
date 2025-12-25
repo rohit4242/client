@@ -30,6 +30,10 @@ export const GetPositionsInputSchema = z.object({
     source: z.nativeEnum(Source).optional(),
     limit: z.number().int().positive().max(1000).optional(),
     userId: z.string().optional(), // For admin use
+
+    // Pagination parameters (optional, defaults applied in action)
+    page: z.number().int().positive().optional(),
+    pageSize: z.number().int().positive().min(10).max(100).optional(),
 });
 
 /**
@@ -165,6 +169,13 @@ export const PositionWithRelationsSchema = PositionClientSchema.extend({
 export const GetPositionsResultSchema = z.object({
     positions: z.array(PositionWithRelationsSchema),
     total: z.number(),
+
+    // Pagination metadata
+    page: z.number(),
+    pageSize: z.number(),
+    totalPages: z.number(),
+    hasNextPage: z.boolean(),
+    hasPreviousPage: z.boolean(),
 });
 
 /**

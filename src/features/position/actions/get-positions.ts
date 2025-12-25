@@ -23,7 +23,7 @@ export const getPositions = cache(async (
 
         // Validate input
         const validated = GetPositionsInputSchema.parse(input);
-        const { status, symbol, accountType, source, limit, userId } = validated;
+        const { status, symbol, accountType, source, limit, userId, page = 1, pageSize = 20 } = validated;
 
         // Check if admin is using selected user
         const selectedUser = await getSelectedUser();
@@ -39,6 +39,10 @@ export const getPositions = cache(async (
             ...(accountType && { accountType }),
             ...(source && { source }),
         };
+
+        // Calculate pagination offset
+        const skip = (page - 1) * pageSize;
+        const take = limit || pageSize;
 
         // Fetch positions with related data
         const [positions, total] = await Promise.all([
@@ -64,7 +68,8 @@ export const getPositions = cache(async (
                 orderBy: {
                     createdAt: "desc",
                 },
-                ...(limit && { take: limit }),
+                skip,
+                take,
             }),
             db.position.count({ where }),
         ]);
@@ -89,15 +94,30 @@ export const getPositions = cache(async (
             );
         });
 
+        // Calculate pagination metadata
+        const totalPages = Math.ceil(total / take);
+        const hasNextPage = page < totalPages;
+        const hasPreviousPage = page > 1;
+
         return {
             positions: enrichedPositions,
             total,
+            page,
+            pageSize: take,
+            totalPages,
+            hasNextPage,
+            hasPreviousPage,
         };
     } catch (error) {
         console.error("Error fetching positions:", error);
         return {
             positions: [],
             total: 0,
+            page: 1,
+            pageSize: 20,
+            totalPages: 0,
+            hasNextPage: false,
+            hasPreviousPage: false,
         };
     }
 });

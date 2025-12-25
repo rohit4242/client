@@ -2,11 +2,12 @@
  * Positions Client Component
  * 
  * Main orchestration component for the positions page
- * Handles user selection, data fetching, and page layout
+ * Handles user selection, data fetching, pagination, and page layout
  */
 
 "use client";
 
+import { useState } from "react";
 import { useSelectedUser } from "@/contexts/selected-user-context";
 import { PositionsHeader } from "./positions-header";
 import { PositionsTable } from "./positions-table";
@@ -22,7 +23,11 @@ import { cn } from "@/lib/utils";
 export function PositionsClient() {
     const { selectedUser } = useSelectedUser();
 
-    // Use React Query for data fetching with auto-refresh capabilities
+    // Pagination state
+    const [page, setPage] = useState(1);
+    const [pageSize, setPageSize] = useState(20);
+
+    // Use React Query for data fetching with auto-refresh and pagination
     const {
         data: queryResult,
         isLoading,
@@ -32,6 +37,8 @@ export function PositionsClient() {
     } = usePositionsQuery(
         {
             userId: selectedUser?.id,
+            page,
+            pageSize,
         },
         {
             staleTime: 5000,
@@ -41,6 +48,23 @@ export function PositionsClient() {
     );
 
     const positions = queryResult?.positions || [];
+    const paginationMeta = {
+        page: queryResult?.page ?? 1,
+        pageSize: queryResult?.pageSize ?? 20,
+        totalPages: queryResult?.totalPages ?? 1,
+        total: queryResult?.total ?? 0,
+        hasNextPage: queryResult?.hasNextPage ?? false,
+        hasPreviousPage: queryResult?.hasPreviousPage ?? false,
+    };
+
+    const handlePageChange = (newPage: number) => {
+        setPage(newPage);
+    };
+
+    const handlePageSizeChange = (newSize: number) => {
+        setPageSize(newSize);
+        setPage(1); // Reset to first page when changing page size
+    };
 
     // Show no user selected state
     if (!selectedUser) {
@@ -99,11 +123,14 @@ export function PositionsClient() {
                 <PositionsLoadingSkeleton />
             ) : error ? (
                 <PositionsErrorState error={error} onRetry={refetch} />
-            ) : positions.length === 0 ? (
+            ) : positions.length === 0 && page === 1 ? (
                 <PositionsEmptyState />
             ) : (
                 <PositionsTable
                     positions={positions}
+                    pagination={paginationMeta}
+                    onPageChange={handlePageChange}
+                    onPageSizeChange={handlePageSizeChange}
                     isLoading={isLoading}
                     isRefreshing={isFetching}
                     onRefresh={refetch}

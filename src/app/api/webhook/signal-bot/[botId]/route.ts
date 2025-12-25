@@ -95,26 +95,38 @@ export async function POST(
 
         console.log("[Webhook] Signal record created:", signal.id);
 
-        // Trigger async processing (don't await)
-        // This allows us to return immediately to the webhook sender
-        processSignalAction(signal.id)
-            .then(() => {
-                console.log("[Webhook] Signal processed successfully:", signal.id);
-            })
-            .catch((error) => {
-                console.error("[Webhook] Signal processing failed:", signal.id, error);
-            });
+        // Process signal SYNCHRONOUSLY (await it)
+        // This ensures all signals are processed even when multiple arrive simultaneously
+        const result = await processSignalAction(signal.id);
 
-        // Return 202 Accepted immediately
+        // Return error if processing failed
+        if (!result.success) {
+            console.error("[Webhook] Signal processing failed:", signal.id, result.error);
+            return NextResponse.json(
+                {
+                    success: false,
+                    error: result.error,
+                    signalId: signal.id,
+                    action: signal.action,
+                    symbol: signal.symbol,
+                },
+                { status: 500 }
+            );
+        }
+
+        // Return success after processing completes
+        console.log("[Webhook] Signal processed successfully:", signal.id);
         return NextResponse.json(
             {
                 success: true,
-                message: "Signal received and processing",
+                message: "Signal processed successfully",
                 signalId: signal.id,
                 action: signal.action,
                 symbol: signal.symbol,
+                positionId: result.positionId,
+                orderId: result.orderId,
             },
-            { status: 202 }
+            { status: 200 }
         );
 
     } catch (error) {
