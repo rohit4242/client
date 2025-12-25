@@ -142,6 +142,13 @@ function PositionRowComponent({
         {/* Status */}
         <TableCell>
           {getStatusBadge(position.status)}
+          {position.warningMessage && (
+            <div className="mt-1">
+              <Badge variant="destructive" className="text-[10px] h-4 px-1" title={position.warningMessage}>
+                Error
+              </Badge>
+            </div>
+          )}
         </TableCell>
 
         {/* Time (Entry or Closed) */}

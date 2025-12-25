@@ -98,34 +98,48 @@ export class PositionCloserService {
 
         console.log(`[PositionCloser] Closing position ${position.id} (${reason})`);
 
-        // 1. Fetch exchange credentials
-        const exchange = await db.exchange.findFirst({
-            where: {
-                portfolioId: position.portfolioId,
-                isActive: true
+        try {
+            // 1. Fetch exchange credentials
+            const exchange = await db.exchange.findFirst({
+                where: {
+                    portfolioId: position.portfolioId,
+                    isActive: true
+                }
+            });
+
+            if (!exchange) {
+                throw new Error(`No active exchange found for portfolio ${position.portfolioId}`);
             }
-        });
 
-        if (!exchange) {
-            throw new Error(`No active exchange found for portfolio ${position.portfolioId}`);
+            // 2. Execute market close order
+            const closeResult = await this.executeCloseOrder(position, exchange, currentPrice);
+
+            if (!closeResult.success || !closeResult.data) {
+                throw new Error(`Failed to execute close order: ${closeResult.error}`);
+            }
+
+            // 3. Update database
+            await this.updateDatabase(position, closeResult.data, reason, currentPrice);
+
+            // 4. Notify that position is closed (remove from monitoring)
+            if (this.onPositionClosed) {
+                this.onPositionClosed(position.id);
+            }
+
+            console.log(`[PositionCloser] ✅ Successfully closed position ${position.id}`);
+        } catch (error: any) {
+            console.error(`[PositionCloser] Failed to close ${position.id}:`, error);
+
+            // Update position with warning message
+            await db.position.update({
+                where: { id: position.id },
+                data: {
+                    warningMessage: `Exit Failed: ${error.message || 'Unknown error'}`.substring(0, 190) // Truncate to fit
+                }
+            });
+
+            throw error; // Re-throw to ensure processQueue knows it failed
         }
-
-        // 2. Execute market close order
-        const closeResult = await this.executeCloseOrder(position, exchange, currentPrice);
-
-        if (!closeResult.success || !closeResult.data) {
-            throw new Error(`Failed to execute close order: ${closeResult.error}`);
-        }
-
-        // 3. Update database
-        await this.updateDatabase(position, closeResult.data, reason, currentPrice);
-
-        // 4. Notify that position is closed (remove from monitoring)
-        if (this.onPositionClosed) {
-            this.onPositionClosed(position.id);
-        }
-
-        console.log(`[PositionCloser] ✅ Successfully closed position ${position.id}`);
     }
 
     /**

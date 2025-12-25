@@ -14,7 +14,7 @@ import { MarginStat, PnlStat, PriceStat, RiskIndicator, StatItem } from "./posit
 import { OrderHistory } from "./order-history";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
-import { Copy, Bot, ShieldCheck, Activity } from "lucide-react";
+import { Copy, Bot, ShieldCheck, Activity, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -86,6 +86,19 @@ export function PositionCard({ position, currentPrice }: PositionCardProps) {
             </div>
 
             <div className="p-6 space-y-8">
+                {/* Error / Warning Alert */}
+                {position.warningMessage && (
+                    <div className="p-4 rounded-xl bg-red-50 border border-red-100 flex items-start gap-3">
+                        <AlertCircle className="size-5 text-red-600 mt-0.5 shrink-0" />
+                        <div className="space-y-1">
+                            <h4 className="text-sm font-bold text-red-900">Position Warning</h4>
+                            <p className="text-sm text-red-700 leading-relaxed font-medium">
+                                {position.warningMessage}
+                            </p>
+                        </div>
+                    </div>
+                )}
+
                 {/* Main Stats Row */}
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
                     <PnlStat

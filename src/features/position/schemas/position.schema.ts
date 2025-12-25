@@ -115,6 +115,9 @@ export const PositionSchema = z.object({
     botId: z.string().uuid().nullable(),
     strategyId: z.string().nullable(),
 
+    // Critical warnings
+    warningMessage: z.string().nullable(),
+
     // Timestamps
     openedAt: z.date(),
     closedAt: z.date().nullable(),

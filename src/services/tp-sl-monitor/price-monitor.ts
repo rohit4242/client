@@ -53,10 +53,14 @@ export class PriceMonitorService {
         // Binance Combined Streams URL
         // We start with an empty stream or symbols we already know we need
         const activeSymbols = Array.from(this.symbolPositions.keys());
-        const streams = activeSymbols.length > 0
-            ? activeSymbols.map(s => `${s.toLowerCase()}@ticker`).join('/')
-            : '!miniTicker@arr';
 
+        // If no symbols to monitor, stay in idle state (don't connect)
+        if (activeSymbols.length === 0) {
+            console.log('[PriceMonitor] 💤 No positions to monitor. Service idle.');
+            return;
+        }
+
+        const streams = activeSymbols.map(s => `${s.toLowerCase()}@ticker`).join('/');
         const wsUrl = `wss://stream.binance.com:9443/stream?streams=${streams}`;
 
         console.log(`[PriceMonitor] 🚀 Starting service connection...`);
@@ -205,6 +209,15 @@ export class PriceMonitorService {
                 this.unsubscribeFromSymbols([position.symbol]);
                 this.symbolPositions.delete(position.symbol);
                 this.symbolPrices.delete(position.symbol);
+
+                // If no more symbols are being monitored, disconnect the WebSocket
+                if (this.symbolPositions.size === 0 && this.isConnected) {
+                    console.log('[PriceMonitor] No more symbols to monitor. Disconnecting WebSocket.');
+                    this.ws?.close();
+                    this.ws = null;
+                    this.isConnected = false;
+                    if (this.reconnectTimeout) clearTimeout(this.reconnectTimeout);
+                }
             }
         }
     }
