@@ -171,6 +171,7 @@ export async function closePositionAction(
                 pnl,          // FIXED: Changed from realizedPnl to pnl
                 pnlPercent,   // FIXED: Added pnlPercent
                 closedAt: new Date(),
+                warningMessage: null,  // Clear any warning messages
                 // Update OCO statuses
                 stopLossStatus: position.stopLossOrderId ? 'CANCELED' : null,
                 takeProfitStatus: position.takeProfitOrderId ? 'CANCELED' : null,
