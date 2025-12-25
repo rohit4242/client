@@ -7,7 +7,6 @@
 "use server";
 
 import { z } from "zod";
-import { requireAuth } from "@/lib/auth/session";
 import { handleServerError, successResult, type ServerActionResult } from "@/lib/validation/error-handler";
 import { db } from "@/lib/db/client";
 import { createSpotClient, createMarginClient, closeSpotPosition, closeMarginPosition } from "@/features/binance";

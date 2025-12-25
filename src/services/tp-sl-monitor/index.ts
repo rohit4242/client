@@ -9,6 +9,7 @@ import { db } from "@/lib/db/client";
 import { PriceMonitorService } from "./price-monitor";
 import { PositionCloserService } from "./position-closer";
 import type { MonitoredPosition, MonitorStats } from "./types";
+import { mapToMonitoredPosition } from "./types";
 
 // Service instances
 let priceMonitor: PriceMonitorService;
@@ -35,8 +36,8 @@ export async function initializeTPSLMonitoring(): Promise<void> {
         positionCloser = new PositionCloserService();
 
         // Wire up callbacks
-        priceMonitor.setTriggerCallback((position, currentPrice, reason) => {
-            positionCloser.queueClose(position, currentPrice, reason);
+        priceMonitor.setTriggerCallback((positionId, reason) => {
+            positionCloser.queueClose(positionId, reason);
         });
 
         positionCloser.setClosedCallback((positionId) => {
@@ -65,22 +66,7 @@ export async function initializeTPSLMonitoring(): Promise<void> {
 
         // Add each position to monitoring
         for (const position of positions) {
-            const monitoredPosition: MonitoredPosition = {
-                id: position.id,
-                symbol: position.symbol,
-                side: position.side,
-                stopLoss: position.stopLoss,
-                takeProfit: position.takeProfit,
-                accountType: position.accountType,
-                quantity: position.quantity,
-                entryPrice: position.entryPrice,
-                entryValue: position.entryValue,
-                portfolioId: position.portfolioId,
-                portfolio: {
-                    userId: position.portfolio.userId
-                }
-            };
-
+            const monitoredPosition = mapToMonitoredPosition(position);
             await priceMonitor.addPosition(monitoredPosition);
         }
 
@@ -146,22 +132,7 @@ export async function startMonitoringPosition(positionId: string): Promise<void>
         }
 
         // Add to monitoring
-        const monitoredPosition: MonitoredPosition = {
-            id: position.id,
-            symbol: position.symbol,
-            side: position.side,
-            stopLoss: position.stopLoss,
-            takeProfit: position.takeProfit,
-            accountType: position.accountType,
-            quantity: position.quantity,
-            entryPrice: position.entryPrice,
-            entryValue: position.entryValue,
-            portfolioId: position.portfolioId,
-            portfolio: {
-                userId: position.portfolio.userId
-            }
-        };
-
+        const monitoredPosition = mapToMonitoredPosition(position);
         await priceMonitor.addPosition(monitoredPosition);
 
         console.log(`[TPSL Monitor] Started monitoring position ${positionId} (${position.symbol})`);

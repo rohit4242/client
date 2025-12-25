@@ -6,10 +6,8 @@
  */
 
 import { db } from "@/lib/db/client";
-import { createSpotClient, createMarginClient } from "@/features/binance/sdk/client";
-import { placeSpotMarketOrder, placeMarginMarketOrder } from "@/features/binance";
+import { closePositionAction } from "@/features/trading/actions/close-position";
 import { MonitoredPosition, CloseRequest } from "./types";
-import type { BinanceOrderResponse } from "@/features/binance";
 
 /**
  * Position Closer Service
@@ -43,24 +41,22 @@ export class PositionCloserService {
     /**
      * Queue a position for closing
      */
-    async queueClose(position: MonitoredPosition, currentPrice: number, reason: 'TAKE_PROFIT' | 'STOP_LOSS'): Promise<void> {
+    async queueClose(positionId: string, reason: 'TAKE_PROFIT' | 'STOP_LOSS'): Promise<void> {
         // Prevent duplicate close requests
-        if (this.closeQueue.has(position.id)) {
-            console.log(`[PositionCloser] Position ${position.id} already queued, skipping`);
+        if (this.closeQueue.has(positionId)) {
+            console.log(`[PositionCloser] Position ${positionId} already queued, skipping`);
             return;
         }
 
         const request: CloseRequest = {
-            positionId: position.id,
-            position,
-            currentPrice,
+            positionId,
             reason,
             timestamp: new Date()
         };
 
-        this.closeQueue.set(position.id, request);
+        this.closeQueue.set(positionId, request);
 
-        console.log(`[PositionCloser] Queued ${position.id} for ${reason} at ${currentPrice} (queue size: ${this.closeQueue.size})`);
+        console.log(`[PositionCloser] Queued ${positionId} for ${reason} (queue size: ${this.closeQueue.size})`);
 
         // Start processing if not already running
         if (!this.processing) {
@@ -118,193 +114,49 @@ export class PositionCloserService {
      * Close a single position
      */
     private async closePosition(request: CloseRequest): Promise<void> {
-        const { position, currentPrice, reason } = request;
+        const { positionId, reason } = request;
 
-        console.log(`[PositionCloser] Closing position ${position.id} (${reason})`);
+        console.log(`[PositionCloser] Closing position ${positionId} (${reason})`);
 
         try {
-            // 1. Fetch exchange credentials
-            const exchange = await db.exchange.findFirst({
-                where: {
-                    portfolioId: position.portfolioId,
-                    isActive: true
-                }
+            // Call the working close action
+            const result = await closePositionAction({
+                positionId
             });
 
-            if (!exchange) {
-                throw new Error(`No active exchange found for portfolio ${position.portfolioId}`);
+            if (!result.success) {
+                throw new Error(result.error || 'Failed to close position');
             }
 
-            // 2. Execute market close order
-            const closeResult = await this.executeCloseOrder(position, exchange, currentPrice);
-
-            if (!closeResult.success || !closeResult.data) {
-                throw new Error(`Failed to execute close order: ${closeResult.error}`);
-            }
-
-            // 3. Update database
-            await this.updateDatabase(position, closeResult.data, reason, currentPrice);
-
-            // 4. Notify that position is closed (remove from monitoring)
+            // Remove from monitoring
             if (this.onPositionClosed) {
-                this.onPositionClosed(position.id);
+                this.onPositionClosed(positionId);
             }
 
-            console.log(`[PositionCloser] ✅ Successfully closed position ${position.id}`);
+            console.log(`[PositionCloser] ✅ Successfully closed position ${positionId}`);
         } catch (error: any) {
-            console.error(`[PositionCloser] Failed to close ${position.id}:`, error);
+            console.error(`[PositionCloser] Failed to close ${positionId}:`, error);
 
-            const retries = this.retryCount.get(position.id) || 0;
-            const isPermanentFailure = retries >= this.MAX_RETRIES - 1; // Will hit max on next attempt
+            const retries = this.retryCount.get(positionId) || 0;
+            const isPermanentFailure = retries >= this.MAX_RETRIES - 1;
 
             // Update position with warning message
             await db.position.update({
-                where: { id: position.id },
+                where: { id: positionId },
                 data: {
                     warningMessage: isPermanentFailure
                         ? `⚠️ TP/SL Failed (Max Retries): ${error.message || 'Unknown error'}`.substring(0, 190)
                         : `⚠️ TP/SL Exit Failed (Retry ${retries + 1}/${this.MAX_RETRIES}): ${error.message}`.substring(0, 190)
                 }
             }).catch(dbError => {
-                console.error(`[PositionCloser] Failed to update position warning:
-`, dbError);
+                console.error(`[PositionCloser] Failed to update position warning:`, dbError);
             });
 
-            throw error; // Re-throw to ensure processQueue knows it failed
+            throw error;
         }
     }
 
-    /**
-     * Execute the close order on Binance
-     */
-    private async executeCloseOrder(
-        position: MonitoredPosition,
-        exchange: { apiKey: string; apiSecret: string },
-        currentPrice: number
-    ) {
-        // Determine order side (opposite of entry)
-        const orderSide = position.side === 'LONG' ? 'SELL' : 'BUY';
 
-        // Place market order based on account type
-        if (position.accountType === 'SPOT') {
-            const client = createSpotClient({
-                apiKey: exchange.apiKey,
-                apiSecret: exchange.apiSecret
-            });
-
-            return await placeSpotMarketOrder(client, {
-                symbol: position.symbol,
-                side: orderSide,
-                quantity: position.quantity.toString()
-            });
-        } else {
-            // MARGIN
-            const client = createMarginClient({
-                apiKey: exchange.apiKey,
-                apiSecret: exchange.apiSecret
-            });
-
-            return await placeMarginMarketOrder(client, {
-                symbol: position.symbol,
-                side: orderSide,
-                quantity: position.quantity.toString(),
-                sideEffectType: 'AUTO_REPAY' // Auto repay borrowed funds
-            });
-        }
-    }
-
-    /**
-     * Update database after successful close
-     */
-    private async updateDatabase(
-        position: MonitoredPosition,
-        closeResult: BinanceOrderResponse,
-        reason: 'TAKE_PROFIT' | 'STOP_LOSS',
-        currentPrice: number
-    ): Promise<void> {
-        // Extract execution details
-        const executedQty = parseFloat(closeResult.executedQty || '0');
-        const cumulativeQuoteQty = parseFloat(closeResult.cummulativeQuoteQty || '0');
-
-        // Calculate exit price
-        let exitPrice = currentPrice;
-        if (executedQty > 0 && cumulativeQuoteQty > 0) {
-            exitPrice = cumulativeQuoteQty / executedQty;
-        }
-
-        const exitValue = cumulativeQuoteQty;
-
-        // Calculate PnL
-        let pnl: number;
-        if (position.side === 'LONG') {
-            pnl = (exitPrice - position.entryPrice) * position.quantity;
-        } else {
-            pnl = (position.entryPrice - exitPrice) * position.quantity;
-        }
-
-        const pnlPercent = position.entryValue > 0
-            ? (pnl / position.entryValue) * 100
-            : 0;
-
-        // Use transaction to ensure atomicity
-        await db.$transaction(async (tx) => {
-            // Update position
-            await tx.position.update({
-                where: { id: position.id },
-                data: {
-                    status: 'CLOSED',
-                    exitPrice,
-                    exitValue,
-                    pnl,
-                    pnlPercent,
-                    closedAt: new Date(),
-                    currentPrice: exitPrice
-                }
-            });
-
-            // Create order record
-            await tx.order.create({
-                data: {
-                    positionId: position.id,
-                    portfolioId: position.portfolioId,
-                    orderId: closeResult.orderId.toString(),
-                    clientOrderId: closeResult.clientOrderId,
-                    symbol: position.symbol,
-                    side: closeResult.side as 'BUY' | 'SELL',
-                    type: 'EXIT',
-                    orderType: 'MARKET',
-                    price: exitPrice,
-                    quantity: executedQty,
-                    value: exitValue,
-                    executedQty: executedQty,
-                    cummulativeQuoteQty: cumulativeQuoteQty,
-                    status: 'FILLED',
-                    fillPercent: 100,
-                    accountType: position.accountType,
-                    transactTime: new Date()
-                }
-            });
-        });
-
-        // Recalculate portfolio stats asynchronously
-        this.recalculateStatsAsync(position.portfolio.userId);
-
-        console.log(`[PositionCloser] Updated database for ${position.id}: PnL ${pnl.toFixed(2)} (${pnlPercent.toFixed(2)}%)`);
-    }
-
-    /**
-     * Recalculate portfolio stats without blocking
-     */
-    private recalculateStatsAsync(userId: string): void {
-        setImmediate(async () => {
-            try {
-                const { recalculatePortfolioStatsInternal } = await import('@/db/actions/portfolio/recalculate-stats');
-                await recalculatePortfolioStatsInternal(userId);
-            } catch (error) {
-                console.error('[PositionCloser] Failed to recalculate portfolio stats:', error);
-            }
-        });
-    }
 
     /**
      * Get current queue status

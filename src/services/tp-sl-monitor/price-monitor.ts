@@ -19,7 +19,7 @@ export class PriceMonitorService {
     private positions: Map<string, MonitoredPosition> = new Map();
 
     // Callback when a position should be closed
-    private onTriggerClose?: (position: MonitoredPosition, currentPrice: number, reason: 'TAKE_PROFIT' | 'STOP_LOSS') => void;
+    private onTriggerClose?: (positionId: string, reason: 'TAKE_PROFIT' | 'STOP_LOSS') => void;
 
     // Service state
     private isShuttingDown = false;
@@ -40,7 +40,7 @@ export class PriceMonitorService {
     /**
      * Set the callback for when a position should be closed
      */
-    setTriggerCallback(callback: (position: MonitoredPosition, currentPrice: number, reason: 'TAKE_PROFIT' | 'STOP_LOSS') => void) {
+    setTriggerCallback(callback: (positionId: string, reason: 'TAKE_PROFIT' | 'STOP_LOSS') => void) {
         this.onTriggerClose = callback;
     }
 
@@ -266,7 +266,7 @@ export class PriceMonitorService {
             if (trigger) {
                 console.log(`[PriceMonitor] 🎯 ${trigger.reason} triggered for ${positionId} at ${currentPrice}`);
                 if (this.onTriggerClose) {
-                    this.onTriggerClose(position, currentPrice, trigger.reason);
+                    this.onTriggerClose(position.id, trigger.reason);
                 }
             }
         }

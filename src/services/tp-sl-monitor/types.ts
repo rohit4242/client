@@ -26,12 +26,44 @@ export interface MonitoredPosition {
 }
 
 /**
+ * Helper function to map database position to MonitoredPosition
+ * Eliminates code duplication across the codebase
+ */
+export function mapToMonitoredPosition(dbPosition: {
+    id: string;
+    symbol: string;
+    side: Side;
+    stopLoss: number | null;
+    takeProfit: number | null;
+    accountType: AccountType;
+    quantity: number;
+    entryPrice: number;
+    entryValue: number;
+    portfolioId: string;
+    portfolio: { userId: string };
+}): MonitoredPosition {
+    return {
+        id: dbPosition.id,
+        symbol: dbPosition.symbol,
+        side: dbPosition.side,
+        stopLoss: dbPosition.stopLoss,
+        takeProfit: dbPosition.takeProfit,
+        accountType: dbPosition.accountType,
+        quantity: dbPosition.quantity,
+        entryPrice: dbPosition.entryPrice,
+        entryValue: dbPosition.entryValue,
+        portfolioId: dbPosition.portfolioId,
+        portfolio: {
+            userId: dbPosition.portfolio.userId
+        }
+    };
+}
+
+/**
  * Request to close a position
  */
 export interface CloseRequest {
     positionId: string;
-    position: MonitoredPosition;
-    currentPrice: number;
     reason: 'TAKE_PROFIT' | 'STOP_LOSS';
     timestamp: Date;
 }
