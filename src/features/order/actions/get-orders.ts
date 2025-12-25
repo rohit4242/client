@@ -74,7 +74,15 @@ export const getOrders = cache(async (
             orders: enrichedOrders,
             total,
         };
-    } catch (error) {
+    } catch (error: any) {
+        // Suppress "Unauthorized" errors (expected when checking orders without a session)
+        if (error.message?.includes("Unauthorized")) {
+            return {
+                orders: [],
+                total: 0,
+            };
+        }
+
         console.error("Error fetching orders:", error);
         return {
             orders: [],

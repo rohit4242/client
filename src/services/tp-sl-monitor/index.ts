@@ -105,8 +105,13 @@ export async function initializeTPSLMonitoring(): Promise<void> {
  */
 export async function startMonitoringPosition(positionId: string): Promise<void> {
     if (!initialized) {
-        console.warn('[TPSL Monitor] Not initialized, skipping position monitoring');
-        return;
+        console.log('[TPSL Monitor] Lazy initializing service before adding position...');
+        try {
+            await initializeTPSLMonitoring();
+        } catch (error) {
+            console.error('[TPSL Monitor] Lazy initialization failed:', error);
+            return;
+        }
     }
 
     try {
