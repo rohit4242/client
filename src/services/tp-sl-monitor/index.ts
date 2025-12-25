@@ -23,8 +23,7 @@ let startTime: Date;
  */
 export async function initializeTPSLMonitoring(): Promise<void> {
     if (initialized) {
-        console.log('[TPSL Monitor] Already initialized');
-        return;
+        return; // Silent return - already initialized
     }
 
     console.log('[TPSL Monitor] Initializing...');
@@ -71,20 +70,7 @@ export async function initializeTPSLMonitoring(): Promise<void> {
         }
 
         initialized = true;
-        console.log('[TPSL Monitor] ✅ Initialization complete');
-
-        // Log stats
-        const stats = priceMonitor.getStats();
-        let connectionStatus = 'DISCONNECTED';
-        if (stats.isConnected) {
-            connectionStatus = 'CONNECTED';
-        } else if (stats.activeSymbols > 0) {
-            connectionStatus = 'CONNECTING...';
-        }
-
-        console.log(`[TPSL Monitor] Monitoring ${stats.monitoredPositions} positions across ${stats.activeSymbols} symbols`);
-        console.log(`[TPSL Monitor] Active symbols: ${stats.symbols.join(', ')}`);
-        console.log(`[TPSL Monitor] Connection status: ${connectionStatus}`);
+        console.log(`[TPSL Monitor] ✅ Initialized - monitoring ${positions.length} positions`);
 
     } catch (error) {
         console.error('[TPSL Monitor] ❌ Initialization failed:', error);
@@ -98,11 +84,20 @@ export async function initializeTPSLMonitoring(): Promise<void> {
  */
 export async function startMonitoringPosition(positionId: string): Promise<void> {
     if (!initialized) {
-        console.log('[TPSL Monitor] Lazy initializing service before adding position...');
         try {
             await initializeTPSLMonitoring();
         } catch (error) {
-            console.error('[TPSL Monitor] Lazy initialization failed:', error);
+            console.error('[TPSL Monitor] ❌ Initialization failed:', error);
+
+            // Update position with user message
+            try {
+                await db.position.update({
+                    where: { id: positionId },
+                    data: {
+                        warningMessage: "⚠️ TP/SL monitoring unavailable. Please close position manually when target is hit."
+                    }
+                });
+            } catch { }
             return;
         }
     }
@@ -127,17 +122,26 @@ export async function startMonitoringPosition(positionId: string): Promise<void>
 
         // Only monitor if it has TP or SL
         if (!position.stopLoss && !position.takeProfit) {
-            console.log(`[TPSL Monitor] Position ${positionId} has no TP/SL, skipping`);
-            return;
+            return; // Silent skip - expected behavior
         }
 
         // Add to monitoring
         const monitoredPosition = mapToMonitoredPosition(position);
         await priceMonitor.addPosition(monitoredPosition);
 
-        console.log(`[TPSL Monitor] Started monitoring position ${positionId} (${position.symbol})`);
+        console.log(`[TPSL Monitor] ✅ Started monitoring ${positionId} (${position.symbol})`);
     } catch (error) {
-        console.error(`[TPSL Monitor] Failed to start monitoring ${positionId}:`, error);
+        console.error(`[TPSL Monitor] ❌ Failed to start monitoring ${positionId}:`, error);
+
+        // Update position with user message
+        try {
+            await db.position.update({
+                where: { id: positionId },
+                data: {
+                    warningMessage: "⚠️ TP/SL monitoring failed to start. Please close manually when target is hit."
+                }
+            });
+        } catch { }
     }
 }
 

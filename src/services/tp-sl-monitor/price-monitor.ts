@@ -33,7 +33,7 @@ export class PriceMonitorService {
     private pendingSubscriptions: Set<string> = new Set();
 
     constructor() {
-        console.log('[PriceMonitor] Service initialized');
+        // Service ready
         this.connect();
     }
 
@@ -54,29 +54,22 @@ export class PriceMonitorService {
         // We start with an empty stream or symbols we already know we need
         const activeSymbols = Array.from(this.symbolPositions.keys());
 
-        // If no symbols to monitor, stay in idle state (don't connect)
+        // If no symbols to monitor, stay idle
         if (activeSymbols.length === 0) {
-            console.log('[PriceMonitor] 💤 No positions to monitor. Service idle.');
-            return;
+            return; // Idle - no log needed
         }
 
         const streams = activeSymbols.map(s => `${s.toLowerCase()}@ticker`).join('/');
         const wsUrl = `wss://stream.binance.com:9443/stream?streams=${streams}`;
-
-        console.log(`[PriceMonitor] 🚀 Starting service connection...`);
-        console.log(`[PriceMonitor] 🔗 URL: ${wsUrl}`);
 
         this.ws = new WS(wsUrl, {
             handshakeTimeout: 10000,
         });
 
         this.ws.on('open', () => {
-            console.log('[PriceMonitor] ✅ WebSocket Connected and Streaming');
+            console.log(`[PriceMonitor] ✅ WebSocket connected - monitoring ${this.symbolPositions.size} symbols`);
             this.isConnected = true;
             this.reconnectAttempts = 0;
-
-            // Log monitoring status
-            console.log(`[PriceMonitor] 📊 Monitoring ${this.positions.size} positions across ${this.symbolPositions.size} symbols`);
 
             // Re-subscribe to all active symbols
             const symbolsToSubscribe = new Set([
@@ -155,7 +148,7 @@ export class PriceMonitorService {
         };
 
         this.ws.send(JSON.stringify(subscribeMsg));
-        console.log(`[PriceMonitor] Sent SUBSCRIBE for ${symbols.join(', ')}`);
+        // Silent - subscription is internal detail
     }
 
     /**
@@ -171,7 +164,7 @@ export class PriceMonitorService {
         };
 
         this.ws.send(JSON.stringify(unsubscribeMsg));
-        console.log(`[PriceMonitor] Sent UNSUBSCRIBE for ${symbols.join(', ')}`);
+        // Silent - unsubscription is internal detail
     }
 
     /**
@@ -192,10 +185,9 @@ export class PriceMonitorService {
         this.symbolPositions.get(position.symbol)!.add(position.id);
         console.log(`[PriceMonitor] Monitoring ${position.id} for ${position.symbol}`);
 
-        // If service is idle (no WS), wake it up!
+        // If service is idle, wake it up
         if (!this.ws) {
-            console.log('[PriceMonitor] 💤 Service is idle. Waking up to monitor new position...');
-            this.connect();
+            this.connect(); // Silent wake-up
         }
     }
 
@@ -216,10 +208,9 @@ export class PriceMonitorService {
                 this.symbolPositions.delete(position.symbol);
                 this.symbolPrices.delete(position.symbol);
 
-                // If no more symbols are being monitored, disconnect the WebSocket
+                // If no more symbols, disconnect
                 if (this.symbolPositions.size === 0 && this.isConnected) {
-                    console.log('[PriceMonitor] No more symbols to monitor. Disconnecting WebSocket.');
-                    this.ws?.close();
+                    this.ws?.close(); // Silent cleanup
                     this.ws = null;
                     this.isConnected = false;
                     if (this.reconnectTimeout) clearTimeout(this.reconnectTimeout);
@@ -243,11 +234,7 @@ export class PriceMonitorService {
             lastUpdate: new Date()
         });
 
-        // Log price update periodically for debugging (approx 1% of updates to avoid spam)
-        if (Math.random() < 0.01) {
-            console.log(`[PriceMonitor] 📈 ${symbol} price: ${price}`);
-        }
-
+        // No periodic price logging - too noisy
         this.handlePriceUpdate(symbol, price);
     }
 

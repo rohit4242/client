@@ -10,6 +10,23 @@ import { closePositionAction } from "@/features/trading/actions/close-position";
 import { MonitoredPosition, CloseRequest } from "./types";
 
 /**
+ * Helper to extract simple, user-friendly error messages
+ */
+function getSimpleError(error: any): string {
+    const msg = error.message || 'Unknown error';
+
+    // Extract meaningful error types
+    if (msg.toLowerCase().includes('insufficient')) return 'Insufficient balance';
+    if (msg.includes('LOT_SIZE')) return 'Invalid quantity format';
+    if (msg.includes('NOTIONAL')) return 'Order value too small';
+    if (msg.toLowerCase().includes('unauthorized') || msg.includes('API')) return 'Invalid API credentials';
+    if (msg.toLowerCase().includes('network') || msg.toLowerCase().includes('timeout')) return 'Network error';
+
+    // Truncate long messages
+    return msg.length > 50 ? msg.substring(0, 50) + '...' : msg;
+}
+
+/**
  * Position Closer Service
  * Queues and executes position closes
  */
@@ -28,7 +45,7 @@ export class PositionCloserService {
     private readonly MAX_RETRIES = 3;
 
     constructor() {
-        console.log('[PositionCloser] Service initialized');
+        // Service ready - no log needed
     }
 
     /**
@@ -44,8 +61,7 @@ export class PositionCloserService {
     async queueClose(positionId: string, reason: 'TAKE_PROFIT' | 'STOP_LOSS'): Promise<void> {
         // Prevent duplicate close requests
         if (this.closeQueue.has(positionId)) {
-            console.log(`[PositionCloser] Position ${positionId} already queued, skipping`);
-            return;
+            return; // Silent skip - expected behavior
         }
 
         const request: CloseRequest = {
@@ -56,7 +72,15 @@ export class PositionCloserService {
 
         this.closeQueue.set(positionId, request);
 
-        console.log(`[PositionCloser] Queued ${positionId} for ${reason} (queue size: ${this.closeQueue.size})`);
+        console.log(`[PositionCloser] ⏳ Queued ${positionId} for ${reason}`);
+
+        // Update position to show it's being processed
+        await db.position.update({
+            where: { id: positionId },
+            data: {
+                warningMessage: `⏳ ${reason === 'TAKE_PROFIT' ? 'Take Profit' : 'Stop Loss'} triggered - closing position...`
+            }
+        }).catch(() => { }); // Silent fail - non-critical
 
         // Start processing if not already running
         if (!this.processing) {
@@ -116,7 +140,7 @@ export class PositionCloserService {
     private async closePosition(request: CloseRequest): Promise<void> {
         const { positionId, reason } = request;
 
-        console.log(`[PositionCloser] Closing position ${positionId} (${reason})`);
+        console.log(`[PositionCloser] 🔄 Closing ${positionId} (${reason})...`);
 
         try {
             // Call the working close action
@@ -135,21 +159,23 @@ export class PositionCloserService {
 
             console.log(`[PositionCloser] ✅ Successfully closed position ${positionId}`);
         } catch (error: any) {
-            console.error(`[PositionCloser] Failed to close ${positionId}:`, error);
+            console.error(`[PositionCloser] ❌ Failed to close ${positionId}:`, error);
 
             const retries = this.retryCount.get(positionId) || 0;
             const isPermanentFailure = retries >= this.MAX_RETRIES - 1;
+            const simpleError = getSimpleError(error);
+            const reasonText = reason === 'TAKE_PROFIT' ? 'Take Profit' : 'Stop Loss';
 
-            // Update position with warning message
+            // Update position with user-friendly warning
             await db.position.update({
                 where: { id: positionId },
                 data: {
                     warningMessage: isPermanentFailure
-                        ? `⚠️ TP/SL Failed (Max Retries): ${error.message || 'Unknown error'}`.substring(0, 190)
-                        : `⚠️ TP/SL Exit Failed (Retry ${retries + 1}/${this.MAX_RETRIES}): ${error.message}`.substring(0, 190)
+                        ? `❌ ${reasonText} auto-close failed after ${this.MAX_RETRIES} attempts. Please close manually. Error: ${simpleError}`
+                        : `⚠️ ${reasonText} auto-close retry ${retries + 1}/${this.MAX_RETRIES}: ${simpleError}`
                 }
             }).catch(dbError => {
-                console.error(`[PositionCloser] Failed to update position warning:`, dbError);
+                console.error(`[PositionCloser] Failed to update warning:`, dbError);
             });
 
             throw error;
