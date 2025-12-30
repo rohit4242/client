@@ -24,7 +24,7 @@ import {
  * Schema for getting positions with filters
  */
 export const GetPositionsInputSchema = z.object({
-    status: z.nativeEnum(PositionStatus).optional(),
+    status: z.union([z.nativeEnum(PositionStatus), z.array(z.nativeEnum(PositionStatus))]).optional(),
     symbol: z.string().optional(),
     accountType: z.nativeEnum(AccountType).optional(),
     source: z.nativeEnum(Source).optional(),

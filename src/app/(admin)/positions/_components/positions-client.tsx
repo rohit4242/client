@@ -15,17 +15,26 @@ import { PositionsLoadingSkeleton } from "./positions-loading";
 import { PositionsEmptyState } from "./positions-empty-state";
 import { PositionsErrorState } from "./positions-error-state";
 import { NoUserSelected } from "../../_components/no-user-selected";
-import { TrendingUp, RefreshCcw } from "lucide-react";
+import { TrendingUp, RefreshCcw, History, LayoutGrid } from "lucide-react";
 import { usePositionsQuery } from "@/features/position";
 import { Button } from "@/components/ui/button";
+import { PositionStatus } from "@prisma/client";
 import { cn } from "@/lib/utils";
 
 export function PositionsClient() {
     const { selectedUser } = useSelectedUser();
 
+    // Tab state
+    const [activeTab, setActiveTab] = useState<"live" | "history">("live");
+
     // Pagination state
     const [page, setPage] = useState(1);
     const [pageSize, setPageSize] = useState(20);
+
+    // Filter statuses based on tab
+    const statuses = activeTab === "live"
+        ? [PositionStatus.OPEN, PositionStatus.PENDING]
+        : [PositionStatus.CLOSED, PositionStatus.CANCELED, PositionStatus.FAILED];
 
     // Use React Query for data fetching with auto-refresh and pagination
     const {
@@ -37,15 +46,21 @@ export function PositionsClient() {
     } = usePositionsQuery(
         {
             userId: selectedUser?.id,
+            status: statuses,
             page,
             pageSize,
         },
         {
             staleTime: 5000,
-            refetchInterval: false,
+            refetchInterval: 5000, // Refresh every 5 seconds for live data
             enabled: !!selectedUser?.id,
         }
     );
+
+    const handleTabChange = (tab: string) => {
+        setActiveTab(tab as "live" | "history");
+        setPage(1); // Reset to first page when switching tabs
+    };
 
     const positions = queryResult?.positions || [];
     const paginationMeta = {
@@ -134,6 +149,8 @@ export function PositionsClient() {
                     isLoading={isLoading}
                     isRefreshing={isFetching}
                     onRefresh={refetch}
+                    activeTab={activeTab}
+                    onTabChange={handleTabChange}
                 />
             )}
         </div>

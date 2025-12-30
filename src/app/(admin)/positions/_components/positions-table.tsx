@@ -14,18 +14,11 @@
 "use client";
 
 import { useState, useMemo, useCallback, useEffect } from "react";
-import {
-    Table,
-    TableBody,
-    TableHead,
-    TableHeader,
-    TableRow,
-} from "@/components/ui/table";
+
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { PositionWithRelations } from "@/features/position";
 import { PositionAction, PositionFilters } from "@/features/position";
-import { PositionRow } from "./position-row";
 import { PositionsTableToolbar } from "./positions-table-toolbar";
 import { PositionsFilteredEmpty } from "./positions-filtered-empty";
 import { PaginationControls } from "./pagination-controls";
@@ -51,6 +44,8 @@ interface PositionsTableProps {
     isLoading?: boolean;
     isRefreshing?: boolean;
     onRefresh?: () => void;
+    activeTab: "live" | "history";
+    onTabChange: (tab: string) => void;
 }
 
 export function PositionsTable({
@@ -61,8 +56,9 @@ export function PositionsTable({
     isLoading,
     isRefreshing,
     onRefresh,
+    activeTab,
+    onTabChange,
 }: PositionsTableProps) {
-    const [selectedTab, setSelectedTab] = useState("live");
     const [filters, setFilters] = useState<PositionFilters>({});
     const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
     const [mounted, setMounted] = useState(false);
@@ -128,12 +124,9 @@ export function PositionsTable({
 
     if (!mounted) return null;
 
-    const liveData = filteredPositions.filter((p) => p.status === "OPEN");
-    const historyData = filteredPositions.filter((p) => p.status === "CLOSED");
-
     return (
         <div className="space-y-4">
-            <Tabs value={selectedTab} onValueChange={setSelectedTab}>
+            <Tabs value={activeTab} onValueChange={onTabChange}>
                 <div className="flex flex-col lg:flex-row gap-4 items-start lg:items-center justify-between">
                     <TabsList className="grid w-full lg:w-auto grid-cols-2">
                         <TabsTrigger value="live" className="text-sm">Live</TabsTrigger>
@@ -152,12 +145,13 @@ export function PositionsTable({
                         isClosingAll={closeAllMutation.isPending}
                         onForceCloseAll={handleForceCloseAll}
                         isForceClosing={forceCloseAllMutation.isPending}
-                        positionsCount={positions.length}
+                        positionsCount={filteredPositions.length}
+                        activeTab={activeTab}
                     />
                 </div>
 
                 <TabsContent value="live" className="mt-6">
-                    {liveData.length === 0 ? (
+                    {filteredPositions.length === 0 ? (
                         <PositionsFilteredEmpty onClearFilters={hasActiveFilters ? handleClearFilters : undefined} />
                     ) : (
                         <>
@@ -165,7 +159,7 @@ export function PositionsTable({
                                 <CardContent className="p-0">
                                     <PositionDataTable
                                         mode="live"
-                                        positions={liveData}
+                                        positions={filteredPositions}
                                         expandedRows={expandedRows}
                                         onToggleExpand={toggleRowExpansion}
                                         onPositionAction={handlePositionAction}
@@ -188,7 +182,7 @@ export function PositionsTable({
                 </TabsContent>
 
                 <TabsContent value="history" className="mt-6">
-                    {historyData.length === 0 ? (
+                    {filteredPositions.length === 0 ? (
                         <PositionsFilteredEmpty onClearFilters={hasActiveFilters ? handleClearFilters : undefined} />
                     ) : (
                         <>
@@ -196,7 +190,7 @@ export function PositionsTable({
                                 <CardContent className="p-0">
                                     <PositionDataTable
                                         mode="history"
-                                        positions={historyData}
+                                        positions={filteredPositions}
                                         expandedRows={expandedRows}
                                         onToggleExpand={toggleRowExpansion}
                                         onPositionAction={handlePositionAction}

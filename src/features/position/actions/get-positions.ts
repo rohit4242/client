@@ -34,7 +34,9 @@ export const getPositions = cache(async (
             portfolio: {
                 userId: targetUserId,
             },
-            ...(status && { status }),
+            ...(status && {
+                status: Array.isArray(status) ? { in: status } : status
+            }),
             ...(symbol && { symbol }),
             ...(accountType && { accountType }),
             ...(source && { source }),

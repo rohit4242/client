@@ -35,6 +35,7 @@ interface PositionsTableToolbarProps {
     onForceCloseAll?: () => void;
     isForceClosing?: boolean;
     positionsCount: number;
+    activeTab: "live" | "history";
 }
 
 export function PositionsTableToolbar({
@@ -50,7 +51,9 @@ export function PositionsTableToolbar({
     onForceCloseAll,
     isForceClosing,
     positionsCount,
+    activeTab,
 }: PositionsTableToolbarProps) {
+    const isLive = activeTab === "live";
     return (
         <div className="flex flex-wrap gap-2">
             <PositionFiltersComponent
@@ -81,58 +84,62 @@ export function PositionsTableToolbar({
                 )}
             </Button>
 
-            <Button
-                variant="outline"
-                size="sm"
-                className="h-9 text-sm text-red-600 hover:text-red-700"
-                onClick={onCloseAll}
-                disabled={isClosingAll}
-            >
-                {isClosingAll ? (
-                    <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Closing...
-                    </>
-                ) : (
-                    "Close All"
-                )}
-            </Button>
+            {isLive && (
+                <>
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-9 text-sm text-red-600 hover:text-red-700"
+                        onClick={onCloseAll}
+                        disabled={isClosingAll}
+                    >
+                        {isClosingAll ? (
+                            <>
+                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                Closing...
+                            </>
+                        ) : (
+                            "Close All"
+                        )}
+                    </Button>
 
-            {positionsCount > 0 && (
-                <AlertDialog>
-                    <AlertDialogTrigger asChild>
-                        <Button variant="destructive" size="sm" className="h-9 text-sm">
-                            <XCircle className="h-4 w-4 mr-2" />
-                            Force Close All (DB Only)
-                        </Button>
-                    </AlertDialogTrigger>
-                    <AlertDialogContent>
-                        <AlertDialogHeader>
-                            <AlertDialogTitle>Force Close All Positions?</AlertDialogTitle>
-                            <AlertDialogDescription>
-                                This will mark all open positions as CLOSED in the database only.
-                                No actual trades will be executed on the exchange.
+                    {positionsCount > 0 && (
+                        <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                                <Button variant="destructive" size="sm" className="h-9 text-sm">
+                                    <XCircle className="h-4 w-4 mr-2" />
+                                    Force Close All (DB Only)
+                                </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                                <AlertDialogHeader>
+                                    <AlertDialogTitle>Force Close All Positions?</AlertDialogTitle>
+                                    <AlertDialogDescription>
+                                        This will mark all open positions as CLOSED in the database only.
+                                        No actual trades will be executed on the exchange.
 
-                                This action should only be used for:
-                                - Testing/development
-                                - Cleaning up stale positions
-                                - Emergency database cleanup
+                                        This action should only be used for:
+                                        - Testing/development
+                                        - Cleaning up stale positions
+                                        - Emergency database cleanup
 
-                                {positionsCount} positions will be affected.
-                            </AlertDialogDescription>
-                        </AlertDialogHeader>
-                        <AlertDialogFooter>
-                            <AlertDialogCancel>Cancel</AlertDialogCancel>
-                            <AlertDialogAction
-                                onClick={onForceCloseAll}
-                                className="bg-red-600 hover:bg-red-700"
-                                disabled={isForceClosing}
-                            >
-                                {isForceClosing ? "Closing..." : "Force Close All"}
-                            </AlertDialogAction>
-                        </AlertDialogFooter>
-                    </AlertDialogContent>
-                </AlertDialog>
+                                        {positionsCount} positions will be affected.
+                                    </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                    <AlertDialogAction
+                                        onClick={onForceCloseAll}
+                                        className="bg-red-600 hover:bg-red-700"
+                                        disabled={isForceClosing}
+                                    >
+                                        {isForceClosing ? "Closing..." : "Force Close All"}
+                                    </AlertDialogAction>
+                                </AlertDialogFooter>
+                            </AlertDialogContent>
+                        </AlertDialog>
+                    )}
+                </>
             )}
         </div>
     );
