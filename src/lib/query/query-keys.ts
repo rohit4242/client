@@ -41,7 +41,7 @@ export const queryKeys = {
     // Positions
     positions: {
         all: () => ["positions"] as const,
-        list: (filters?: { status?: string; accountType?: string }) =>
+        list: (filters?: any) =>
             [...queryKeys.positions.all(), "list", filters] as const,
         detail: (id: string) => [...queryKeys.positions.all(), "detail", id] as const,
         byBot: (botId: string) => [...queryKeys.positions.all(), "byBot", botId] as const,
